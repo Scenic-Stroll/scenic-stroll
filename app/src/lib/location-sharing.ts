@@ -8,7 +8,6 @@
 import { z } from 'zod';
 import { useQuery } from '@tanstack/react-query';
 import * as Location from 'expo-location';
-import { useEffect } from 'react';
 import { create } from 'zustand';
 
 import { queryClient } from '@/lib/query-client';
@@ -187,23 +186,31 @@ export type FriendLocation = z.infer<typeof FriendLocationSchema>;
 
 const friendLocationsKey = ['friend-locations'] as const;
 
-/** Friends' live locations: Realtime pushes changes; a 30 s refresh is the fallback. */
+/**
+ * Opens ONE Realtime subscription for the whole app (called from useBackgroundSync while signed in).
+ * Any change to a share I'm allowed to see refreshes the friend-locations query.
+ *
+ * Why not in useFriendLocations(): several screens use that hook at once, and supabase.channel()
+ * returns the SAME channel for the same name — adding a listener to an already-subscribed channel
+ * throws ("cannot add postgres_changes callbacks … after subscribe()"). A unique name per
+ * subscription also avoids reusing a channel that is still being removed after a re-run.
+ */
+export function subscribeToFriendLocations(): () => void {
+  const channel = supabase
+    .channel(`friend-locations-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'location_shares' }, () => {
+      void queryClient.invalidateQueries({ queryKey: friendLocationsKey });
+    })
+    .subscribe();
+  return () => {
+    void supabase.removeChannel(channel);
+  };
+}
+
+/** Friends' live locations (kept fresh by subscribeToFriendLocations + a 30 s refresh fallback). */
 export function useFriendLocations() {
   const auth = useAuth();
   const signedIn = auth.status === 'signed-in';
-
-  useEffect(() => {
-    if (!signedIn) return;
-    const channel = supabase
-      .channel('friend-locations')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'location_shares' }, () => {
-        void queryClient.invalidateQueries({ queryKey: friendLocationsKey });
-      })
-      .subscribe();
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [signedIn]);
 
   return useQuery({
     queryKey: friendLocationsKey,

@@ -5,7 +5,7 @@ import { AppState } from 'react-native';
 import { recoverInterruptedRecordings } from '@/lib/local-db';
 import { useRecorder } from '@/lib/recorder';
 import { refreshLocalData } from '@/lib/query-client';
-import { cleanUpLeftoverShare } from '@/lib/location-sharing';
+import { cleanUpLeftoverShare, subscribeToFriendLocations } from '@/lib/location-sharing';
 import { processUploadQueue } from '@/lib/upload-queue';
 import { useAuth } from '@/providers/auth-provider';
 
@@ -37,9 +37,12 @@ export function useBackgroundSync() {
     const net = NetInfo.addEventListener((state) => {
       if (state.isConnected) void processUploadQueue();
     });
+    // Friends' live locations: one Realtime subscription for the whole app.
+    const unsubscribeLocations = subscribeToFriendLocations();
     return () => {
       appState.remove();
       net();
+      unsubscribeLocations();
     };
   }, [signedIn]);
 }
