@@ -1,20 +1,37 @@
 /**
  * Profile → Diagnostics: which Supabase project the app talks to, whether we're signed in,
  * and a "Test backend" button that pings every Edge Function and shows OK / the problem.
+ * Also the live-weather status and the demo "Simulate weather" switch for the pitch.
  */
-import { FUNCTIONS, type FunctionName } from '@scenic/shared';
+import {
+  agoLabel,
+  CONDITION_MODE_INFO,
+  CONDITION_MODES,
+  FUNCTIONS,
+  type Conditions,
+  type FunctionName,
+} from '@scenic/shared';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Chip } from '@/components/ui/chip';
 import { Spacing } from '@/constants/theme';
 import { FunctionCallError, pingFunction } from '@/lib/api';
+import { useConditions, useConditionsUi } from '@/lib/conditions';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 import { useAppTheme } from '@/theme';
 
 type Result = { name: FunctionName; ok: boolean; text: string };
+
+/** "HKO, 4 min ago" / "HKO cache (HKO unreachable), 2 h ago" / "none — time of day only". */
+function weatherStatus(c: Conditions | null): string {
+  if (!c || c.source === 'defaults') return 'none — time of day only';
+  const when = agoLabel(c.fetched_at);
+  return c.source === 'hko' ? `HKO, fetched ${when}` : `HKO cache (HKO unreachable), ${when}`;
+}
 
 /** "https://xelz…edru.supabase.co" — enough to tell projects apart, not the full ref. */
 function maskedUrl(): string {
@@ -28,6 +45,9 @@ export function DiagnosticsCard() {
   const auth = useAuth();
   const [results, setResults] = useState<Result[] | null>(null);
   const [testing, setTesting] = useState(false);
+  const now = useConditions();
+  const simulated = useConditionsUi((s) => s.simulated);
+  const setSimulated = useConditionsUi((s) => s.setSimulated);
 
   const signedIn =
     auth.status === 'signed-in'
@@ -66,6 +86,30 @@ export function DiagnosticsCard() {
       <ThemedText type="smallBold">Diagnostics</ThemedText>
       <Row label="Supabase" value={maskedUrl()} />
       <Row label="Signed in" value={signedIn} />
+      <Row label="Weather" value={weatherStatus(now.conditions)} />
+      <Row
+        label="Priority"
+        value={`${CONDITION_MODE_INFO[now.mode].en}${now.isSimulated ? ' (simulated)' : ''}${
+          now.isOverridden ? ' (your choice)' : ''
+        }`}
+      />
+
+      {/* Demo only: show routes changing with the weather on a mild day. Resets on app restart. */}
+      <ThemedText type="small" themeColor="textSecondary">
+        Simulate weather (demo)
+      </ThemedText>
+      <View style={styles.chips}>
+        <Chip small label="Off" selected={simulated === null} onPress={() => setSimulated(null)} />
+        {CONDITION_MODES.map((m) => (
+          <Chip
+            key={m}
+            small
+            label={CONDITION_MODE_INFO[m].en}
+            selected={simulated === m}
+            onPress={() => setSimulated(m)}
+          />
+        ))}
+      </View>
 
       <Pressable
         accessibilityRole="button"
@@ -111,4 +155,5 @@ const styles = StyleSheet.create({
   flex1: { flex: 1 },
   button: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   result: { flexDirection: 'row', gap: Spacing.two, alignItems: 'flex-start' },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
 });

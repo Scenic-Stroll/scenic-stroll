@@ -2,6 +2,7 @@
  * Location sharing settings: who (all friends / chosen), how long (15 min / 1 h / until I stop) and
  * precision (exact / approximate ~200 m). Off by default; foreground only.
  */
+import { agoLabel } from '@scenic/shared';
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -10,13 +11,7 @@ import { Icon } from '@/components/ui/icon';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { SegmentedTabs } from '@/components/ui/segmented-tabs';
 import { useFriendList } from '@/lib/friends';
-import {
-  agoLabel,
-  startSharing,
-  stopSharing,
-  useSharing,
-  type ShareSettings,
-} from '@/lib/location-sharing';
+import { startSharing, stopSharing, useSharing, type ShareSettings } from '@/lib/location-sharing';
 import { radius, space, TAP_TARGET, type, useAppTheme } from '@/theme';
 
 const WHO = [

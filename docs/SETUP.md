@@ -116,7 +116,8 @@ npx supabase secrets set ORS_API_KEY=xxxx GEMINI_API_KEY=xxxx --project-ref xelz
 
 ## 8. Deploy Edge Functions and check they work
 
-The map route (`plan-route`) and place search (`geocode`) run on Supabase, not on the phone. If the app
+The map route (`plan-route`), place search (`geocode`) and live weather (`conditions`, Hong Kong Observatory —
+no key needed) run on Supabase, not on the phone. If the app
 says **“… isn’t deployed on the server yet”** (or the old “Requested function was not found”), run this:
 
 ```bash
@@ -141,6 +142,7 @@ npm run smoke:routing                                       # signs in + plans E
 | “You’re not signed in…” / Diagnostics says Signed in: No | Dashboard → Authentication → Anonymous sign-ins **ON**, then Settings → Try again |
 | “The server is missing a key: ORS_API_KEY is not set”    | `npx supabase secrets set ORS_API_KEY=…` (no redeploy needed)                     |
 | “Can’t reach the server”                                 | Phone is offline — routes still record and upload later                           |
+| “Now” card: “Live weather unavailable”                   | HKO or our server unreachable; card uses time of day. `npm run smoke:routing`     |
 
 ## 9. Before you push code
 

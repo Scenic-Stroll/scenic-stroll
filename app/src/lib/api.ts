@@ -4,10 +4,12 @@
  * Technical details go to the console (visible in the `npx expo start` terminal).
  */
 import {
+  ConditionsSchema,
   FUNCTIONS,
   FunctionHealthSchema,
   GeocodeResponseSchema,
   PlanRouteResponseSchema,
+  type Conditions,
   type FunctionHealth,
   type FunctionName,
   type GeocodeResult,
@@ -153,6 +155,11 @@ export async function geocode(text: string): Promise<GeocodeResult[]> {
     GeocodeResponseSchema,
   );
   return res.results;
+}
+
+/** Live weather + sun around CityU (Hong Kong Observatory, cached on the server). */
+export function fetchConditions(): Promise<Conditions> {
+  return callFunction(FUNCTIONS.conditions, { method: 'POST', body: {} }, ConditionsSchema);
 }
 
 /** Profile → Diagnostics → "Test backend": asks one function for its health report. */

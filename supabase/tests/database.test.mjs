@@ -655,3 +655,25 @@ describe('checkpoints_near (floor selector)', () => {
     );
   });
 });
+
+describe('conditions_cache (HKO weather cache)', () => {
+  it('is invisible to app users, signed in or not', async () => {
+    await db.query(
+      `insert into public.conditions_cache (feed, payload) values ('warnsum', '{}'::jsonb)`,
+    );
+    for (const user of [null, ALICE]) {
+      await assert.rejects(as(user, 'select * from public.conditions_cache'), /permission denied/);
+      await assert.rejects(
+        as(user, `update public.conditions_cache set payload = '{"fake":1}'::jsonb`),
+        /permission denied/,
+      );
+    }
+  });
+
+  it('only accepts the two HKO feeds we use', async () => {
+    await assert.rejects(
+      db.query(`insert into public.conditions_cache (feed, payload) values ('other', '{}')`),
+      /check/,
+    );
+  });
+});

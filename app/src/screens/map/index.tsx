@@ -37,6 +37,7 @@ import { Icon, type IconName } from '@/components/ui/icon';
 import { SearchBar } from '@/components/ui/search-bar';
 import { planRoute } from '@/lib/api';
 import { communityKeys, fetchCommunityRoutes } from '@/lib/community-routes';
+import { useConditions, useConditionsUi } from '@/lib/conditions';
 import { friendAsPlace, stopSharing, useFriendLocations, useSharing } from '@/lib/location-sharing';
 import { useCheckpointsNear } from '@/lib/checkpoints-near';
 import { useMapFocus } from '@/lib/map-focus-store';
@@ -51,7 +52,12 @@ import { DARK_MAP_STYLE, LIGHT_MAP_STYLE } from './map-style';
 import { NearbySheet } from './nearby-sheet';
 import { PlacePicker } from './place-picker';
 import { PlaceSheet } from './place-sheet';
-import { PlanningSheet, STANDARD_OPTION_ID, type RouteMode } from './planning-sheet';
+import {
+  PlanningSheet,
+  ROUTE_MODE_FOR_CONDITION,
+  STANDARD_OPTION_ID,
+  type RouteMode,
+} from './planning-sheet';
 import type { Place } from './types';
 
 const PITCH_3D = 55;
@@ -89,7 +95,11 @@ export function MapHome() {
   const [destination, setDestination] = useState<Place | null>(null);
   const [picking, setPicking] = useState<'origin' | 'destination' | null>(null);
   const [planning, setPlanning] = useState(false);
-  const [mode, setMode] = useState<RouteMode>('fastest');
+  const now = useConditions();
+  const setConditionOverride = useConditionsUi((s) => s.setModeOverride);
+  // null = the user hasn't picked a tab, so the weather decides (rain → Sheltered, heat → Shaded).
+  const [modeChoice, setModeChoice] = useState<RouteMode | null>(null);
+  const mode = modeChoice ?? ROUTE_MODE_FOR_CONDITION[now.mode];
   const [filters, setFilters] = useState<ReadonlySet<FilterKey>>(new Set());
   const [layers, setLayers] = useState<MapLayers>({
     threeD: false,
@@ -272,7 +282,7 @@ export function MapHome() {
     setPlanning(false);
     setOrigin(null);
     setDestination(null);
-    setMode('fastest');
+    setModeChoice(null);
     setSelectedOptionId(null);
     sheetRef.current?.snapToIndex(SHEET_PEEK);
   };
@@ -550,7 +560,12 @@ export function MapHome() {
               }}
               onClose={closePlanning}
               mode={mode}
-              onModeChange={setMode}
+              onModeChange={setModeChoice}
+              now={now}
+              onConditionOverride={(m) => {
+                setConditionOverride(m);
+                setModeChoice(null); // let the new priority choose the tab
+              }}
               standardRoute={standardRoute.data}
               isLoading={standardRoute.isFetching}
               error={standardRoute.error}

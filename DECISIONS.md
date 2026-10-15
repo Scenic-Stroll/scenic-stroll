@@ -213,3 +213,47 @@ checkpoint sheet, route trace, diagnostics). New tokens: `trace`, `onDanger`, an
 `success/warning/danger/infoSurface`; `warning` darkened to #B35C00 (4.7:1 on white). Status rows (GPS quality,
 upload state) are now tinted backgrounds with normal text and coloured icons instead of white text on saturated
 colours (the old orange GPS row was 2.8:1). Only `shadowColor: '#000'` remains, intentionally.
+
+### D23 · Smart routing step 1: live conditions from the Hong Kong Observatory (2026-10-16)
+
+**Data sources checked (2026-10-16):**
+
+- HKO open data API `weather.php?dataType=rhrread` (current weather) and `dataType=warnsum` (warnings in force):
+  both answered live, JSON, no key. DATA.GOV.HK terms (read 2026-10-16): free for commercial and non-commercial use if we name the source, acknowledge the Government / HKO ownership and attribute DATA.GOV.HK → "© Hong Kong Observatory, HKSAR Government · via DATA.GOV.HK" in Profile → About, plus "Hong Kong Observatory" on the "Now" card. Shapes we rely on: `temperature/humidity/rainfall.data[]` by place; `uvindex` is `""`
+  at night and an object by day; rainfall `max` is missing when a gauge is under maintenance; `warnsum` is `{}`
+  with no warnings, else keyed objects with `code` (`WHOT`, `WRAINA/R/B`, `WTS`, `TC1/3/8NE…/9/10`) and
+  `actionCode` (`CANCEL` ignored). Parsing is lenient (zod) and anything else is treated as "HKO down".
+- Sun position: `suncalc` 1.9.0 (BSD-2-Clause, © Vladimir Agafonkin), computed locally. Pinned to 1.9.0 with
+  `@types/suncalc` rather than the 2.x line released this month, to avoid a brand-new major days before the
+  deadline. In Deno it is mapped per function in `deno.json`; `sun.ts` carries a `@ts-types` hint for Deno.
+- Not used: HKO rain nowcast / 9-day forecast ("high rain probability") — optional in the brief; the
+  Thunderstorm Warning (`WTS`) stands in for "rain likely" for now.
+
+**Location:** temperature from the Kowloon City station (then Sham Shui Po, then the Observatory); rainfall =
+highest of the Kowloon City and Sham Shui Po districts (CityU sits on their border); UV is HKO's single King's
+Park reading; the sun is computed at the demo centre (`CONDITIONS_POINT`, kept equal to `DEMO_CENTER` by a test,
+not imported, so the function bundle doesn't pull in the presets/taxonomy).
+
+**Mode rules** (`deriveConditionMode`, tested), in priority order: `typhoon_or_black_rain` (Signal 8+ or Black
+Rainstorm) > `rain` (rain in the past hour, or Amber/Red/Black rainstorm or Thunderstorm warning) > `heat`
+(≥ 31 °C, UV ≥ 6 or Very Hot Weather Warning — **daytime only**, there's no sun to hide from at night) > `night`
+(sun below the horizon) > `normal`. Signal 1/3 alone stays normal (warnings are still listed on the card).
+
+**Caching instead of a scheduler:** the function fetches on request but reuses `public.conditions_cache` while it
+is fresh (current weather 10 min, warnings 5 min — HKO updates hourly). If HKO fails it serves the cached
+answer up to 6 h old (`source: 'cache'`, `stale: true`), else time-of-day defaults (`source: 'defaults'`).
+A garbage HKO answer is never cached. The orchestration (`getConditions`) is plain code with injected
+fetch/cache, so every fallback is unit-tested without the network. No pg_cron job is needed for the demo.
+The cache table has RLS on, **no policies and no grants** for anon/authenticated (only the function's service
+role touches it) — the advisor's INFO "RLS enabled, no policy" for it is intentional.
+
+**App:** the "Now" card (top of route planning) shows facts, the English + Traditional Chinese headline, warnings
+in force and where the data came from ("updated 4 min ago" / "offline, last report …" / "Live weather
+unavailable" / "Simulated"). The weather picks the starting tab until the user taps one (rain/severe →
+Sheltered, heat → Shaded, else Fastest); tapping the card lets the user set the priority (session only).
+If the function can't be reached the phone computes day/night itself, so the card never errors.
+**Simulate weather** (Profile → Diagnostics) is for the pitch; not saved, so it can't be left on by accident.
+**Bilingual:** the app has no language switch yet (deferred in redesign step 4), so new strings follow the
+existing "English · 中文" side-by-side pattern; a real switch remains a separate task.
+`agoLabel` moved from `location-sharing.ts` to `shared/format.ts` (now tested) so both features use it.
+Live check: cold call 6.5 s (function boot), cached call 0.6 s; signed-out call → 401.

@@ -74,6 +74,7 @@ export const ApiErrorSchema = z.object({ error: z.string() });
 export const FUNCTIONS = {
   planRoute: 'plan-route',
   geocode: 'geocode',
+  conditions: 'conditions',
 } as const;
 export type FunctionName = (typeof FUNCTIONS)[keyof typeof FUNCTIONS];
 

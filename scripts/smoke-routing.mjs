@@ -1,6 +1,7 @@
 // End-to-end routing test, exactly like the app does it:
 //   1. sign in anonymously (needs "Anonymous sign-ins" ON in the Supabase dashboard)
 //   2. call plan-route: Kowloon Tong Exit A1 → Mong Man-wai Building
+//   3. call conditions: live HKO weather + sun, and which source it came from
 // Run: npm run smoke:routing
 // Note: each run creates one anonymous test user in Supabase Auth (harmless; delete in the dashboard).
 import fs from 'node:fs';
@@ -75,4 +76,21 @@ if (!res.ok) {
 }
 console.log(
   `✓ Route Exit A1 → MMW: ${Math.round(route.distance_m)} m, ${Math.round(route.duration_s / 60)} min, ${route.coordinates.length} points, ${route.steps?.length ?? 0} directions (${route.provider})`,
+);
+
+// 4. Live conditions (Hong Kong Observatory weather + sun). Never fails, but say where data came from.
+const condRes = await call(FUNCTIONS.conditions, { method: 'POST', body: '{}' });
+const cond = await condRes.json();
+if (!condRes.ok) {
+  console.error(`✗ conditions failed (HTTP ${condRes.status}): ${cond.error ?? cond.message}`);
+  process.exit(1);
+}
+const facts = [
+  cond.temp_c !== null ? `${cond.temp_c} °C` : null,
+  cond.uv_index !== null ? `UV ${cond.uv_index}` : null,
+]
+  .filter(Boolean)
+  .join(', ');
+console.log(
+  `${cond.source === 'hko' ? '✓' : '!'} Conditions: mode "${cond.mode}"${facts ? ` (${facts})` : ''}, data from ${cond.source}${cond.stale ? ' — STALE, HKO unreachable' : ''}`,
 );

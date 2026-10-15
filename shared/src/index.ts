@@ -13,3 +13,5 @@ export * from './segments.ts';
 export * from './levels.ts';
 export * from './friends.ts';
 export * from './floors.ts';
+export * from './sun.ts';
+export * from './conditions.ts';

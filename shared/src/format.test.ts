@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatDistance, formatDuration } from './format.ts';
+import { agoLabel, formatDistance, formatDuration } from './format.ts';
 
 describe('formatDuration', () => {
   it.each([
@@ -25,5 +25,19 @@ describe('formatDistance', () => {
     [-5, '–'],
   ])('%s m → %s', (m, expected) => {
     expect(formatDistance(m)).toBe(expected);
+  });
+});
+
+describe('agoLabel', () => {
+  const now = Date.parse('2026-10-16T12:00:00Z');
+  it.each([
+    ['2026-10-16T11:59:40Z', 'just now'],
+    ['2026-10-16T11:56:00Z', '4 min ago'],
+    ['2026-10-16T09:30:00Z', '2 h ago'],
+  ])('%s → %s', (when, expected) => {
+    expect(agoLabel(when, now)).toBe(expected);
+  });
+  it('accepts a millisecond timestamp', () => {
+    expect(agoLabel(now - 5 * 60_000, now)).toBe('5 min ago');
   });
 });

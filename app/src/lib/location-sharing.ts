@@ -5,6 +5,7 @@
  * The server keeps it private: only chosen, accepted friends can read it; "approximate" is snapped
  * to ~200 m before storing; shares vanish 30 min after the last update or at the chosen expiry.
  */
+import { agoLabel } from '@scenic/shared';
 import { z } from 'zod';
 import { useQuery } from '@tanstack/react-query';
 import * as Location from 'expo-location';
@@ -226,15 +227,6 @@ export function useFriendLocations() {
       return parsed.success ? parsed.data : [];
     },
   });
-}
-
-/** "just now", "2 min ago", "1 h ago" */
-export function agoLabel(iso: string | number): string {
-  const ms = Date.now() - (typeof iso === 'number' ? iso : new Date(iso).getTime());
-  const min = Math.floor(ms / 60_000);
-  if (min < 1) return 'just now';
-  if (min < 60) return `${min} min ago`;
-  return `${Math.floor(min / 60)} h ago`;
 }
 
 /** A friend's live location as a map place (opens the place card with "Route here"). */

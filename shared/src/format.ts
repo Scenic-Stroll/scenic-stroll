@@ -16,3 +16,12 @@ export function formatDistance(meters: number): string {
   if (rounded < 1000) return `${rounded} m`;
   return `${(meters / 1000).toFixed(1)} km`;
 }
+
+/** "just now", "2 min ago", "1 h ago". `when` is an ISO date or a millisecond timestamp. */
+export function agoLabel(when: string | number, now: number = Date.now()): string {
+  const ms = now - (typeof when === 'number' ? when : new Date(when).getTime());
+  const min = Math.floor(ms / 60_000);
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min} min ago`;
+  return `${Math.floor(min / 60)} h ago`;
+}

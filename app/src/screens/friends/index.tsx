@@ -3,7 +3,13 @@
  * Privacy: friends only see each other's points, public profile and routes they chose to show
  * their name on. Live location sharing comes later (step 6).
  */
-import { levelFor, type ActivityRow, type FriendRow, type LeaderboardRow } from '@scenic/shared';
+import {
+  agoLabel,
+  levelFor,
+  type ActivityRow,
+  type FriendRow,
+  type LeaderboardRow,
+} from '@scenic/shared';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -32,7 +38,7 @@ import {
   useFriendList,
   useLeaderboard,
 } from '@/lib/friends';
-import { agoLabel, useFriendLocations, useSharing } from '@/lib/location-sharing';
+import { useFriendLocations, useSharing } from '@/lib/location-sharing';
 import { useMapFocus } from '@/lib/map-focus-store';
 import { radius, space, TAP_TARGET, type, useAppTheme } from '@/theme';
 

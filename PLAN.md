@@ -75,6 +75,17 @@ Secrets are never committed and never go in the app — only into `supabase secr
 - [x] 6. Live location sharing: who/how long/precision, foreground updates ~15 s, Realtime, friend markers + Route to friend, map banner — 9 DB tests + live check
 - [x] 7. Floor selector (floors from real checkpoints near Festival Walk / CityU buildings), dark theme polish (all hard-coded colours → tokens, AA contrast)
 
+## Smart routing (computed sheltered / shaded / step-free routes, brief of 2026-10-16) — build order
+
+- [x] 1. Conditions service: `conditions` Edge Function (HKO current weather + warnings, cached in `conditions_cache`, suncalc sun position, mode rain / heat / night / severe / normal, fallbacks cache → time of day), "Now" card on route planning (tap to override), weather picks the starting tab, Diagnostics weather status + "Simulate weather" demo switch, HKO attribution
+- [ ] 2. Pedestrian graph import for the bbox (Lands Dept 3D Pedestrian Network, else OSM) + seed fixes for MTR exits / Festival Walk / CityU entrances (pgRouting 3.4.1 is available on the project)
+- [ ] 3. `smart-route` (time + covered/indoor + step-free + opening hours), merged with the standard route, silent fallback
+- [ ] 4. Shade precompute + shade in the cost + exposure bar + segment colouring
+- [ ] 5. Mode tabs (Best now · Fastest · Shaded · Sheltered · Cool · Step-free), departure time, diverse alternatives
+- [ ] 6. Re-routing while walking (rain starts, off-route, blocked edge)
+- [ ] 7. Feedback ("was it shaded as promised?") + save as community route
+- [ ] 8. Shade heatmap layer, eval report, demo seed, polish
+
 ## Phase 3 — AI tagging (target Oct 12–13)
 
 - [ ] LLM provider interface: Gemini (default), DeepSeek, OpenAI-compatible (OpenRouter); `LLM_PROVIDER` env

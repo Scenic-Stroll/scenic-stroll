@@ -1,9 +1,14 @@
 /**
- * Bottom sheet, route planning state: From / To, mode tabs (Fastest · Sheltered · Shaded ·
- * Step-free) and the route options. Community route options arrive with Phase 4 (find-routes);
+ * Bottom sheet, route planning state: the "Now" conditions card, From / To, mode tabs (Fastest ·
+ * Sheltered · Shaded · Step-free) and the route options. The weather picks the starting tab. Community route options arrive with Phase 4 (find-routes);
  * until then each mode honestly says so and the standard walking route is listed.
  */
-import { buildSegments, type PlanRouteResponse } from '@scenic/shared';
+import {
+  buildSegments,
+  type ConditionMode,
+  type Conditions,
+  type PlanRouteResponse,
+} from '@scenic/shared';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { DirectionsList } from '@/components/route/directions-list';
@@ -13,6 +18,7 @@ import { Icon } from '@/components/ui/icon';
 import { SegmentedTabs } from '@/components/ui/segmented-tabs';
 import { radius, space, TAP_TARGET, type, useAppTheme } from '@/theme';
 
+import { ConditionsCard } from './conditions-card';
 import type { Place } from './types';
 
 export const ROUTE_MODES = [
@@ -22,6 +28,23 @@ export const ROUTE_MODES = [
   { key: 'step_free', label: 'Step-free' },
 ] as const;
 export type RouteMode = (typeof ROUTE_MODES)[number]['key'];
+
+/** Which tab opens first for each weather condition (until smart routes add "Best now"). */
+export const ROUTE_MODE_FOR_CONDITION: Record<ConditionMode, RouteMode> = {
+  normal: 'fastest',
+  rain: 'sheltered',
+  heat: 'shaded',
+  night: 'fastest',
+  typhoon_or_black_rain: 'sheltered',
+};
+
+/** What the "Now" card needs (comes from useConditions()). */
+export type NowInfo = {
+  conditions: Conditions | null;
+  mode: ConditionMode;
+  isOverridden: boolean;
+  isSimulated: boolean;
+};
 
 /** Id of the standard (provider) route option; community options use their route id. */
 export const STANDARD_OPTION_ID = 'standard';
@@ -41,6 +64,8 @@ export function PlanningSheet({
   onRetry,
   selectedOptionId,
   onSelectOption,
+  now,
+  onConditionOverride,
 }: {
   origin: Place | null;
   destination: Place | null;
@@ -56,6 +81,8 @@ export function PlanningSheet({
   onRetry: () => void;
   selectedOptionId: string | null;
   onSelectOption: (id: string) => void;
+  now: NowInfo;
+  onConditionOverride: (mode: ConditionMode | null) => void;
 }) {
   const t = useAppTheme();
   const ready = origin !== null && destination !== null;
@@ -63,6 +90,16 @@ export function PlanningSheet({
 
   return (
     <View style={styles.container}>
+      {now.conditions ? (
+        <ConditionsCard
+          conditions={now.conditions}
+          mode={now.mode}
+          isOverridden={now.isOverridden}
+          isSimulated={now.isSimulated}
+          onOverride={onConditionOverride}
+        />
+      ) : null}
+
       {/* From / To */}
       <View style={[styles.fieldsCard, { backgroundColor: t.surface }]}>
         <View style={styles.fields}>

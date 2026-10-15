@@ -349,6 +349,11 @@ export function ProfileScreen() {
             title="Landmark data"
             subtitle="© OpenStreetMap contributors (ODbL)"
           />
+          <ListRow
+            icon="weather-partly-cloudy"
+            title="Weather data"
+            subtitle="© Hong Kong Observatory, HKSAR Government · via DATA.GOV.HK"
+          />
         </Section>
       </ScrollView>
 
