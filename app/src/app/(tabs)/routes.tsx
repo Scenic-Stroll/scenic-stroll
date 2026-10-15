@@ -1,5 +1,5 @@
-import { MyRoutes } from '@/screens/my-routes';
+import { RoutesScreen } from '@/screens/routes';
 
-export default function MyRoutesScreen() {
-  return <MyRoutes />;
+export default function RoutesTab() {
+  return <RoutesScreen />;
 }

@@ -7,7 +7,7 @@ import { useNetInfo } from '@react-native-community/netinfo';
 import { formatDistance } from '@scenic/shared';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -25,7 +25,8 @@ const STATUS_LOOK: Record<RecordingSummary['status'], { label: string; color: st
   uploaded: { label: 'Uploaded', color: '#2E7D32' },
 };
 
-export function MyRoutes() {
+/** `header` is shown above the list and scrolls with it (the Routes tab puts its title + tabs there). */
+export function MyRoutes({ header }: { header?: ReactNode }) {
   const recordings = useQuery({ queryKey: localKeys.recordings, queryFn: listRecordings });
   const net = useNetInfo();
   const [uploading, setUploading] = useState(false);
@@ -48,7 +49,7 @@ export function MyRoutes() {
           contentContainerStyle={styles.list}
           ListHeaderComponent={
             <View style={styles.header}>
-              <ThemedText type="subtitle">My routes</ThemedText>
+              {header}
               {pending > 0 ? (
                 <ThemedView type="backgroundElement" style={styles.queue}>
                   <MaterialCommunityIcons name="cloud-upload" size={22} color="#E65100" />

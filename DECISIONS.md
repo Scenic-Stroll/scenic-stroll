@@ -106,3 +106,18 @@ versions (20261007160713, 20261007160754, 20261007161011) so `supabase db push` 
 database. The security advisor reported no issues; the performance advisor's missing foreign-key index on
 `routes.public_author_id` was fixed by the third migration. Rules were re-verified on the live project inside a
 transaction that always rolls back (nothing left behind: 0 rows, 0 users afterwards).
+
+### D16 · Redesign step 1: city-map-app style, own identity, AA-contrast green (2026-10-16)
+
+Layout and interaction patterns follow mainstream city-map apps (floating search bar, chips, sliding sheets,
+5-tab bar with a raised centre action); no third-party names, logos, icons, fonts or assets are used — icons
+are MaterialCommunityIcons (open source, bundled in Expo Go). Tokens live in `app/src/theme/` (inside `src/`,
+matching the Expo folder convention) and the legacy `Colors`/`useTheme()` now derive from them, so older
+screens follow the new palette and the theme setting automatically.
+Contrast: the brief's green `#1BA136` gives only 3.4:1 with white text (WCAG AA needs 4.5:1 for normal text),
+so `primary` (buttons, selected chips, active tab, links) is `#14822A` (4.9:1) and `#1BA136` is kept as
+`accent` for route lines and map graphics (non-text needs 3:1). Dark theme puts dark text on its brighter green
+(7.9:1 instead of 2.4:1 for white). `textSecondary` is `#6B7079` (5.0:1 on white) instead of `#8A8F98` (3.4:1).
+Tabs: `expo-router/js-tabs` (the plain `Tabs` export is deprecated) because native tabs can't render a raised
+custom centre button. Saved/Explore (Routes) and Friends show honest "coming soon" states until steps 4–5;
+no demo-mode switch until demo mode exists (Phase 7).

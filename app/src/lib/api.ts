@@ -65,7 +65,7 @@ async function toFunctionError(name: FunctionName, error: unknown): Promise<Func
     if (status === 401 || status === 403) {
       return new FunctionCallError(
         'unauthorized',
-        'You’re not signed in, so the server refused the request. Check Settings → Diagnostics (anonymous sign-ins may be turned off).',
+        'You’re not signed in, so the server refused the request. Check Profile → Diagnostics (anonymous sign-ins may be turned off).',
         name,
       );
     }
@@ -155,7 +155,7 @@ export async function geocode(text: string): Promise<GeocodeResult[]> {
   return res.results;
 }
 
-/** Settings → "Test backend": asks one function for its health report. */
+/** Profile → Diagnostics → "Test backend": asks one function for its health report. */
 export function pingFunction(name: FunctionName): Promise<FunctionHealth> {
   return callFunction(name, { method: 'GET' }, FunctionHealthSchema);
 }

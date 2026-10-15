@@ -65,6 +65,16 @@ Secrets are never committed and never go in the app — only into `supabase secr
 - [x] Migrations applied to Supabase (2026-10-08): `init_profiles`, `routes`, `index_routes_public_author`; security advisor clean; 10 live checks passed in a rolled-back transaction
 - [ ] Field test on 1 iPhone + 1 Android around CityU before Oct 10
 
+## Redesign (2GIS-style UI, brief of 2026-10-16) — priority order
+
+- [x] 1. Design system (`app/src/theme`, 9 UI components), 5-tab bar (Map · Routes · Record · Friends · Profile), Settings → Profile, theme setting
+- [ ] 2. Map restyle: light map, search bar, chips, floating buttons, bottom sheet (route planning)
+- [ ] 3. Place card + route options list with segment strip
+- [ ] 4. Profile: stats, levels, badges, privacy
+- [ ] 5. Friends backend + screens (codes, requests, activity, leaderboard)
+- [ ] 6. Live location sharing
+- [ ] 7. Floor selector, dark theme polish
+
 ## Phase 3 — AI tagging (target Oct 12–13)
 
 - [ ] LLM provider interface: Gemini (default), DeepSeek, OpenAI-compatible (OpenRouter); `LLM_PROVIDER` env

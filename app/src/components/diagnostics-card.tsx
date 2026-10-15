@@ -1,5 +1,5 @@
 /**
- * Settings → Diagnostics: which Supabase project the app talks to, whether we're signed in,
+ * Profile → Diagnostics: which Supabase project the app talks to, whether we're signed in,
  * and a "Test backend" button that pings every Edge Function and shows OK / the problem.
  */
 import { FUNCTIONS, type FunctionName } from '@scenic/shared';

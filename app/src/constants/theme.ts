@@ -1,25 +1,24 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * Legacy colour names used by ThemedText / ThemedView, now derived from the design tokens in
+ * src/theme/tokens.ts (the single source of truth). New code should use useAppTheme() instead.
  */
 
 import { Platform } from 'react-native';
 
+import { palettes } from '@/theme/tokens';
+
+const legacy = (p: (typeof palettes)['light']) => ({
+  text: p.textPrimary,
+  background: p.background,
+  backgroundElement: p.surface,
+  backgroundSelected: p.surfacePressed,
+  textSecondary: p.textSecondary,
+  link: p.primary,
+});
+
 export const Colors = {
-  light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
-  },
-  dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
-  },
+  light: legacy(palettes.light),
+  dark: legacy(palettes.dark),
 } as const;
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
@@ -59,5 +58,7 @@ export const Spacing = {
   six: 64,
 } as const;
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
+// The tab bar (src/app/(tabs)/_layout.tsx) sits below screen content instead of floating over it,
+// so screens need no extra bottom padding for it. Kept as a named constant so that stays obvious.
+export const BottomTabInset = 0;
 export const MaxContentWidth = 800;
