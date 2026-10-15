@@ -319,3 +319,133 @@ describe('rate limit', () => {
     );
   });
 });
+
+describe('friends', () => {
+  const CAROL = '44444444-4444-4444-8444-444444444444';
+  const DAVE = '55555555-5555-4555-8555-555555555555';
+  const ERIN = '66666666-6666-4666-8666-666666666666';
+  const code = async (user) => (await as(user, 'select public.my_friend_code() as c')).rows[0].c;
+  const request = async (user, c) =>
+    (await as(user, 'select public.send_friend_request($1) as r', [c])).rows[0].r;
+  const list = async (user) => (await as(user, 'select * from public.list_friends()')).rows;
+
+  before(async () => {
+    await db.query('insert into auth.users (id) values ($1), ($2), ($3)', [CAROL, DAVE, ERIN]);
+  });
+
+  it('every user gets one stable, readable friend code', async () => {
+    const c1 = await code(CAROL);
+    assert.match(c1, /^STROLL-[A-HJ-NP-Z2-9]{4}$/);
+    assert.equal(await code(CAROL), c1);
+  });
+
+  it('signed-out users cannot use friend functions', async () => {
+    await rejects(as(null, 'select public.my_friend_code()'), /permission denied/);
+  });
+
+  it('nobody can write friendships directly', async () => {
+    await rejects(
+      as(CAROL, 'insert into public.friendships (requester_id, addressee_id) values ($1, $2)', [
+        CAROL,
+        DAVE,
+      ]),
+      /permission denied/,
+    );
+  });
+
+  it('request → shows as outgoing/incoming; strangers see nothing', async () => {
+    assert.equal(await request(CAROL, await code(DAVE)), 'requested');
+    assert.deepEqual(
+      (await list(CAROL)).map((r) => r.kind),
+      ['outgoing'],
+    );
+    assert.deepEqual(
+      (await list(DAVE)).map((r) => r.kind),
+      ['incoming'],
+    );
+    assert.equal((await as(ERIN, 'select * from public.friendships')).rows.length, 0);
+    assert.equal((await list(ERIN)).length, 0);
+  });
+
+  it('cannot add yourself, and a repeat request is reported, not duplicated', async () => {
+    await rejects(request(CAROL, await code(CAROL)), /your own code/);
+    assert.equal(await request(CAROL, await code(DAVE)), 'already_requested');
+    await rejects(request(CAROL, 'STROLL-ZZZZ'), /No walker has that code/);
+  });
+
+  it('only the addressee can accept; then both are friends (points hidden before that)', async () => {
+    const id = (await list(DAVE))[0].friendship_id;
+    assert.equal((await list(DAVE))[0].points_total, null);
+    await rejects(
+      as(CAROL, 'select public.respond_friend_request($1, true)', [id]),
+      /Request not found/,
+    );
+    await as(DAVE, 'select public.respond_friend_request($1, true)', [id]);
+    assert.deepEqual(
+      (await list(CAROL)).map((r) => r.kind),
+      ['friend'],
+    );
+    assert.deepEqual(
+      (await list(DAVE)).map((r) => r.kind),
+      ['friend'],
+    );
+    assert.equal(await request(DAVE, await code(CAROL)), 'already_friends');
+  });
+
+  it('friend profiles are for friends only', async () => {
+    const p = (await as(CAROL, 'select * from public.friend_profile($1)', [DAVE])).rows[0];
+    assert.match(p.name, /^Walker [A-HJ-NP-Z2-9]{4}$/); // no display name set → code-based name
+    await rejects(as(ERIN, 'select * from public.friend_profile($1)', [DAVE]), /Not friends/);
+  });
+
+  it('weekly leaderboard counts points (+10 route, +5 description) for me + friends only', async () => {
+    const route = payload({
+      id: crypto.randomUUID(),
+      checkpoints: [],
+      description: 'Covered all the way',
+    });
+    await as(DAVE, 'select public.create_route($1::jsonb)', [JSON.stringify(route)]);
+    const board = (await as(CAROL, 'select * from public.friends_leaderboard()')).rows;
+    assert.deepEqual(
+      board.map((r) => [r.user_id, r.points_week, r.is_me]),
+      [
+        [DAVE, 15, false],
+        [CAROL, 0, true],
+      ],
+    );
+    assert.equal((await as(ERIN, 'select * from public.friends_leaderboard()')).rows.length, 1); // only Erin
+  });
+
+  it('activity shows a friend’s route only when they chose “show my name”', async () => {
+    assert.equal((await as(CAROL, 'select * from public.friend_activity()')).rows.length, 0);
+    await db.query('update public.routes set show_author = true where created_by = $1', [DAVE]);
+    const feed = (await as(CAROL, 'select * from public.friend_activity()')).rows;
+    assert.equal(feed.length, 1);
+    assert.equal(feed[0].friend_id, DAVE);
+    assert.equal((await as(ERIN, 'select * from public.friend_activity()')).rows.length, 0);
+  });
+
+  it('blocking: replaces the request, hides the block from the blocked user, stops new requests', async () => {
+    assert.equal(await request(ERIN, await code(DAVE)), 'requested');
+    await as(DAVE, 'select public.block_user($1)', [ERIN]);
+    assert.deepEqual((await list(DAVE)).map((r) => r.kind).sort(), ['blocked', 'friend']);
+    assert.equal((await list(ERIN)).length, 0); // Erin can't see she was blocked
+    await rejects(request(ERIN, await code(DAVE)), /Can’t send a request/);
+    await rejects(as(ERIN, 'select public.remove_friend($1)', [DAVE]), /Not found/); // can't unblock herself
+    await as(ERIN, 'select public.block_user($1)', [DAVE]); // can't overwrite Dave's block
+    const row = (
+      await db.query(
+        'select blocked_by from public.friendships where $1 in (requester_id, addressee_id) and $2 in (requester_id, addressee_id)',
+        [DAVE, ERIN],
+      )
+    ).rows[0];
+    assert.equal(row.blocked_by, DAVE);
+  });
+
+  it('the blocker can unblock; removing a friend ends the friendship', async () => {
+    await as(DAVE, 'select public.remove_friend($1)', [ERIN]);
+    assert.equal(await request(ERIN, await code(DAVE)), 'requested');
+    await as(CAROL, 'select public.remove_friend($1)', [DAVE]);
+    await rejects(as(CAROL, 'select * from public.friend_profile($1)', [DAVE]), /Not friends/);
+  });
+});

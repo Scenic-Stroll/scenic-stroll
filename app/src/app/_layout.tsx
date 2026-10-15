@@ -37,6 +37,10 @@ export default function RootLayout() {
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="(tabs)" />
               <Stack.Screen
+                name="friend/[id]"
+                options={{ headerShown: true, title: 'Friend', headerBackTitle: 'Friends' }}
+              />
+              <Stack.Screen
                 name="saved-places"
                 options={{ headerShown: true, title: 'Saved places', headerBackTitle: 'Profile' }}
               />

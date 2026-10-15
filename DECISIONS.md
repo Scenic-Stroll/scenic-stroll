@@ -162,3 +162,23 @@ both rows say so. "Download my data" writes a JSON file (expo-file-system) and o
 verified on the live project: another user's delete-all removed 0 rows of someone else's data; the owner's
 removed exactly their own route. Server deletion happens first; phone data is only wiped if it succeeds.
 The auth user itself can't be deleted from the client (needs an admin key) — it keeps no data afterwards.
+
+### D20 · Redesign step 5: friends — privacy-first, all writes through checked functions (2026-10-16)
+
+Tables `friend_codes` (STROLL-XXXX, no I/O/0/1) and `friendships` (one row per pair, unique on
+least/greatest ids; statuses pending/accepted/blocked). Clients can only SELECT their own rows (a block is
+visible only to the blocker); every change goes through functions that check `auth.uid()`. Privileged logic
+is SECURITY DEFINER in the non-exposed `private` schema; the app calls thin SECURITY INVOKER wrappers in
+`public` (pattern recommended by the Supabase security guidance). `authenticated` got USAGE on `private`
+for this; all `private` functions have EXECUTE revoked from public/anon except those explicitly granted, and
+default privileges now revoke EXECUTE on future `private` functions.
+Privacy choices: friend activity shows only routes whose author turned on "show my name"; points/profile of
+someone are only returned for ACCEPTED friends; blocked senders get a generic error (they aren't told);
+50 pending outgoing requests max (anti code-guessing). Server-side points = +10/route +5/description, the same
+rule as `shared/src/levels.ts`. Names fall back to "Walker 7K2Q". Live location sharing, "Show on map" and
+"Route to friend" are step 6 and say so. QR encodes `scenicstroll://friend/CODE` (a deep link once the app is
+built; in Expo Go people scan or type the code in the app).
+Verified: 11 PGlite tests (requests, accept-only-by-addressee, strangers see nothing, profile/leaderboard for
+friends only, activity privacy, blocks can't be overwritten or undone by the blocked user) + a live run with
+two anonymous accounts. Advisor: no errors; the expected "anonymous access" WARNs (anonymous users are
+first-class here) and "leaked password protection" (relevant once email sign-up exists).

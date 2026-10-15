@@ -42,7 +42,15 @@
           "locationWhenInUsePermission": "Scenic Stroll uses your location to show where you are on the map and to record the walking routes you choose to share."
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Scenic Stroll uses the camera only to scan a friend’s QR code. Nothing is recorded or uploaded.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

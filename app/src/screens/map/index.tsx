@@ -34,6 +34,7 @@ import type { IconName } from '@/components/ui/icon';
 import { SearchBar } from '@/components/ui/search-bar';
 import { planRoute } from '@/lib/api';
 import { communityKeys, fetchCommunityRoutes } from '@/lib/community-routes';
+import { useMapFocus } from '@/lib/map-focus-store';
 import { useMyProfile } from '@/lib/profile';
 import { radius, space, useAppTheme, useColorSchemeName } from '@/theme';
 
@@ -133,6 +134,30 @@ export function MapHome() {
   useEffect(() => {
     mapRef.current?.animateCamera({ pitch: layers.threeD ? PITCH_3D : 0 }, { duration: 400 });
   }, [layers.threeD]);
+
+  // Another tab (Friends → Activity) can ask us to show a route. We listen to the store, refresh
+  // the community routes (the route may be brand new) and then select it.
+  const communityRef = useRef(community);
+  useEffect(() => {
+    communityRef.current = community;
+  });
+  useEffect(
+    () =>
+      useMapFocus.subscribe((state) => {
+        const id = state.routeId;
+        if (!id) return;
+        useMapFocus.getState().clear();
+        void communityRef.current.refetch().then(({ data }) => {
+          const route = data?.find((r) => r.id === id);
+          if (!route) return; // deleted meanwhile — nothing to show
+          setPlanning(false);
+          setSelectedPlace(null);
+          setSelectedRouteId(route.id);
+          fit(route.line);
+        });
+      }),
+    [fit],
+  );
 
   const visibleCommunity = useMemo(
     () => (community.data ?? []).filter((r) => matchesFilters(r, filters)),
