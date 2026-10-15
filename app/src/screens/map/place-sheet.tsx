@@ -46,11 +46,14 @@ export function PlaceSheet({
   const saved = useSavedPlaces((s) => s.places.some((p) => p.id === id));
   const toggleSaved = useSavedPlaces((s) => s.toggle);
 
-  const typeLabel = preset
-    ? `${PRESET_KIND_TYPE[preset.kind].en} · ${PRESET_KIND_TYPE[preset.kind].zh}`
-    : place.label === 'Dropped pin'
-      ? 'Dropped pin'
-      : 'Place';
+  const typeLabel =
+    place.kind === 'friend'
+      ? 'Friend · live location'
+      : preset
+        ? `${PRESET_KIND_TYPE[preset.kind].en} · ${PRESET_KIND_TYPE[preset.kind].zh}`
+        : place.label === 'Dropped pin'
+          ? 'Dropped pin'
+          : 'Place';
   const exits =
     preset?.kind === 'mtr_exit' ? [] : nearestPresets(place.point, { kind: 'mtr_exit', limit: 3 });
   const arriving = communityRoutes.filter(
@@ -73,6 +76,9 @@ export function PlaceSheet({
           </Text>
           {preset ? <Text style={[type.body, { color: t.textSecondary }]}>{preset.zh}</Text> : null}
           <Text style={[type.small, { color: t.textSecondary }]}>{typeLabel}</Text>
+          {place.note ? (
+            <Text style={[type.small, { color: t.textSecondary }]}>{place.note}</Text>
+          ) : null}
         </View>
         <Pressable
           accessibilityRole="button"

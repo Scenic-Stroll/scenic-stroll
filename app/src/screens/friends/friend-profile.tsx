@@ -1,6 +1,6 @@
 /**
  * A friend's public profile: name, level, points, routes. Only visible while you're friends.
- * "Show on map" / "Route to friend" need live location sharing (step 6) — they say so.
+ * "Show on map" / "Route to friend" appear while the friend shares their live location with you.
  */
 import { levelFor } from '@scenic/shared';
 import { router } from 'expo-router';
@@ -13,11 +13,15 @@ import { ListRow } from '@/components/ui/list-row';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { StatTile } from '@/components/ui/stat-tile';
 import { blockUser, removeFriend, useFriendProfile } from '@/lib/friends';
+import { friendAsPlace, useFriendLocations } from '@/lib/location-sharing';
+import { useMapFocus } from '@/lib/map-focus-store';
 import { radius, space, type, useAppTheme } from '@/theme';
 
 export function FriendProfileScreen({ friendId }: { friendId: string }) {
   const t = useAppTheme();
   const profile = useFriendProfile(friendId);
+  const location = useFriendLocations().data?.find((l) => l.user_id === friendId) ?? null;
+  const focusPlace = useMapFocus((s) => s.focusPlace);
   const [busy, setBusy] = useState(false);
 
   const confirm = (title: string, body: string, action: () => Promise<void>, verb: string) =>
@@ -88,16 +92,34 @@ export function FriendProfileScreen({ friendId }: { friendId: string }) {
           title="Public routes"
           subtitle={`${p.public_routes} with their name shown — see them under Activity`}
         />
-        <ListRow
-          icon="map-marker-account-outline"
-          title="Show on map"
-          subtitle="Needs live location sharing (coming soon)"
-        />
-        <ListRow
-          icon="directions"
-          title="Route to friend"
-          subtitle="Needs live location sharing (coming soon)"
-        />
+        {location ? (
+          <>
+            <ListRow
+              icon="map-marker-account-outline"
+              title="Show on map"
+              subtitle={friendAsPlace(location).note}
+              onPress={() => {
+                focusPlace(friendAsPlace(location));
+                router.navigate('/');
+              }}
+            />
+            <ListRow
+              icon="directions"
+              title="Route to friend"
+              subtitle="Walking route to where they are now"
+              onPress={() => {
+                focusPlace(friendAsPlace(location), true);
+                router.navigate('/');
+              }}
+            />
+          </>
+        ) : (
+          <ListRow
+            icon="map-marker-off-outline"
+            title="Not sharing their location"
+            subtitle="Show on map and Route to friend appear when they share with you"
+          />
+        )}
       </View>
 
       <PrimaryButton

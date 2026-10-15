@@ -182,3 +182,20 @@ Verified: 11 PGlite tests (requests, accept-only-by-addressee, strangers see not
 friends only, activity privacy, blocks can't be overwritten or undone by the blocked user) + a live run with
 two anonymous accounts. Advisor: no errors; the expected "anonymous access" WARNs (anonymous users are
 first-class here) and "leaked password protection" (relevant once email sign-up exists).
+
+### D21 · Redesign step 6: live location sharing — opt-in, foreground, enforced by the database (2026-10-16)
+
+`location_shares` (one row per user) + `location_share_recipients`. RLS lets you read a share only if you are an
+ACCEPTED friend, it hasn't expired, it was updated in the last 30 minutes (a killed app can't leave a dot
+behind, even with "until I stop"), and — when the sharer picked people — you're on their list. Recipients can
+only be accepted friends (insert policy). No SECURITY DEFINER needed: the viewer can already see their own
+friendship rows, so the policy checks friendships directly. Approximate mode rounds to a 0.002° (~200 m) grid
+**on the phone** before sending, and a trigger snaps again before storing (defence in depth); the trigger also
+keeps shares inside Hong Kong. Updates every ~15 s via `watchPositionAsync` while the app is open; no
+background tracking; on launch any leftover share from a closed session is deleted. Default precision is
+approximate. Friends' maps refresh through Supabase Realtime (`location_shares` added to the
+`supabase_realtime` publication; RLS decides who receives changes) with a 30 s polling fallback.
+Verified: 9 PGlite tests (strangers, selected-only, non-friend recipients rejected, expiry, staleness, block/
+remove stop visibility, can't write others' rows, HK-only, snapping) + a live run (stranger saw 0, friend got a
+Realtime event, stop removed it). A follow-up migration replaced the "Walker ????" fallback name with one
+derived from the user id and indexed `friendships.requester_id` (performance advisor).

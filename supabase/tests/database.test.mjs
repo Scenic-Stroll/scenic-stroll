@@ -394,7 +394,8 @@ describe('friends', () => {
 
   it('friend profiles are for friends only', async () => {
     const p = (await as(CAROL, 'select * from public.friend_profile($1)', [DAVE])).rows[0];
-    assert.match(p.name, /^Walker [A-HJ-NP-Z2-9]{4}$/); // no display name set → code-based name
+    assert.match(p.name, /^Walker [A-Z0-9]{4}$/); // no display name set → code- or id-based name
+    assert.ok(!p.name.includes('?'), `name has placeholder: ${p.name}`);
     await rejects(as(ERIN, 'select * from public.friend_profile($1)', [DAVE]), /Not friends/);
   });
 
@@ -447,5 +448,146 @@ describe('friends', () => {
     assert.equal(await request(ERIN, await code(DAVE)), 'requested');
     await as(CAROL, 'select public.remove_friend($1)', [DAVE]);
     await rejects(as(CAROL, 'select * from public.friend_profile($1)', [DAVE]), /Not friends/);
+  });
+});
+
+describe('location sharing', () => {
+  const FAY = '77777777-7777-4777-8777-777777777777'; // sharer
+  const GUS = '88888888-8888-4888-8888-888888888888'; // friend
+  const HAL = '99999999-9999-4999-8999-999999999999'; // friend, not on the selected list
+  const IVY = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'; // stranger
+  const FW = { lat: 22.337331, lng: 114.174601 }; // Festival Walk
+
+  const start = (user, opts = {}) =>
+    as(user, 'select public.start_location_share($1, $2, $3, $4, $5, $6, $7)', [
+      opts.lat ?? FW.lat,
+      opts.lng ?? FW.lng,
+      opts.accuracy ?? 8,
+      opts.precision ?? 'exact',
+      opts.all ?? true,
+      opts.minutes ?? 60,
+      opts.recipients ?? [],
+    ]);
+  const sees = async (viewer) => (await as(viewer, 'select * from public.friend_locations()')).rows;
+  const befriend = async (a, b) => {
+    const code = (await as(b, 'select public.my_friend_code() as c')).rows[0].c;
+    await as(a, 'select public.send_friend_request($1)', [code]);
+    const id = (await as(b, 'select * from public.list_friends()')).rows.find(
+      (r) => r.kind === 'incoming',
+    ).friendship_id;
+    await as(b, 'select public.respond_friend_request($1, true)', [id]);
+  };
+
+  before(async () => {
+    await db.query('insert into auth.users (id) values ($1), ($2), ($3), ($4)', [
+      FAY,
+      GUS,
+      HAL,
+      IVY,
+    ]);
+    await befriend(FAY, GUS);
+    await befriend(FAY, HAL);
+  });
+
+  it('nothing is shared until you turn it on', async () => {
+    assert.equal((await sees(GUS)).length, 0);
+  });
+
+  it('accepted friends see an exact share; strangers never do', async () => {
+    await start(FAY);
+    const [loc] = await sees(GUS);
+    assert.equal(loc.user_id, FAY);
+    assert.ok(Math.abs(loc.lat - FW.lat) < 1e-9 && Math.abs(loc.lng - FW.lng) < 1e-9);
+    assert.equal((await sees(IVY)).length, 0);
+    assert.equal((await as(IVY, 'select * from public.location_shares')).rows.length, 0);
+  });
+
+  it('approximate shares are snapped (~200 m) before they are stored', async () => {
+    await start(FAY, { precision: 'approximate' });
+    const stored = (
+      await db.query(
+        'select extensions.st_y(point) as lat, extensions.st_x(point) as lng, accuracy_m from public.location_shares where user_id = $1',
+        [FAY],
+      )
+    ).rows[0];
+    assert.notEqual(stored.lat, FW.lat); // the exact point is gone, even for an admin
+    assert.ok(Math.abs(stored.lat / 0.002 - Math.round(stored.lat / 0.002)) < 1e-6);
+    assert.ok(stored.accuracy_m >= 200);
+  });
+
+  it('"selected friends" hides the share from friends not on the list', async () => {
+    await start(FAY, { all: false, recipients: [GUS] });
+    assert.equal((await sees(GUS)).length, 1);
+    assert.equal((await sees(HAL)).length, 0);
+  });
+
+  it('you cannot put a non-friend on your share list', async () => {
+    await rejects(start(FAY, { all: false, recipients: [IVY] }), /row-level security/);
+  });
+
+  it('expired or stale (30 min without updates) shares disappear', async () => {
+    await start(FAY);
+    await db.query(
+      `update public.location_shares set expires_at = now() - interval '1 minute' where user_id = $1`,
+      [FAY],
+    );
+    // The trigger re-stamps updated_at, so set expiry directly via admin and check visibility:
+    assert.equal((await sees(GUS)).length, 0);
+    await start(FAY, { minutes: null });
+    await db.exec('alter table public.location_shares disable trigger location_shares_prepare');
+    await db.query(
+      `update public.location_shares set updated_at = now() - interval '31 minutes' where user_id = $1`,
+      [FAY],
+    );
+    await db.exec('alter table public.location_shares enable trigger location_shares_prepare');
+    assert.equal((await sees(GUS)).length, 0);
+  });
+
+  it('updates keep working while active and report when the share has ended', async () => {
+    await start(FAY);
+    const ok = await as(
+      FAY,
+      'select public.update_location_share($1, $2, $3) as ok',
+      [22.3365, 114.1735, 5],
+    );
+    assert.equal(ok.rows[0].ok, true);
+    await as(FAY, 'select public.stop_location_share()');
+    const after = await as(
+      FAY,
+      'select public.update_location_share($1, $2, $3) as ok',
+      [22.3365, 114.1735, 5],
+    );
+    assert.equal(after.rows[0].ok, false);
+    assert.equal((await sees(GUS)).length, 0);
+  });
+
+  it('nobody can write someone else’s location, and it must be in Hong Kong', async () => {
+    await start(FAY);
+    // Updating someone else's share changes nothing (RLS hides their row from your UPDATE).
+    const upd = await as(
+      IVY,
+      'update public.location_shares set accuracy_m = 1 where user_id = $1 returning user_id',
+      [FAY],
+    );
+    assert.equal(upd.rows.length, 0);
+    // You can't choose whose share you insert: user_id has no insert grant (it defaults to you).
+    await rejects(
+      as(
+        IVY,
+        `insert into public.location_shares (user_id, point) values ($1, extensions.st_setsrid(extensions.st_makepoint(114.17, 22.33), 4326))`,
+        [FAY],
+      ),
+      /permission denied/,
+    );
+    await rejects(start(FAY, { lat: 51.5, lng: -0.12 }), /Hong Kong/);
+  });
+
+  it('removing or blocking a friend stops them seeing your location immediately', async () => {
+    await start(FAY);
+    assert.equal((await sees(HAL)).length, 1);
+    await as(FAY, 'select public.block_user($1)', [HAL]);
+    assert.equal((await sees(HAL)).length, 0);
+    await as(GUS, 'select public.remove_friend($1)', [FAY]);
+    assert.equal((await sees(GUS)).length, 0);
   });
 });

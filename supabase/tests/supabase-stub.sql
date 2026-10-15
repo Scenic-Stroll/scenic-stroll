@@ -18,3 +18,6 @@ as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$
 grant execute on function auth.uid() to anon, authenticated, service_role;
 
 grant usage on schema public to anon, authenticated, service_role;
+
+-- Supabase Realtime streams changes of tables in this publication.
+create publication supabase_realtime;

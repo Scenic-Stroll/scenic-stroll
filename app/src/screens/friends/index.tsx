@@ -22,7 +22,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { Chip } from '@/components/ui/chip';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorCard } from '@/components/ui/error-card';
-import { Icon } from '@/components/ui/icon';
+import { Icon, type IconName } from '@/components/ui/icon';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { SegmentedTabs } from '@/components/ui/segmented-tabs';
 import {
@@ -32,10 +32,12 @@ import {
   useFriendList,
   useLeaderboard,
 } from '@/lib/friends';
+import { agoLabel, useFriendLocations, useSharing } from '@/lib/location-sharing';
 import { useMapFocus } from '@/lib/map-focus-store';
 import { radius, space, TAP_TARGET, type, useAppTheme } from '@/theme';
 
 import { AddFriendSheet } from './add-friend-sheet';
+import { ShareLocationSheet } from './share-location-sheet';
 
 const TABS = [
   { key: 'friends', label: 'Friends' },
@@ -48,6 +50,10 @@ export function FriendsScreen() {
   const t = useAppTheme();
   const [tab, setTab] = useState<TabKey>('friends');
   const [adding, setAdding] = useState(false);
+  const [sharingSheet, setSharingSheet] = useState(false);
+  const sharingOn = useSharing((s) => s.status === 'on');
+  const locations = useFriendLocations();
+  const sharingSince = new Map((locations.data ?? []).map((l) => [l.user_id, l.updated_at]));
   const list = useFriendList();
   const leaderboard = useLeaderboard();
   const activity = useFriendActivity();
@@ -106,6 +112,17 @@ export function FriendsScreen() {
 
         {!list.isPending && !list.error && tab === 'friends' ? (
           <>
+            {friends.length > 0 ? (
+              <PersonRow
+                name=""
+                icon={sharingOn ? 'access-point' : 'map-marker-account-outline'}
+                title={sharingOn ? 'You’re sharing your location' : 'Share my location'}
+                subtitle={
+                  sharingOn ? 'Tap to change or stop' : 'Off · choose who, how long and how precise'
+                }
+                onPress={() => setSharingSheet(true)}
+              />
+            ) : null}
             {leaderboard.data && leaderboard.data.length > 1 ? (
               <Leaderboard rows={leaderboard.data} />
             ) : null}
@@ -123,7 +140,13 @@ export function FriendsScreen() {
                 }
               />
             ) : (
-              friends.map((f) => <FriendRowView key={f.friendship_id} friend={f} />)
+              friends.map((f) => (
+                <FriendRowView
+                  key={f.friendship_id}
+                  friend={f}
+                  sharingSince={sharingSince.get(f.other_id) ?? null}
+                />
+              ))
             )}
             {blocked.length > 0 ? (
               <>
@@ -165,6 +188,7 @@ export function FriendsScreen() {
       </ScrollView>
 
       <AddFriendSheet visible={adding} onClose={() => setAdding(false)} />
+      <ShareLocationSheet visible={sharingSheet} onClose={() => setSharingSheet(false)} />
     </SafeAreaView>
   );
 }
@@ -207,12 +231,19 @@ function Leaderboard({ rows }: { rows: LeaderboardRow[] }) {
   );
 }
 
-function FriendRowView({ friend }: { friend: FriendRow }) {
+function FriendRowView({
+  friend,
+  sharingSince,
+}: {
+  friend: FriendRow;
+  sharingSince: string | null;
+}) {
   const level = levelFor(friend.points_total ?? 0);
+  const sharing = sharingSince ? `Sharing location · ${agoLabel(sharingSince)}` : 'Not sharing';
   return (
     <PersonRow
       name={friend.name}
-      subtitle={`Level ${level.number} · ${level.name} · Not sharing location`}
+      subtitle={`Level ${level.number} · ${level.name} · ${sharing}`}
       onPress={() => router.push({ pathname: '/friend/[id]', params: { id: friend.other_id } })}
     />
   );
@@ -343,19 +374,32 @@ function PersonRow({
   subtitle,
   right,
   onPress,
+  icon,
+  title,
 }: {
   name: string;
   subtitle: string;
   right?: React.ReactNode;
   onPress?: () => void;
+  /** Show an icon instead of an avatar (for non-person rows like "Share my location"). */
+  icon?: IconName;
+  /** Overrides `name` as the row title. */
+  title?: string;
 }) {
   const t = useAppTheme();
+  const label = title ?? name;
   const content = (
     <>
-      <Avatar name={name} size={44} />
+      {icon ? (
+        <View style={[styles.iconCircle, { backgroundColor: t.surface }]}>
+          <Icon name={icon} size={22} color={t.primary} />
+        </View>
+      ) : (
+        <Avatar name={name} size={44} />
+      )}
       <View style={styles.flex1}>
         <Text style={[type.body, { color: t.textPrimary, fontWeight: '600' }]} numberOfLines={1}>
-          {name}
+          {label}
         </Text>
         <Text style={[type.small, { color: t.textSecondary }]} numberOfLines={1}>
           {subtitle}
@@ -368,7 +412,7 @@ function PersonRow({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${name}, ${subtitle}`}
+      accessibilityLabel={`${label}, ${subtitle}`}
       onPress={onPress}
       style={({ pressed }) => [styles.person, pressed && { backgroundColor: t.surface }]}
     >
@@ -427,6 +471,13 @@ function SectionTitle({ text }: { text: string }) {
 }
 
 const styles = StyleSheet.create({
+  iconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.round,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   fill: { flex: 1 },
   flex1: { flex: 1 },
   content: {

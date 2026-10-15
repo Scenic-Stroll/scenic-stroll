@@ -72,7 +72,7 @@ Secrets are never committed and never go in the app — only into `supabase secr
 - [x] 3. Place card (route here/from, save, share, nearest exits), route option cards with segment strip, step-by-step directions (plan-route v3)
 - [x] 4. Profile: name/level/progress, 2×2 stats, badges, saved places, show-my-name default, download/delete my data (photo upload + language switch deferred)
 - [x] 5. Friends: codes + QR, requests, accept/decline/remove/block, friend profiles, activity (public routes only), weekly leaderboard — migration `friends` applied, 11 DB tests
-- [ ] 6. Live location sharing
+- [x] 6. Live location sharing: who/how long/precision, foreground updates ~15 s, Realtime, friend markers + Route to friend, map banner — 9 DB tests + live check
 - [ ] 7. Floor selector, dark theme polish
 
 ## Phase 3 — AI tagging (target Oct 12–13)

@@ -5,6 +5,7 @@ import { AppState } from 'react-native';
 import { recoverInterruptedRecordings } from '@/lib/local-db';
 import { useRecorder } from '@/lib/recorder';
 import { refreshLocalData } from '@/lib/query-client';
+import { cleanUpLeftoverShare } from '@/lib/location-sharing';
 import { processUploadQueue } from '@/lib/upload-queue';
 import { useAuth } from '@/providers/auth-provider';
 
@@ -27,6 +28,8 @@ export function useBackgroundSync() {
   useEffect(() => {
     if (!signedIn) return;
     void processUploadQueue();
+    // Sharing is foreground-only: a share left by a previous (closed) session is removed.
+    void cleanUpLeftoverShare().catch((err) => console.warn('share cleanup failed', err));
 
     const appState = AppState.addEventListener('change', (state) => {
       if (state === 'active') void processUploadQueue();

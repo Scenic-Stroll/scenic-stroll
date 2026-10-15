@@ -33,7 +33,9 @@ import { getMyStats } from '@/lib/local-db';
 import { deleteMyData, downloadMyData } from '@/lib/my-data';
 import { useMyProfile } from '@/lib/profile';
 import { localKeys } from '@/lib/query-client';
+import { useSharing } from '@/lib/location-sharing';
 import { useSavedPlaces } from '@/lib/saved-places-store';
+import { ShareLocationSheet } from '@/screens/friends/share-location-sheet';
 import { useSettings, type ThemePreference } from '@/lib/settings-store';
 import { useAuth } from '@/providers/auth-provider';
 import { radius, space, TAP_TARGET, type, useAppTheme } from '@/theme';
@@ -61,6 +63,8 @@ export function ProfileScreen() {
   const [editing, setEditing] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [sharingSheet, setSharingSheet] = useState(false);
+  const sharingOn = useSharing((s) => s.status === 'on');
 
   // Verification (Phase 5) isn't built yet, so these are honestly 0 for now.
   const routesVerified = 0;
@@ -274,9 +278,12 @@ export function ProfileScreen() {
             }
           />
           <ListRow
-            icon="map-marker-account-outline"
+            icon={sharingOn ? 'access-point' : 'map-marker-account-outline'}
             title="Location sharing"
-            subtitle="Off · live sharing with friends comes later"
+            subtitle={
+              sharingOn ? 'On — tap to change or stop' : 'Off · share live with chosen friends'
+            }
+            onPress={() => setSharingSheet(true)}
           />
           <ListRow
             icon="download-outline"
@@ -345,6 +352,7 @@ export function ProfileScreen() {
         </Section>
       </ScrollView>
 
+      <ShareLocationSheet visible={sharingSheet} onClose={() => setSharingSheet(false)} />
       <EditProfileSheet
         visible={editing}
         userId={userId}

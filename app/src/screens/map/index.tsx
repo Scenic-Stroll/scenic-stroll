@@ -19,7 +19,7 @@ import { useQuery } from '@tanstack/react-query';
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import MapView, {
   Marker,
   Polyline,
@@ -30,13 +30,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/ui/avatar';
 import { Chip } from '@/components/ui/chip';
-import type { IconName } from '@/components/ui/icon';
+import { Icon, type IconName } from '@/components/ui/icon';
 import { SearchBar } from '@/components/ui/search-bar';
 import { planRoute } from '@/lib/api';
 import { communityKeys, fetchCommunityRoutes } from '@/lib/community-routes';
+import { friendAsPlace, stopSharing, useFriendLocations, useSharing } from '@/lib/location-sharing';
 import { useMapFocus } from '@/lib/map-focus-store';
+import { ShareLocationSheet } from '@/screens/friends/share-location-sheet';
 import { useMyProfile } from '@/lib/profile';
-import { radius, space, useAppTheme, useColorSchemeName } from '@/theme';
+import { radius, shadow, space, TAP_TARGET, type, useAppTheme, useColorSchemeName } from '@/theme';
 
 import { MapControls, type MapLayers } from './map-controls';
 import { DARK_MAP_STYLE, LIGHT_MAP_STYLE } from './map-style';
@@ -69,6 +71,9 @@ export function MapHome() {
   const mapRef = useRef<MapView>(null);
   const sheetRef = useRef<BottomSheet>(null);
   const profile = useMyProfile();
+  const friendLocations = useFriendLocations();
+  const sharingOn = useSharing((s) => s.status === 'on');
+  const [sharingSheetOpen, setSharingSheetOpen] = useState(false);
 
   const [origin, setOrigin] = useState<Place | null>(null);
   const [destination, setDestination] = useState<Place | null>(null);
@@ -135,30 +140,6 @@ export function MapHome() {
     mapRef.current?.animateCamera({ pitch: layers.threeD ? PITCH_3D : 0 }, { duration: 400 });
   }, [layers.threeD]);
 
-  // Another tab (Friends → Activity) can ask us to show a route. We listen to the store, refresh
-  // the community routes (the route may be brand new) and then select it.
-  const communityRef = useRef(community);
-  useEffect(() => {
-    communityRef.current = community;
-  });
-  useEffect(
-    () =>
-      useMapFocus.subscribe((state) => {
-        const id = state.routeId;
-        if (!id) return;
-        useMapFocus.getState().clear();
-        void communityRef.current.refetch().then(({ data }) => {
-          const route = data?.find((r) => r.id === id);
-          if (!route) return; // deleted meanwhile — nothing to show
-          setPlanning(false);
-          setSelectedPlace(null);
-          setSelectedRouteId(route.id);
-          fit(route.line);
-        });
-      }),
-    [fit],
-  );
-
   const visibleCommunity = useMemo(
     () => (community.data ?? []).filter((r) => matchesFilters(r, filters)),
     [community.data, filters],
@@ -224,6 +205,44 @@ export function MapHome() {
     setPickerFromSearchBar(false);
     setPicking('destination');
   };
+
+  // The focus-store subscription is created once; this ref always points at the latest actions.
+  const actionsRef = useRef({ openPlace, routeTo });
+  useEffect(() => {
+    actionsRef.current = { openPlace, routeTo };
+  });
+
+  // Another tab (Friends → Activity) can ask us to show a route. We listen to the store, refresh
+  // the community routes (the route may be brand new) and then select it.
+  const communityRef = useRef(community);
+  useEffect(() => {
+    communityRef.current = community;
+  });
+  useEffect(
+    () =>
+      useMapFocus.subscribe((state) => {
+        // A place (friend's location, landmark): show its card, or route straight to it.
+        if (state.place) {
+          const { place, routeToPlace } = state;
+          useMapFocus.getState().clear();
+          if (routeToPlace) actionsRef.current.routeTo(place);
+          else actionsRef.current.openPlace(place);
+          return;
+        }
+        const id = state.routeId;
+        if (!id) return;
+        useMapFocus.getState().clear();
+        void communityRef.current.refetch().then(({ data }) => {
+          const route = data?.find((r) => r.id === id);
+          if (!route) return; // deleted meanwhile — nothing to show
+          setPlanning(false);
+          setSelectedPlace(null);
+          setSelectedRouteId(route.id);
+          fit(route.line);
+        });
+      }),
+    [fit],
+  );
 
   const closePlanning = () => {
     setPlanning(false);
@@ -315,6 +334,24 @@ export function MapHome() {
               </Marker>
             ))
           : null}
+        {(friendLocations.data ?? []).map((f) => (
+          <Marker
+            key={`friend-${f.user_id}`}
+            coordinate={{ latitude: f.lat, longitude: f.lng }}
+            accessibilityLabel={`${f.name}, friend`}
+            onPress={() => openPlace(friendAsPlace(f))}
+            zIndex={5}
+          >
+            <View
+              style={[
+                styles.friendMarker,
+                { borderColor: t.accent, backgroundColor: t.background },
+              ]}
+            >
+              <Avatar name={f.name} size={30} />
+            </View>
+          </Marker>
+        ))}
         {planning && origin ? (
           <Marker
             coordinate={toMap(origin.point)}
@@ -370,6 +407,30 @@ export function MapHome() {
             </View>
           ))}
         </ScrollView>
+        {sharingOn ? (
+          <View style={styles.bannerRow} pointerEvents="box-none">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="You are sharing your location. Open sharing settings"
+              onPress={() => setSharingSheetOpen(true)}
+              style={[styles.sharingBanner, shadow, { backgroundColor: t.primary }]}
+            >
+              <Icon name="access-point" size={18} color={t.onPrimary} />
+              <Text style={[type.small, styles.bannerText, { color: t.onPrimary }]}>
+                You’re sharing your location
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Stop sharing your location"
+                onPress={() => void stopSharing()}
+                hitSlop={8}
+                style={styles.bannerStop}
+              >
+                <Text style={[type.small, { color: t.onPrimary, fontWeight: '700' }]}>Stop</Text>
+              </Pressable>
+            </Pressable>
+          </View>
+        ) : null}
         <View style={styles.controls} pointerEvents="box-none">
           <MapControls
             layers={layers}
@@ -448,6 +509,8 @@ export function MapHome() {
         </BottomSheetScrollView>
       </BottomSheet>
 
+      <ShareLocationSheet visible={sharingSheetOpen} onClose={() => setSharingSheetOpen(false)} />
+
       <PlacePicker
         visible={picking !== null}
         title={picking === 'origin' ? 'Start from' : 'Go to'}
@@ -487,4 +550,16 @@ const styles = StyleSheet.create({
   },
   controls: { alignItems: 'flex-end', paddingHorizontal: space.lg, marginTop: space.sm },
   placeDot: { width: 14, height: 14, borderRadius: 7, borderWidth: 3 },
+  friendMarker: { padding: 2, borderRadius: radius.round, borderWidth: 3 },
+  bannerRow: { paddingHorizontal: space.lg },
+  sharingBanner: {
+    minHeight: TAP_TARGET,
+    borderRadius: radius.round,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    paddingLeft: space.md,
+  },
+  bannerText: { flex: 1, fontWeight: '600' },
+  bannerStop: { minHeight: TAP_TARGET, justifyContent: 'center', paddingHorizontal: space.lg },
 });
