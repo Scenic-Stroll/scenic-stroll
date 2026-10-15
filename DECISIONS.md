@@ -146,3 +146,19 @@ indoor/outdoor; lifts/escalators/stairs/footbridges/underpasses are their own se
 "outdoor" only. `plan-route` now also returns turn-by-turn `steps` (ORS default output; Google via field
 mask) — optional in the schema so old/new deployments interoperate; redeployed as version 3 and verified live
 (8 steps for Exit A1 → MMW). Directions state clearly that street directions don't know lifts or floors.
+
+### D19 · Redesign step 4: Profile — points on the phone, honest locks, safe delete (2026-10-16)
+
+Levels/points/badges live in `shared/src/levels.ts` (tested: thresholds Newcomer 0 · Explorer 50 · Local Guide
+150 · Route Master 400 · Legend 1000; +10 route, +5 description, +5 verified walk, +20 route verified).
+Stats are computed **on the phone** from the local SQLite data (uploaded routes, descriptions, lift/entrance
+checkpoints, distance) — works offline and for anonymous users; `profiles.points` stays unused until server-side
+verification (Phase 5). "Verified by others" is 0 and the Verified Contributor / Top Contributor badges stay
+locked (with how-to-earn) until verification and the friends leaderboard exist.
+Display name is saved to `profiles.display_name` (column-level update grant). **Not done:** avatar photo upload
+(needs a Storage bucket + policies; initials are shown) and the language switch (bilingual pass is Phase 7) —
+both rows say so. "Download my data" writes a JSON file (expo-file-system) and opens the share sheet.
+"Delete my data" deletes server routes + descriptions with a match-all filter that RLS narrows to the caller —
+verified on the live project: another user's delete-all removed 0 rows of someone else's data; the owner's
+removed exactly their own route. Server deletion happens first; phone data is only wiped if it succeeds.
+The auth user itself can't be deleted from the client (needs an admin key) — it keeps no data afterwards.

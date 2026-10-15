@@ -11,6 +11,7 @@ export const localKeys = {
   recordings: ['local', 'recordings'] as const,
   recording: (id: string) => ['local', 'recording', id] as const,
   pendingCount: ['local', 'pending-count'] as const,
+  stats: ['local', 'stats'] as const,
 };
 
 /** Call after anything changes in the local database so every list re-reads it. */

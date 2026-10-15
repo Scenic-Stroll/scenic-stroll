@@ -102,7 +102,11 @@ function ReviewForm({ rec }: { rec: localDb.RecordingDetail }) {
   );
   const [title, setTitle] = useState(rec.title);
   const [description, setDescription] = useState(rec.description ?? '');
-  const [showAuthor, setShowAuthor] = useState(rec.showAuthor);
+  const showNameByDefault = useSettings((s) => s.showNameByDefault);
+  // New recordings start from the Profile → Privacy default; saved ones keep their own choice.
+  const [showAuthor, setShowAuthor] = useState(
+    rec.status === 'draft' ? showNameByDefault : rec.showAuthor,
+  );
   const [trimEnds, setTrimEnds] = useState(rec.trimEnds);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -291,3 +291,73 @@ export async function loadRecording(id: string): Promise<RecordingDetail | null>
     })),
   };
 }
+
+// ---- profile stats / my data ------------------------------------------------------------
+
+export type MyStats = {
+  /** Routes uploaded (shared with the community). */
+  routesLogged: number;
+  /** Uploaded routes that include a description. */
+  descriptions: number;
+  /** Total distance of saved recordings (waiting or uploaded), in metres. */
+  metersWalked: number;
+  /** Lift checkpoints on uploaded routes. */
+  liftCheckpoints: number;
+  /** Uploaded routes that go indoors (have an entrance checkpoint). */
+  shelteredRoutes: number;
+};
+
+/** Numbers for the Profile tab, calculated from what's stored on this phone. */
+export async function getMyStats(): Promise<MyStats> {
+  const row = await db.getFirstAsync<{
+    routes: number;
+    descriptions: number;
+    meters: number | null;
+  }>(
+    `SELECT
+       SUM(CASE WHEN status = 'uploaded' THEN 1 ELSE 0 END) AS routes,
+       SUM(CASE WHEN status = 'uploaded' AND TRIM(COALESCE(description, '')) != '' THEN 1 ELSE 0 END) AS descriptions,
+       SUM(CASE WHEN status IN ('pending', 'uploaded') THEN distance_m ELSE 0 END) AS meters
+     FROM recordings`,
+  );
+  const cps = await db.getFirstAsync<{ lifts: number; sheltered: number }>(
+    `SELECT
+       SUM(CASE WHEN c.kind = 'lift' THEN 1 ELSE 0 END) AS lifts,
+       COUNT(DISTINCT CASE WHEN c.kind = 'entrance' THEN c.recording_id END) AS sheltered
+     FROM checkpoints c JOIN recordings r ON r.id = c.recording_id
+     WHERE r.status = 'uploaded'`,
+  );
+  return {
+    routesLogged: row?.routes ?? 0,
+    descriptions: row?.descriptions ?? 0,
+    metersWalked: row?.meters ?? 0,
+    liftCheckpoints: cps?.lifts ?? 0,
+    shelteredRoutes: cps?.sheltered ?? 0,
+  };
+}
+
+/** Everything stored on this phone, for "Download my data". */
+export async function exportLocalData() {
+  return {
+    recordings: await db.getAllAsync('SELECT * FROM recordings ORDER BY started_at'),
+    checkpoints: await db.getAllAsync('SELECT * FROM checkpoints ORDER BY recording_id, ts'),
+    samples: await db.getAllAsync('SELECT * FROM samples ORDER BY recording_id, ts'),
+  };
+}
+
+/** Ids of routes this phone uploaded (= route ids on the server). */
+export async function listUploadedIds(): Promise<string[]> {
+  const rows = await db.getAllAsync<{ id: string }>(
+    `SELECT id FROM recordings WHERE status = 'uploaded'`,
+  );
+  return rows.map((r) => r.id);
+}
+
+/** "Delete my data": wipes every recording, GPS sample and checkpoint on this phone. */
+export async function deleteAllLocalData() {
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM checkpoints');
+    await db.runAsync('DELETE FROM samples');
+    await db.runAsync('DELETE FROM recordings');
+  });
+}

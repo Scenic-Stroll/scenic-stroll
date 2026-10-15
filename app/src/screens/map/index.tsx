@@ -34,6 +34,7 @@ import type { IconName } from '@/components/ui/icon';
 import { SearchBar } from '@/components/ui/search-bar';
 import { planRoute } from '@/lib/api';
 import { communityKeys, fetchCommunityRoutes } from '@/lib/community-routes';
+import { useMyProfile } from '@/lib/profile';
 import { radius, space, useAppTheme, useColorSchemeName } from '@/theme';
 
 import { MapControls, type MapLayers } from './map-controls';
@@ -66,6 +67,7 @@ export function MapHome() {
   const scheme = useColorSchemeName();
   const mapRef = useRef<MapView>(null);
   const sheetRef = useRef<BottomSheet>(null);
+  const profile = useMyProfile();
 
   const [origin, setOrigin] = useState<Place | null>(null);
   const [destination, setDestination] = useState<Place | null>(null);
@@ -321,7 +323,7 @@ export function MapHome() {
                 onPress={() => router.navigate('/profile')}
                 hitSlop={6}
               >
-                <Avatar name={null} size={34} />
+                <Avatar name={profile.data?.displayName ?? null} size={34} />
               </Pressable>
             }
           />

@@ -14,10 +14,13 @@ type SettingsState = {
   dataCollectionMode: boolean;
   /** Profile → Theme. 'system' follows the phone. */
   themePreference: ThemePreference;
+  /** Profile → Privacy: pre-tick "Show my name" on new routes. Off by default (anonymous). */
+  showNameByDefault: boolean;
   /** Next number for auto-numbered titles in data collection mode. */
   nextRouteNumber: number;
   setDataCollectionMode: (on: boolean) => void;
   setThemePreference: (t: ThemePreference) => void;
+  setShowNameByDefault: (on: boolean) => void;
   /** Returns the next "Route N" title and advances the counter. */
   takeRouteNumber: () => number;
 };
@@ -28,8 +31,10 @@ export const useSettings = create<SettingsState>()(
       dataCollectionMode: false,
       nextRouteNumber: 1,
       themePreference: 'system',
+      showNameByDefault: false,
       setDataCollectionMode: (on) => set({ dataCollectionMode: on }),
       setThemePreference: (t) => set({ themePreference: t }),
+      setShowNameByDefault: (on) => set({ showNameByDefault: on }),
       takeRouteNumber: () => {
         const n = get().nextRouteNumber;
         set({ nextRouteNumber: n + 1 });
@@ -44,6 +49,7 @@ export const useSettings = create<SettingsState>()(
         dataCollectionMode: s.dataCollectionMode,
         nextRouteNumber: s.nextRouteNumber,
         themePreference: s.themePreference,
+        showNameByDefault: s.showNameByDefault,
       }),
     },
   ),

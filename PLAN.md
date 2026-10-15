@@ -70,7 +70,7 @@ Secrets are never committed and never go in the app — only into `supabase secr
 - [x] 1. Design system (`app/src/theme`, 9 UI components), 5-tab bar (Map · Routes · Record · Friends · Profile), Settings → Profile, theme setting
 - [x] 2. Map restyle: light map, search bar (+ avatar), filter chips, zoom/location/layers buttons, bottom sheet (Nearby + route planning, friendly error cards)
 - [x] 3. Place card (route here/from, save, share, nearest exits), route option cards with segment strip, step-by-step directions (plan-route v3)
-- [ ] 4. Profile: stats, levels, badges, privacy
+- [x] 4. Profile: name/level/progress, 2×2 stats, badges, saved places, show-my-name default, download/delete my data (photo upload + language switch deferred)
 - [ ] 5. Friends backend + screens (codes, requests, activity, leaderboard)
 - [ ] 6. Live location sharing
 - [ ] 7. Floor selector, dark theme polish

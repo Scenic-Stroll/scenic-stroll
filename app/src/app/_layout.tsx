@@ -37,6 +37,10 @@ export default function RootLayout() {
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="(tabs)" />
               <Stack.Screen
+                name="saved-places"
+                options={{ headerShown: true, title: 'Saved places', headerBackTitle: 'Profile' }}
+              />
+              <Stack.Screen
                 name="recording/[id]"
                 options={{ presentation: 'modal', headerShown: true, title: 'Review route' }}
               />

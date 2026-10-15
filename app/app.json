@@ -41,7 +41,8 @@
         {
           "locationWhenInUsePermission": "Scenic Stroll uses your location to show where you are on the map and to record the walking routes you choose to share."
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,
