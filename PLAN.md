@@ -68,7 +68,7 @@ Secrets are never committed and never go in the app — only into `supabase secr
 ## Redesign (2GIS-style UI, brief of 2026-10-16) — priority order
 
 - [x] 1. Design system (`app/src/theme`, 9 UI components), 5-tab bar (Map · Routes · Record · Friends · Profile), Settings → Profile, theme setting
-- [ ] 2. Map restyle: light map, search bar, chips, floating buttons, bottom sheet (route planning)
+- [x] 2. Map restyle: light map, search bar (+ avatar), filter chips, zoom/location/layers buttons, bottom sheet (Nearby + route planning, friendly error cards)
 - [ ] 3. Place card + route options list with segment strip
 - [ ] 4. Profile: stats, levels, badges, privacy
 - [ ] 5. Friends backend + screens (codes, requests, activity, leaderboard)

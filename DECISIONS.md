@@ -121,3 +121,15 @@ so `primary` (buttons, selected chips, active tab, links) is `#14822A` (4.9:1) a
 Tabs: `expo-router/js-tabs` (the plain `Tabs` export is deprecated) because native tabs can't render a raised
 custom centre button. Saved/Explore (Routes) and Friends show honest "coming soon" states until steps 4–5;
 no demo-mode switch until demo mode exists (Phase 7).
+
+### D17 · Redesign step 2: map layout, light base map, honest route options (2026-10-16)
+
+`@gorhom/bottom-sheet` 5.2 (supports Reanimated 4 / Gesture Handler 2.32, runs in Expo Go) with snap points
+15 % / 50 % / 90 %; `GestureHandlerRootView` wraps the app. Light base map: Google Maps (Android) gets a custom
+JSON style; Apple Maps (iOS) doesn't support JSON styles in react-native-maps, so it uses `mutedStandard` +
+`userInterfaceStyle`. 2D is the default; 3D (tilt + buildings) is a layer toggle. Filter chips map to taxonomy
+tags in `shared/src/filters.ts` (step-free requires the `step_free` tag — a lift alone never counts).
+Community routes come from `routes_public` (readable signed-out). Route modes other than Fastest say plainly
+that no community route covers the trip yet and list the standard route (step-free: "not confirmed") —
+real community options arrive with `find-routes` (Phase 4). Errors appear as `ErrorCard`s with Retry.
+Floor selector → step 7; follow mode → later.

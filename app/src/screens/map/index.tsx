@@ -1,12 +1,25 @@
 /**
- * Map tab: the demo area, your location, start/destination pickers and the standard walking route
- * (drawn in grey). Community routes are added on top of this in Phase 4.
+ * Map tab (city-map-app layout):
+ *   top    — floating search bar (+ avatar → Profile) and filter chips
+ *   right  — zoom, my location, layers
+ *   bottom — sheet with 3 snap points: "Nearby" community routes, or route planning
+ * Light base map by default (2D); 3D is a layer toggle.
  */
-import { DEMO_CENTER, formatDistance, formatDuration } from '@scenic/shared';
+import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import {
+  DEMO_CENTER,
+  FILTERS,
+  matchesFilters,
+  PRESETS,
+  type CommunityRoute,
+  type FilterKey,
+  type LatLng,
+} from '@scenic/shared';
 import { useQuery } from '@tanstack/react-query';
 import * as Location from 'expo-location';
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { router } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import MapView, {
   Marker,
   Polyline,
@@ -15,196 +28,335 @@ import MapView, {
 } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { Avatar } from '@/components/ui/avatar';
+import { Chip } from '@/components/ui/chip';
+import type { IconName } from '@/components/ui/icon';
+import { SearchBar } from '@/components/ui/search-bar';
 import { planRoute } from '@/lib/api';
+import { communityKeys, fetchCommunityRoutes } from '@/lib/community-routes';
+import { radius, space, useAppTheme, useColorSchemeName } from '@/theme';
 
+import { MapControls, type MapLayers } from './map-controls';
+import { DARK_MAP_STYLE, LIGHT_MAP_STYLE } from './map-style';
+import { NearbySheet } from './nearby-sheet';
 import { PlacePicker } from './place-picker';
+import { PlanningSheet, type RouteMode } from './planning-sheet';
 import type { Place } from './types';
 
-const ROUTE_GREY = '#8E8E93';
-const START_GREEN = '#2E7D32';
-const END_RED = '#C62828';
-
-// How far the map tilts in 3D mode (0 = flat, top-down). 55° shows buildings as 3D blocks
-// while street names stay readable.
 const PITCH_3D = 55;
+const SNAP_POINTS = ['15%', '50%', '90%'];
+const SHEET_PEEK = 0;
+const SHEET_HALF = 1;
 
-// Starting view: CityU, Festival Walk and Kowloon Tong station on screen, tilted in 3D.
-// `altitude` (metres above ground) is used by Apple Maps on iPhone, `zoom` by Google Maps on Android.
+// CityU, Festival Walk and Kowloon Tong station on screen, flat (2D) by default.
 const DEMO_CAMERA: Camera = {
   center: { latitude: DEMO_CENTER.lat, longitude: DEMO_CENTER.lng },
-  pitch: PITCH_3D,
+  pitch: 0,
   heading: 0,
-  altitude: 900,
-  zoom: 17,
+  altitude: 1100, // Apple Maps
+  zoom: 16.5, // Google Maps
 };
 
-const toMap = (p: { lat: number; lng: number }): MapLatLng => ({
-  latitude: p.lat,
-  longitude: p.lng,
-});
+const toMap = (p: LatLng): MapLatLng => ({ latitude: p.lat, longitude: p.lng });
 
 export function MapHome() {
-  const theme = useTheme();
+  const t = useAppTheme();
+  const scheme = useColorSchemeName();
   const mapRef = useRef<MapView>(null);
+  const sheetRef = useRef<BottomSheet>(null);
+
   const [origin, setOrigin] = useState<Place | null>(null);
   const [destination, setDestination] = useState<Place | null>(null);
   const [picking, setPicking] = useState<'origin' | 'destination' | null>(null);
+  const [planning, setPlanning] = useState(false);
+  const [mode, setMode] = useState<RouteMode>('fastest');
+  const [filters, setFilters] = useState<ReadonlySet<FilterKey>>(new Set());
+  const [layers, setLayers] = useState<MapLayers>({
+    threeD: false,
+    communityRoutes: true,
+    places: true,
+  });
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<LatLng | null>(null);
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
-  const [is3D, setIs3D] = useState(true);
 
-  // Tilt the camera in/out of 3D without moving the map.
-  const toggle3D = () => {
-    const next = !is3D;
-    setIs3D(next);
-    mapRef.current?.animateCamera({ pitch: next ? PITCH_3D : 0 }, { duration: 400 });
-  };
-
-  // Ask for location once, so the blue "you are here" dot can show.
+  // Location once on open: the blue dot, and "nearby" measured from where you are.
   useEffect(() => {
     Location.requestForegroundPermissionsAsync()
-      .then(({ granted }) => setHasLocationPermission(granted))
+      .then(async ({ granted }) => {
+        setHasLocationPermission(granted);
+        if (!granted) return;
+        const last = await Location.getLastKnownPositionAsync();
+        if (last) setUserLocation({ lat: last.coords.latitude, lng: last.coords.longitude });
+      })
       .catch(() => setHasLocationPermission(false));
   }, []);
 
-  // The standard walking route. Re-fetched automatically when start or destination change.
-  const route = useQuery({
+  const community = useQuery({
+    queryKey: communityKeys.all,
+    queryFn: fetchCommunityRoutes,
+    staleTime: 60_000,
+  });
+
+  const standardRoute = useQuery({
     queryKey: ['plan-route', origin?.point, destination?.point],
     queryFn: () => planRoute(origin!.point, destination!.point),
-    enabled: origin !== null && destination !== null,
-    staleTime: 10 * 60 * 1000, // walking routes don't change minute to minute
+    enabled: planning && origin !== null && destination !== null,
+    staleTime: 10 * 60 * 1000,
     retry: 1,
   });
 
-  // Zoom the map to fit the route when it arrives.
-  useEffect(() => {
-    if (!route.data) return;
-    mapRef.current?.fitToCoordinates(route.data.coordinates.map(toMap), {
-      edgePadding: { top: 220, right: 60, bottom: 260, left: 60 },
+  const fit = useCallback((points: LatLng[]) => {
+    if (points.length < 2) return;
+    mapRef.current?.fitToCoordinates(points.map(toMap), {
+      edgePadding: { top: 200, right: 80, bottom: 380, left: 60 },
       animated: true,
     });
-  }, [route.data]);
+  }, []);
 
-  const swap = () => {
-    setOrigin(destination);
-    setDestination(origin);
+  // Zoom to the standard route when it arrives.
+  useEffect(() => {
+    if (standardRoute.data) fit(standardRoute.data.coordinates);
+  }, [standardRoute.data, fit]);
+
+  // 2D ↔ 3D tilt.
+  useEffect(() => {
+    mapRef.current?.animateCamera({ pitch: layers.threeD ? PITCH_3D : 0 }, { duration: 400 });
+  }, [layers.threeD]);
+
+  const visibleCommunity = useMemo(
+    () => (community.data ?? []).filter((r) => matchesFilters(r, filters)),
+    [community.data, filters],
+  );
+
+  // ---- actions -------------------------------------------------------------------------
+
+  const zoomBy = async (zoomIn: boolean) => {
+    const cam = await mapRef.current?.getCamera();
+    if (!cam) return;
+    if (Platform.OS === 'ios') {
+      const altitude = (cam.altitude ?? 1000) * (zoomIn ? 0.5 : 2);
+      mapRef.current?.animateCamera({ altitude }, { duration: 250 });
+    } else {
+      mapRef.current?.animateCamera(
+        { zoom: (cam.zoom ?? 16) + (zoomIn ? 1 : -1) },
+        { duration: 250 },
+      );
+    }
   };
 
+  const goToMyLocation = async () => {
+    try {
+      const { granted } = await Location.requestForegroundPermissionsAsync();
+      setHasLocationPermission(granted);
+      if (!granted) return;
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const here = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      setUserLocation(here);
+      mapRef.current?.animateCamera({ center: toMap(here) }, { duration: 400 });
+    } catch {
+      // No fix (e.g. indoors) — keep the map where it is.
+    }
+  };
+
+  /** Start planning a trip to `place` (from your location when known). */
+  const routeTo = (place: Place) => {
+    setDestination(place);
+    if (!origin && userLocation) setOrigin({ label: 'My location', point: userLocation });
+    setPlanning(true);
+    setSelectedRouteId(null);
+    sheetRef.current?.snapToIndex(SHEET_HALF);
+  };
+
+  const closePlanning = () => {
+    setPlanning(false);
+    setOrigin(null);
+    setDestination(null);
+    setMode('fastest');
+    sheetRef.current?.snapToIndex(SHEET_PEEK);
+  };
+
+  const selectCommunityRoute = (route: CommunityRoute) => {
+    setSelectedRouteId(route.id);
+    fit(route.line);
+  };
+
+  const toggleFilter = (key: FilterKey) => {
+    const next = new Set(filters);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    setFilters(next);
+  };
+
+  // ---- render --------------------------------------------------------------------------
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.fill, { backgroundColor: t.background }]}>
       <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFill}
         initialCamera={DEMO_CAMERA}
-        showsBuildings // 3D building blocks (Apple Maps on iPhone, Google Maps on Android)
-        pitchEnabled // two-finger drag up/down tilts the map
+        // Light, low-clutter base map (see map-style.ts for the per-platform details).
+        customMapStyle={scheme === 'dark' ? DARK_MAP_STYLE : LIGHT_MAP_STYLE}
+        mapType={Platform.OS === 'ios' ? 'mutedStandard' : 'standard'}
+        userInterfaceStyle={scheme}
+        showsBuildings={layers.threeD}
+        pitchEnabled
         showsUserLocation={hasLocationPermission}
         showsMyLocationButton={false}
-        // Long-press anywhere to set a destination there.
+        showsCompass={false}
+        toolbarEnabled={false}
         onLongPress={(e) => {
           const { latitude, longitude } = e.nativeEvent.coordinate;
-          setDestination({ label: 'Dropped pin', point: { lat: latitude, lng: longitude } });
+          routeTo({ label: 'Dropped pin', point: { lat: latitude, lng: longitude } });
         }}
       >
-        {route.data ? (
+        {layers.communityRoutes
+          ? visibleCommunity.map((r) => (
+              <Polyline
+                key={r.id}
+                coordinates={r.line.map(toMap)}
+                strokeColor={t.accent}
+                strokeWidth={r.id === selectedRouteId ? 7 : 4}
+                zIndex={r.id === selectedRouteId ? 3 : 2}
+                tappable
+                onPress={() => selectCommunityRoute(r)}
+              />
+            ))
+          : null}
+        {planning && standardRoute.data ? (
           <Polyline
-            coordinates={route.data.coordinates.map(toMap)}
-            strokeColor={ROUTE_GREY}
+            coordinates={standardRoute.data.coordinates.map(toMap)}
+            strokeColor={t.routeStandard}
             strokeWidth={6}
+            zIndex={1}
           />
         ) : null}
-        {origin ? (
+        {layers.places
+          ? PRESETS.map((p) => (
+              <Marker
+                key={p.id}
+                coordinate={toMap(p.point)}
+                title={p.en}
+                description={`${p.zh} · tap here to route`}
+                tracksViewChanges={false}
+                onCalloutPress={() => routeTo({ label: p.en, point: p.point })}
+              >
+                <View
+                  style={[
+                    styles.placeDot,
+                    { backgroundColor: t.background, borderColor: t.textSecondary },
+                  ]}
+                />
+              </Marker>
+            ))
+          : null}
+        {planning && origin ? (
           <Marker
             coordinate={toMap(origin.point)}
             title={`Start: ${origin.label}`}
-            pinColor={START_GREEN}
+            pinColor={t.primary}
           />
         ) : null}
-        {destination ? (
+        {planning && destination ? (
           <Marker
             coordinate={toMap(destination.point)}
             title={`Destination: ${destination.label}`}
-            pinColor={END_RED}
+            pinColor={t.danger}
           />
         ) : null}
       </MapView>
 
-      {/* Start / destination card */}
-      <SafeAreaView edges={['top']} style={styles.topOverlay} pointerEvents="box-none">
-        <ThemedView type="background" style={[styles.card, styles.shadow]}>
-          <View style={styles.fields}>
-            <PlaceField
-              color={START_GREEN}
-              label="From"
-              value={origin?.label}
-              placeholder="Choose start"
-              onPress={() => setPicking('origin')}
-            />
-            <PlaceField
-              color={END_RED}
-              label="To"
-              value={destination?.label}
-              placeholder="Choose destination"
-              onPress={() => setPicking('destination')}
-            />
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Swap start and destination"
-            onPress={swap}
-            style={styles.swap}
-            hitSlop={8}
-          >
-            <ThemedText type="subtitle" style={styles.swapIcon}>
-              ⇅
-            </ThemedText>
-          </Pressable>
-        </ThemedView>
+      {/* Search bar + chips + map buttons */}
+      <SafeAreaView edges={['top']} style={styles.top} pointerEvents="box-none">
+        <View style={styles.searchRow}>
+          <SearchBar
+            floating
+            placeholder="Search places, buildings, MTR exits…"
+            onPress={() => setPicking('destination')}
+            right={
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Open profile"
+                onPress={() => router.navigate('/profile')}
+                hitSlop={6}
+              >
+                <Avatar name={null} size={34} />
+              </Pressable>
+            }
+          />
+        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chips}
+          keyboardShouldPersistTaps="handled"
+        >
+          {FILTERS.map((f) => (
+            <View key={f.key} style={styles.chipShadow}>
+              <Chip
+                label={f.en}
+                icon={f.icon as IconName}
+                selected={filters.has(f.key)}
+                onPress={() => toggleFilter(f.key)}
+              />
+            </View>
+          ))}
+        </ScrollView>
+        <View style={styles.controls} pointerEvents="box-none">
+          <MapControls
+            layers={layers}
+            onLayersChange={setLayers}
+            onZoomIn={() => void zoomBy(true)}
+            onZoomOut={() => void zoomBy(false)}
+            onMyLocation={() => void goToMyLocation()}
+          />
+        </View>
       </SafeAreaView>
 
-      {/* Route summary */}
-      <View style={styles.bottomOverlay} pointerEvents="box-none">
-        <View style={styles.mapButtons}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={is3D ? 'Switch to flat 2D map' : 'Switch to 3D map'}
-            onPress={toggle3D}
-            style={[styles.recenter, styles.shadow, { backgroundColor: theme.background }]}
-          >
-            <ThemedText type="smallBold">{is3D ? '2D' : '3D'}</ThemedText>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Show the CityU demo area"
-            onPress={() => {
-              setIs3D(true);
-              mapRef.current?.animateCamera(DEMO_CAMERA, { duration: 400 });
-            }}
-            style={[styles.recenter, styles.shadow, { backgroundColor: theme.background }]}
-          >
-            <ThemedText type="smallBold">CityU</ThemedText>
-          </Pressable>
-        </View>
-        <RouteSummary
-          state={
-            origin === null || destination === null
-              ? { kind: 'hint' }
-              : route.isPending
-                ? { kind: 'loading' }
-                : route.error
-                  ? { kind: 'error', message: route.error.message, retry: () => route.refetch() }
-                  : route.data
-                    ? {
-                        kind: 'route',
-                        text: `${formatDuration(route.data.duration_s)} · ${formatDistance(route.data.distance_m)}`,
-                      }
-                    : { kind: 'hint' }
-          }
-        />
-      </View>
+      <BottomSheet
+        ref={sheetRef}
+        index={SHEET_PEEK}
+        snapPoints={SNAP_POINTS}
+        enableDynamicSizing={false}
+        backgroundStyle={{ backgroundColor: t.background, borderRadius: radius.sheet }}
+        handleIndicatorStyle={{ backgroundColor: t.border, width: 40 }}
+        accessibilityLabel={planning ? 'Route planning' : 'Nearby routes'}
+      >
+        <BottomSheetScrollView keyboardShouldPersistTaps="handled">
+          {planning ? (
+            <PlanningSheet
+              origin={origin}
+              destination={destination}
+              onPickOrigin={() => setPicking('origin')}
+              onPickDestination={() => setPicking('destination')}
+              onSwap={() => {
+                setOrigin(destination);
+                setDestination(origin);
+              }}
+              onClose={closePlanning}
+              mode={mode}
+              onModeChange={setMode}
+              standardRoute={standardRoute.data}
+              isLoading={standardRoute.isFetching}
+              error={standardRoute.error}
+              onRetry={() => void standardRoute.refetch()}
+            />
+          ) : (
+            <NearbySheet
+              routes={community.data}
+              isLoading={community.isPending}
+              error={community.error}
+              onRetry={() => void community.refetch()}
+              center={userLocation ?? DEMO_CENTER}
+              filters={filters}
+              selectedId={selectedRouteId}
+              onSelectRoute={selectCommunityRoute}
+              onRecord={() => router.navigate('/record')}
+            />
+          )}
+        </BottomSheetScrollView>
+      </BottomSheet>
 
       <PlacePicker
         visible={picking !== null}
@@ -212,139 +364,34 @@ export function MapHome() {
         allowCurrentLocation={picking === 'origin'}
         onClose={() => setPicking(null)}
         onPick={(place) => {
-          if (picking === 'origin') setOrigin(place);
-          else setDestination(place);
+          const target = picking;
           setPicking(null);
+          if (target === 'origin') {
+            setOrigin(place);
+            setPlanning(true);
+            sheetRef.current?.snapToIndex(SHEET_HALF);
+          } else {
+            routeTo(place);
+          }
         }}
       />
     </View>
   );
 }
 
-function PlaceField({
-  color,
-  label,
-  value,
-  placeholder,
-  onPress,
-}: {
-  color: string;
-  label: string;
-  value: string | undefined;
-  placeholder: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${label}: ${value ?? placeholder}`}
-      onPress={onPress}
-      style={styles.field}
-    >
-      <View style={[styles.dot, { backgroundColor: color }]} />
-      <ThemedText type="small" themeColor="textSecondary" style={styles.fieldLabel}>
-        {label}
-      </ThemedText>
-      <ThemedText
-        numberOfLines={1}
-        themeColor={value ? 'text' : 'textSecondary'}
-        style={styles.fieldValue}
-      >
-        {value ?? placeholder}
-      </ThemedText>
-    </Pressable>
-  );
-}
-
-type SummaryState =
-  | { kind: 'hint' }
-  | { kind: 'loading' }
-  | { kind: 'error'; message: string; retry: () => void }
-  | { kind: 'route'; text: string };
-
-function RouteSummary({ state }: { state: SummaryState }) {
-  return (
-    <ThemedView type="background" style={[styles.card, styles.summary, styles.shadow]}>
-      {state.kind === 'hint' ? (
-        <ThemedText type="small" themeColor="textSecondary">
-          Choose a start and destination — or long-press the map to drop a pin.
-        </ThemedText>
-      ) : null}
-      {state.kind === 'loading' ? (
-        <View style={styles.inline}>
-          <ActivityIndicator />
-          <ThemedText type="small">Finding the standard walking route…</ThemedText>
-        </View>
-      ) : null}
-      {state.kind === 'error' ? (
-        <View style={styles.summaryError}>
-          <ThemedText type="small">Couldn’t get a route: {state.message}</ThemedText>
-          <Pressable
-            accessibilityRole="button"
-            onPress={state.retry}
-            hitSlop={8}
-            style={styles.retry}
-          >
-            <ThemedText type="linkPrimary">Try again</ThemedText>
-          </Pressable>
-        </View>
-      ) : null}
-      {state.kind === 'route' ? (
-        <View style={styles.inline}>
-          <View style={[styles.legend, { backgroundColor: ROUTE_GREY }]} />
-          <View>
-            <ThemedText type="smallBold">Standard walk</ThemedText>
-            <ThemedText>{state.text}</ThemedText>
-          </View>
-        </View>
-      ) : null}
-    </ThemedView>
-  );
-}
-
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  topOverlay: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: Spacing.three },
-  bottomOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: BottomTabInset + Spacing.three,
-    paddingHorizontal: Spacing.three,
-    gap: Spacing.two,
-    alignItems: 'flex-end',
-  },
-  card: {
-    borderRadius: Spacing.three,
-    padding: Spacing.three,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: Spacing.two,
-  },
-  shadow: {
+  fill: { flex: 1 },
+  top: { position: 'absolute', top: 0, left: 0, right: 0 },
+  searchRow: { paddingHorizontal: space.lg, paddingTop: space.sm },
+  chips: { gap: space.sm, paddingHorizontal: space.lg, paddingVertical: space.md },
+  chipShadow: {
+    borderRadius: radius.round,
     shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 2,
   },
-  fields: { flex: 1, gap: Spacing.one },
-  field: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  dot: { width: 10, height: 10, borderRadius: 5 },
-  fieldLabel: { width: 40 },
-  fieldValue: { flex: 1 },
-  swap: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  swapIcon: { fontSize: 24, lineHeight: 30 },
-  mapButtons: { flexDirection: 'row', gap: Spacing.two },
-  recenter: {
-    minHeight: 44,
-    paddingHorizontal: Spacing.three,
-    borderRadius: 22,
-    justifyContent: 'center',
-  },
-  summary: { alignSelf: 'stretch', marginTop: 0 },
-  summaryError: { flex: 1, gap: Spacing.one },
-  retry: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
-  inline: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  legend: { width: 6, alignSelf: 'stretch', borderRadius: 3 },
+  controls: { alignItems: 'flex-end', paddingHorizontal: space.lg, marginTop: space.sm },
+  placeDot: { width: 14, height: 14, borderRadius: 7, borderWidth: 3 },
 });
