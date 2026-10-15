@@ -1,0 +1,37 @@
+# dependencies
+node_modules/
+
+# env files — NEVER commit real keys
+.env
+.env.*
+!.env.example
+
+# Expo / Metro
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.metro-health-check*
+
+# Supabase local state
+supabase/.temp/
+supabase/.branches/
+
+# misc
+*.tsbuildinfo
+.DS_Store
+npm-debug.*
+coverage/
+
+# Expo generated native folders (Continuous Native Generation) and signing files
+app/ios/
+app/android/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+
+# Generated copy of /shared for Edge Functions (scripts/sync-shared.mjs)
+supabase/functions/_shared/scenic/

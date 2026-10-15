@@ -1,0 +1,29 @@
+{
+  "name": "scenic-stroll",
+  "private": true,
+  "description": "Community-sourced pedestrian navigation for Hong Kong (hackathon prototype)",
+  "workspaces": [
+    "app",
+    "shared"
+  ],
+  "scripts": {
+    "start": "npm run start --workspace app --",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present && npm run test:functions && npm run test:db",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "sync-shared": "node scripts/sync-shared.mjs",
+    "check:functions": "node scripts/check-functions.mjs",
+    "deploy:functions": "npm run sync-shared && npx supabase functions deploy --use-api",
+    "test:functions": "npm run sync-shared && npx -y deno test --config supabase/functions/plan-route/deno.json \"supabase/functions/**/*.test.ts\"",
+    "test:db": "node --test supabase/tests/database.test.mjs",
+    "typecheck:functions": "npm run sync-shared && npx -y deno check --config supabase/functions/plan-route/deno.json supabase/functions/plan-route/index.ts && npx -y deno check --config supabase/functions/geocode/deno.json supabase/functions/geocode/index.ts",
+    "smoke:routing": "node scripts/smoke-routing.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@electric-sql/pglite-postgis": "^0.2.8",
+    "prettier": "^3.9.9"
+  }
+}
