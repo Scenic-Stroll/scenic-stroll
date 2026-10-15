@@ -677,3 +677,166 @@ describe('conditions_cache (HKO weather cache)', () => {
     );
   });
 });
+
+describe('walking graph (graph_builds, ped_nodes, ped_edges + loader)', () => {
+  const KEY = 'test-loader-key-0123456789abcdef';
+  const BBOX = { minLat: 22.33, maxLat: 22.34, minLng: 114.17, maxLng: 114.18 };
+  const node = (id, lng, kind = 'street') => ({
+    id,
+    lng,
+    lat: 22.335,
+    z: 10,
+    level: null,
+    kind,
+    is_entrance: false,
+  });
+  const edge = (id, source, target, extra = {}) => ({
+    id,
+    source,
+    target,
+    coords: [
+      [114.171 + source / 1000, 22.335],
+      [114.171 + target / 1000, 22.335],
+    ],
+    length_m: 100,
+    kind: 'footway',
+    covered: false,
+    indoor: false,
+    air_conditioned: false,
+    step_free: 'yes',
+    slope_pct: 0,
+    z_from: 10,
+    z_to: 10,
+    level_from: null,
+    level_to: null,
+    crossing_wait_s: 0,
+    opening_hours: null,
+    tree_cover_pct: null,
+    data_source: 'lands_3dpn',
+    confidence: 0.9,
+    bidirectional: true,
+    name_en: 'Test',
+    name_zh: null,
+    source_ref: String(id),
+    ...extra,
+  });
+  const load = async (key, nodes, edges) => {
+    const build = (
+      await as(ALICE, `select public.graph_begin($1, 'lands_3dpn', '2026-10-16', $2) as id`, [
+        key,
+        BBOX,
+      ])
+    ).rows[0].id;
+    await as(ALICE, 'select public.graph_add($1, $2, $3, $4)', [
+      key,
+      build,
+      JSON.stringify(nodes),
+      JSON.stringify(edges),
+    ]);
+    return build;
+  };
+
+  before(async () => {
+    await db.query(
+      `insert into private.graph_loader_keys (key_hash, expires_at) values (sha256(convert_to($1, 'UTF8')), now() + interval '1 day')`,
+      [KEY],
+    );
+  });
+
+  it('refuses to load without a valid key, and anon cannot even call the loader', async () => {
+    await assert.rejects(
+      as(ALICE, `select public.graph_begin('wrong', 'lands_3dpn', 'x', $1)`, [BBOX]),
+      /loader key/,
+    );
+    await assert.rejects(
+      as(null, `select public.graph_begin($1, 'lands_3dpn', 'x', $2)`, [KEY, BBOX]),
+      /permission denied/,
+    );
+  });
+
+  it('refuses an expired key', async () => {
+    await db.query(
+      `insert into private.graph_loader_keys (key_hash, expires_at) values (sha256(convert_to('old-key', 'UTF8')), now() - interval '1 minute')`,
+    );
+    await assert.rejects(
+      as(ALICE, `select public.graph_begin('old-key', 'lands_3dpn', 'x', $1)`, [BBOX]),
+      /loader key/,
+    );
+  });
+
+  it('loads a build, activates it, and everyone can read it', async () => {
+    const build = await load(
+      KEY,
+      [node(0, 114.171), node(1, 114.172), node(2, 114.173)],
+      [edge(0, 0, 1), edge(1, 1, 2, { kind: 'stairs', step_free: 'no' })],
+    );
+    const result = (
+      await as(ALICE, 'select public.graph_activate($1, $2, $3) as r', [
+        KEY,
+        build,
+        { components: 1 },
+      ])
+    ).rows[0].r;
+    assert.deepEqual(result, { build_id: Number(build), nodes: 3, edges: 2 });
+    const edges = (
+      await as(
+        null,
+        'select kind, step_free, round(extensions.st_length(geom::extensions.geography)) as m from public.ped_edges order by id',
+      )
+    ).rows;
+    assert.deepEqual(
+      edges.map((e) => e.kind),
+      ['footway', 'stairs'],
+    );
+    assert.ok(
+      edges[0].m > 90 && edges[0].m < 115,
+      `edge geometry should be ~103 m, got ${edges[0].m}`,
+    );
+    const active = (
+      await as(null, `select status, node_count from public.graph_builds where status = 'active'`)
+    ).rows;
+    assert.deepEqual(active, [{ status: 'active', node_count: 3 }]);
+  });
+
+  it('nobody can write the graph tables directly', async () => {
+    for (const user of [null, ALICE]) {
+      await assert.rejects(as(user, 'delete from public.ped_edges'), /permission denied/);
+      await assert.rejects(
+        as(user, `update public.graph_builds set status = 'retired'`),
+        /permission denied/,
+      );
+    }
+  });
+
+  it('a new build replaces the old one only when activated, and the old rows are removed', async () => {
+    const before = (await db.query(`select id from public.graph_builds where status = 'active'`))
+      .rows[0].id;
+    const build = await load(KEY, [node(0, 114.171), node(1, 114.172)], [edge(0, 0, 1)]);
+    // still loading → the old build is still the active one
+    assert.equal(
+      (await db.query(`select id from public.graph_builds where status = 'active'`)).rows[0].id,
+      before,
+    );
+    await as(ALICE, 'select public.graph_activate($1, $2, $3)', [KEY, build, {}]);
+    const counts = (
+      await db.query('select build_id, count(*)::int as n from public.ped_edges group by build_id')
+    ).rows;
+    assert.deepEqual(counts, [{ build_id: build, n: 1 }]);
+    assert.equal(
+      (await db.query(`select status from public.graph_builds where id = $1`, [before])).rows[0]
+        .status,
+      'retired',
+    );
+  });
+
+  it('rejects edges that point at missing nodes, and empty builds', async () => {
+    await assert.rejects(load(KEY, [node(0, 114.171)], [edge(0, 0, 5)]), /foreign key/);
+    const empty = (
+      await as(ALICE, `select public.graph_begin($1, 'lands_3dpn', 'x', $2) as id`, [KEY, BBOX])
+    ).rows[0].id;
+    await assert.rejects(
+      as(ALICE, 'select public.graph_activate($1, $2, $3)', [KEY, empty, {}]),
+      /empty/,
+    );
+  });
+});

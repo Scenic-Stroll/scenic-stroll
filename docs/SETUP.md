@@ -144,7 +144,26 @@ npm run smoke:routing                                       # signs in + plans E
 | “Can’t reach the server”                                 | Phone is offline — routes still record and upload later                           |
 | “Now” card: “Live weather unavailable”                   | HKO or our server unreachable; card uses time of day. `npm run smoke:routing`     |
 
-## 9. Before you push code
+## 9. Walking graph (smart routing) — rebuild only when the map data changes
+
+Smart routes run on our own walking graph in Supabase (`graph_builds`, `ped_nodes`, `ped_edges`), built from the
+Lands Department **3D Pedestrian Network** (open data, updated quarterly). It is already loaded; rebuild it only
+to pick up new data or a bigger area (`GRAPH_BBOX` in `shared/src/graph-area.ts`).
+
+```bash
+npm run graph:download   # 3DPN for the area + 300 m margin → scripts/graph/data/3dpn.json (~1 min)
+npm run graph:build      # nodes + edges + checks → scripts/graph/data/graph.json, prints a report
+npm run graph:key        # prints a one-day loader key + one SQL line
+#   → paste the SQL line into Supabase dashboard → SQL editor → Run
+GRAPH_LOADER_KEY=<key> npm run graph:load   # uploads (~15 s), then switches the app to the new graph
+```
+
+- Read the build report: the biggest connected piece should be ~99 % of nodes and every MTR exit matched.
+- The old graph keeps serving until the last step of `graph:load`, so a failed upload changes nothing.
+- The key expires after 24 h; only its hash is stored. Never commit it.
+- Phone check: **Profile → Diagnostics → Walk map** shows the data date and number of paths.
+
+## 10. Before you push code
 
 ```bash
 npm run typecheck

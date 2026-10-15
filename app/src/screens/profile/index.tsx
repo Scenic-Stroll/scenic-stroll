@@ -354,6 +354,11 @@ export function ProfileScreen() {
             title="Weather data"
             subtitle="© Hong Kong Observatory, HKSAR Government · via DATA.GOV.HK"
           />
+          <ListRow
+            icon="walk"
+            title="Walking network"
+            subtitle="3D Pedestrian Network © Lands Department, HKSAR Government · via CSDI / DATA.GOV.HK"
+          />
         </Section>
       </ScrollView>
 

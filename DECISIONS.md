@@ -257,3 +257,53 @@ If the function can't be reached the phone computes day/night itself, so the car
 existing "English · 中文" side-by-side pattern; a real switch remains a separate task.
 `agoLabel` moved from `location-sharing.ts` to `shared/format.ts` (now tested) so both features use it.
 Live check: cold call 6.5 s (function boot), cached call 0.6 s; signed-out call → 401.
+
+### D24 · Smart routing step 2: walking graph from the Lands Department 3D Pedestrian Network (2026-10-16)
+
+**Source (checked 2026-10-16):** the 3D Pedestrian Network (3DPN), CSDI dataset `landsd_rcd_1637222018065_52265`,
+queried from its public ArcGIS MapServer (`portal.csdi.gov.hk/server/rest/services/common/…/MapServer`, layer 0
+`PedestrianRoute` + tables `AccessTime`, `AccessTimeDetails`, `PedRouteRelFloorPoly`), JSON with heights
+(`returnZ`), WGS84 (`outSR=4326`), paged 2,000 rows. Listed on DATA.GOV.HK, so the DATA.GOV.HK terms apply (free
+use, name the source, acknowledge the Government) → "3D Pedestrian Network © Lands Department, HKSAR Government ·
+via CSDI / DATA.GOV.HK" in Profile → About. It loaded in about a minute, so the OSM fallback wasn't needed.
+
+**Area:** `GRAPH_BBOX` (≈1.5 × 1.5 km around Kowloon Tong MTR / Festival Walk / CityU, `shared/src/graph-area.ts`),
+downloaded with a **300 m margin**: cut exactly at the box, edge streets (Beacon Heights, Broadcast Drive, Sai Yeung
+Choi St N.) became 15 disconnected scraps (93 % connected); with the margin the main piece holds 99.2 % of nodes.
+Routing stays inside `GRAPH_BBOX`; the margin is only there so paths near the edge keep their links.
+
+**Attribute mapping** (`edgeAttributesFrom3dpn`, tested): `FeatureType` → kind (footbridge, subway, escalator,
+lift, ramp, stairs/stairlift, crossings; other footways → `footway` or `indoor_corridor` when `Location` = indoor);
+covered = `WeatherProof` covered, or indoor, or subway; **air_conditioned = indoor (estimate)** — 3DPN has no AC
+field; indoor links here are malls, the station and campus buildings; flagged as an estimate for the UI. 3DPN's
+`WheelchairAccess` field is "False" even for lifts (6,376 of 6,507 segments), so it is **not used**; step-free comes
+from the type plus `WheelchairBarrier` (which marks 285/286 staircases and 28/29 escalators): stairs, escalators
+and barriers → "no", stairlift → "unknown", the rest → "yes". `Gradient` is rise/run → `slope_pct`. One-way
+escalators (`Direction` ±1) are stored pointing the allowed way. Crossing waits are estimates (signalised 45 s,
+zebra 5 s, cautionary 10 s). Opening hours → OSM-style text ("Mo-Su 07:00-24:00" for Festival Walk); CLOSE rows
+(lift maintenance windows) become "… off". Skipped: disabled segments, proposals, MTR paid areas (none in our box).
+Confidence 0.9 for field-checked data, 0.8 otherwise, −0.2 when the position is uncertain.
+
+**Topology:** segments are joined only at their **ends**, never where lines cross on the map (a footbridge over a
+road crosses the road without connecting), in two passes: ends at the same point (5 cm, same height) first, then
+**loose ends only** snap to a node within 1.5 m and 2 m of height. A first version snapped every end at 1.5 m and
+collapsed 863 short segments, including 20 short staircases, which step-free routing would have walked over.
+Node kinds come from the edges that meet (lift / escalator / stairs top/bottom); a node where indoor meets outdoor is
+a door (`building_entrance`, `is_entrance`); the node nearest each MTR exit preset (≤ 25 m, main piece) is
+`mrt_exit` — all 9 matched. Components are computed in the script (union-find) and only the main piece is loaded;
+`pgr_createTopology` isn't needed (the script assigns source/target), and pgRouting is enabled in step 3 where it is
+used. **No manual seed links were needed:** Festival Walk LG1 ↔ the Tat Chee Avenue subway ↔ CityU and every MTR exit
+are in the main piece. A quick shortest-path check: Exit A1 → MMW 575 m via Festival Walk LG1 and the subway (ORS
+street route: 537 m); Exit C1 → YEUNG 338 m, 91 % covered.
+**Known gap:** 3DPN models almost no lifts _inside_ CityU buildings (one, at the student hostels), so the node nearest
+a building's centre can be behind steps (AC2: nearest node 24 m, nearest step-free-reachable node 46 m). Step 3 must
+snap to the nearest node that is reachable for the chosen mode; community routes are the way to fill this gap.
+
+**Loading:** the CLI isn't logged in on the build laptop and we have no service-role key locally, so the graph is
+uploaded through `graph_begin / graph_add / graph_activate` (public INVOKER wrappers → private SECURITY DEFINER,
+signed-in callers only) that each demand a **loader key**: `npm run graph:key` makes a random 32-byte key and prints
+the SQL to register its **SHA-256 hash** with a 24 h expiry (built-in `sha256()`, no extension). Writes are atomic per
+build: a build loads as 'loading', `graph_activate` checks it isn't empty, retires the old active build and deletes
+its rows (one active build enforced by a partial unique index). Everyone may read the three tables (open data);
+nobody can write them directly. Build 1 is live: 9,372 nodes, 10,730 edges, 154 km of paths (21 km covered),
+uploaded in 12 s. The data date (Hong Kong time) is shown in Profile → Diagnostics → Walk map.

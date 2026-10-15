@@ -19,7 +19,11 @@
     "test:functions": "npm run sync-shared && npx -y deno test --config supabase/functions/plan-route/deno.json \"supabase/functions/**/*.test.ts\"",
     "test:db": "node --test supabase/tests/database.test.mjs",
     "typecheck:functions": "npm run sync-shared && npx -y deno check --config supabase/functions/plan-route/deno.json supabase/functions/plan-route/index.ts && npx -y deno check --config supabase/functions/geocode/deno.json supabase/functions/geocode/index.ts && npx -y deno check --config supabase/functions/conditions/deno.json supabase/functions/conditions/index.ts",
-    "smoke:routing": "node scripts/smoke-routing.mjs"
+    "smoke:routing": "node scripts/smoke-routing.mjs",
+    "graph:download": "node scripts/graph/download-3dpn.mts",
+    "graph:build": "node scripts/graph/build-graph.mts",
+    "graph:key": "node scripts/graph/new-loader-key.mts",
+    "graph:load": "node scripts/graph/load-graph.mts"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",

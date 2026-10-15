@@ -35,3 +35,6 @@ app/android/
 
 # Generated copy of /shared for Edge Functions (scripts/sync-shared.mjs)
 supabase/functions/_shared/scenic/
+
+# Walking graph downloads (re-create with npm run graph:download)
+scripts/graph/data/

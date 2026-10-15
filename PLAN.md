@@ -78,7 +78,7 @@ Secrets are never committed and never go in the app — only into `supabase secr
 ## Smart routing (computed sheltered / shaded / step-free routes, brief of 2026-10-16) — build order
 
 - [x] 1. Conditions service: `conditions` Edge Function (HKO current weather + warnings, cached in `conditions_cache`, suncalc sun position, mode rain / heat / night / severe / normal, fallbacks cache → time of day), "Now" card on route planning (tap to override), weather picks the starting tab, Diagnostics weather status + "Simulate weather" demo switch, HKO attribution
-- [ ] 2. Pedestrian graph import for the bbox (Lands Dept 3D Pedestrian Network, else OSM) + seed fixes for MTR exits / Festival Walk / CityU entrances (pgRouting 3.4.1 is available on the project)
+- [x] 2. Walking graph from the Lands Dept 3D Pedestrian Network (bbox + 300 m margin): 9,372 nodes / 10,730 edges live (build 1), 99.2 % connected, all 9 MTR exits matched, doors marked where indoor meets outdoor; `graph:download/build/key/load` scripts, key-protected loader, 6 DB + 17 unit tests; Diagnostics "Walk map" + attribution. No manual seed links needed (see D24). pgRouting 3.4.1 available, enabled in step 3
 - [ ] 3. `smart-route` (time + covered/indoor + step-free + opening hours), merged with the standard route, silent fallback
 - [ ] 4. Shade precompute + shade in the cost + exposure bar + segment colouring
 - [ ] 5. Mode tabs (Best now · Fastest · Shaded · Sheltered · Cool · Step-free), departure time, diverse alternatives

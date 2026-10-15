@@ -20,11 +20,21 @@ import { Chip } from '@/components/ui/chip';
 import { Spacing } from '@/constants/theme';
 import { FunctionCallError, pingFunction } from '@/lib/api';
 import { useConditions, useConditionsUi } from '@/lib/conditions';
+import { useActiveGraph, type ActiveGraph } from '@/lib/walking-graph';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 import { useAppTheme } from '@/theme';
 
 type Result = { name: FunctionName; ok: boolean; text: string };
+
+/** "Lands Dept 3DPN, data of 2026-10-15 · 10,730 paths" */
+function graphStatus(g: ActiveGraph | null | undefined, failed: boolean): string {
+  if (failed) return 'couldn’t check';
+  if (g === undefined) return 'checking…';
+  if (g === null) return 'none loaded — smart routes unavailable';
+  const source = g.source === 'lands_3dpn' ? 'Lands Dept 3DPN' : 'OpenStreetMap';
+  return `${source}, data of ${g.source_version} · ${g.edge_count.toLocaleString('en')} paths`;
+}
 
 /** "HKO, 4 min ago" / "HKO cache (HKO unreachable), 2 h ago" / "none — time of day only". */
 function weatherStatus(c: Conditions | null): string {
@@ -48,6 +58,7 @@ export function DiagnosticsCard() {
   const now = useConditions();
   const simulated = useConditionsUi((s) => s.simulated);
   const setSimulated = useConditionsUi((s) => s.setSimulated);
+  const graph = useActiveGraph();
 
   const signedIn =
     auth.status === 'signed-in'
@@ -87,6 +98,7 @@ export function DiagnosticsCard() {
       <Row label="Supabase" value={maskedUrl()} />
       <Row label="Signed in" value={signedIn} />
       <Row label="Weather" value={weatherStatus(now.conditions)} />
+      <Row label="Walk map" value={graphStatus(graph.data, graph.isError)} />
       <Row
         label="Priority"
         value={`${CONDITION_MODE_INFO[now.mode].en}${now.isSimulated ? ' (simulated)' : ''}${
