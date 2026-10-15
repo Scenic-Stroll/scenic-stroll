@@ -9,12 +9,15 @@ import {
   FunctionHealthSchema,
   GeocodeResponseSchema,
   PlanRouteResponseSchema,
+  SmartRouteResponseSchema,
   type Conditions,
   type FunctionHealth,
   type FunctionName,
   type GeocodeResult,
   type LatLng,
   type PlanRouteResponse,
+  type SmartRouteRequest,
+  type SmartRouteResponse,
 } from '@scenic/shared';
 import {
   FunctionsFetchError,
@@ -155,6 +158,15 @@ export async function geocode(text: string): Promise<GeocodeResult[]> {
     GeocodeResponseSchema,
   );
   return res.results;
+}
+
+/** Our own computed routes (walking graph): requested profile, "Best now" and fastest. */
+export function smartRoute(request: SmartRouteRequest): Promise<SmartRouteResponse> {
+  return callFunction(
+    FUNCTIONS.smartRoute,
+    { method: 'POST', body: request as Record<string, unknown> },
+    SmartRouteResponseSchema,
+  );
 }
 
 /** Live weather + sun around CityU (Hong Kong Observatory, cached on the server). */

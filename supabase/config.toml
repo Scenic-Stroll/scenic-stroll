@@ -425,3 +425,6 @@ verify_jwt = false
 
 [functions.conditions]
 verify_jwt = false
+
+[functions.smart-route]
+verify_jwt = false

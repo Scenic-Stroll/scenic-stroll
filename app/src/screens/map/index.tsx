@@ -38,6 +38,7 @@ import { SearchBar } from '@/components/ui/search-bar';
 import { planRoute } from '@/lib/api';
 import { communityKeys, fetchCommunityRoutes } from '@/lib/community-routes';
 import { useConditions, useConditionsUi } from '@/lib/conditions';
+import { useSmartRoutes } from '@/lib/smart-routes';
 import { friendAsPlace, stopSharing, useFriendLocations, useSharing } from '@/lib/location-sharing';
 import { useCheckpointsNear } from '@/lib/checkpoints-near';
 import { useMapFocus } from '@/lib/map-focus-store';
@@ -164,10 +165,30 @@ export function MapHome() {
     });
   }, []);
 
-  // Zoom to the standard route when it arrives.
+  // Our computed routes (fall back silently to the standard route if unavailable).
+  const smart = useSmartRoutes({
+    origin: origin?.point ?? null,
+    destination: destination?.point ?? null,
+    profile: mode, // the tab names are routing profile names
+    condition: now.mode,
+    enabled: planning,
+  });
+  const smartOptions = smart.data?.status === 'ok' ? smart.data.options : [];
+  // The option shown on the map and in the directions: the one tapped, else the first computed
+  // route, else the standard route. Derived (not stored) so a new search picks a fresh default.
+  const shownOptionId =
+    (selectedOptionId === STANDARD_OPTION_ID || smartOptions.some((o) => o.id === selectedOptionId)
+      ? selectedOptionId
+      : null) ??
+    smartOptions[0]?.id ??
+    (standardRoute.data ? STANDARD_OPTION_ID : null);
+
+  // Zoom to the best route we have: the first computed one, else the standard route.
+  const firstSmartLine = smartOptions[0]?.coordinates;
   useEffect(() => {
-    if (standardRoute.data) fit(standardRoute.data.coordinates);
-  }, [standardRoute.data, fit]);
+    if (firstSmartLine) fit(firstSmartLine);
+    else if (standardRoute.data) fit(standardRoute.data.coordinates);
+  }, [firstSmartLine, standardRoute.data, fit]);
 
   // 2D ↔ 3D tilt.
   useEffect(() => {
@@ -290,6 +311,8 @@ export function MapHome() {
   const selectOption = (id: string) => {
     setSelectedOptionId(id);
     if (id === STANDARD_OPTION_ID && standardRoute.data) fit(standardRoute.data.coordinates);
+    const option = smartOptions.find((o) => o.id === id);
+    if (option) fit(option.coordinates);
     sheetRef.current?.snapToIndex(SHEET_FULL);
   };
 
@@ -357,10 +380,23 @@ export function MapHome() {
           <Polyline
             coordinates={standardRoute.data.coordinates.map(toMap)}
             strokeColor={t.routeStandard}
-            strokeWidth={selectedOptionId === STANDARD_OPTION_ID ? 8 : 5}
+            strokeWidth={shownOptionId === STANDARD_OPTION_ID ? 8 : 5}
             zIndex={1}
           />
         ) : null}
+        {planning
+          ? smartOptions.map((o) => (
+              <Polyline
+                key={`smart-${o.id}`}
+                coordinates={o.coordinates.map(toMap)}
+                strokeColor={o.id === shownOptionId ? t.primary : t.accent}
+                strokeWidth={o.id === shownOptionId ? 8 : 4}
+                zIndex={o.id === shownOptionId ? 4 : 2}
+                tappable
+                onPress={() => selectOption(o.id)}
+              />
+            ))
+          : null}
         {layers.places
           ? PRESETS.map((p) => (
               <Marker
@@ -570,8 +606,10 @@ export function MapHome() {
               isLoading={standardRoute.isFetching}
               error={standardRoute.error}
               onRetry={() => void standardRoute.refetch()}
-              selectedOptionId={selectedOptionId}
+              selectedOptionId={shownOptionId}
               onSelectOption={selectOption}
+              smart={smart.data}
+              smartLoading={smart.isFetching}
             />
           ) : selectedPlace ? (
             <PlaceSheet

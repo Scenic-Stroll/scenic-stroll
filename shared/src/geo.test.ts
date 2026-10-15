@@ -50,4 +50,10 @@ describe('decodePolyline', () => {
   it('returns an empty list for an empty string', () => {
     expect(decodePolyline('')).toEqual([]);
   });
+
+  it('decodes precision 6 (our walking graph export)', () => {
+    // Same line as the Google example, encoded at precision 6 by PostGIS: first point 38.5, -120.2.
+    const [first] = decodePolyline('_izlhA~rlgdF', 6);
+    expect(first).toEqual({ lat: 38.5, lng: -120.2 });
+  });
 });

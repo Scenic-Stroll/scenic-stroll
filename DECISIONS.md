@@ -307,3 +307,53 @@ build: a build loads as 'loading', `graph_activate` checks it isn't empty, retir
 its rows (one active build enforced by a partial unique index). Everyone may read the three tables (open data);
 nobody can write them directly. Build 1 is live: 9,372 nodes, 10,730 edges, 154 km of paths (21 km covered),
 uploaded in 12 s. The data date (Hong Kong time) is shown in Profile → Diagnostics → Walk map.
+
+### D25 · Smart routing step 3: `smart-route` — our own computed routes (2026-10-16)
+
+**Routing in TypeScript, not pgRouting.** The brief suggested pgRouting (available, 3.4.1). We route with a small
+Dijkstra in `shared/src/router.ts` instead, because the cost depends on things that are awkward in SQL and easy in
+code: opening hours **at the time you'd reach each edge** (departure + walking time so far), one-way escalators,
+the conservative step-free rule, per-profile weights, and "find a different route" penalties for step 5. Being in
+`/shared` it is the same code in the Edge Function, the unit tests and `npm run graph:try` (and the step 8 eval) —
+readable for first-year maintainers and testable without a database. Still deterministic: no language model
+touches a route. pgRouting stays unused for now.
+
+**Costs** (`shared/src/routing-profiles.ts`, the one place to tune): time = length / 1.3 m/s (0.9 m/s on stairs and
+slopes > 8 %, escalators 3D length / 0.6 m/s, lifts 40 s + 10 s per 3.5 m floor, crossings + their wait), times
+multipliers per profile: sun/rain on uncovered edges, a capped air-conditioning bonus (never below ×0.3), slope
+above 5 %, community confidence (none yet). Step-free: "no" edges impossible, "unknown" ×3. In step 3 "shaded"
+treats covered/indoor as shade (step 4 adds building shadows). "Best now" per condition: rain/severe → sheltered,
+heat → cool, night → fastest (no lighting data), normal → balanced. Detour cap 1.4× fastest → "Much longer".
+
+**Start/end ("access") handling** — two real bugs found by tests and the live data:
+
+1. The router may connect the start to several nearby nodes (so a building whose nearest node is behind steps
+   can still be reached step-free via the ramp 40 m away). First version allowed any node within 250 m with a
+   cheap straight-line walk, and the search **"teleported" past parts of the trip** (through buildings, past
+   stairs). Now only nodes within **60 m of the nearest one** are candidates, and the unmapped straight walk costs
+   ×3, so mapped paths win. If every candidate is indoor-only (a point inside Festival Walk at 2 am) the nearest
+   outdoor nodes are added, else there'd be no route.
+2. The database keeps the build script's node ids, which have gaps (scraps were left out); the router indexed
+   arrays by id and crashed live. `prepareGraph` now renumbers ids itself (tested with gapped ids).
+   Step-free verdict: any "no" edge → no; any "unknown" edge or an unmapped access walk > 60 m → **unconfirmed**; only
+   then "yes". Access walks ≤ 60 m are treated as "where you tapped vs the door", not as a path.
+
+**Per-request partial graph instead of a cached whole graph.** Hosted Edge Functions shut the worker down after
+(almost) every request (logs: "shutdown" after each call), so an in-memory cache of the 10,730-edge graph was
+re-loaded every time (1.1–3.2 s). `walking_graph_export(min_lng, min_lat, max_lng, max_lat)` now returns only the
+edges in a box around the trip + 400 m (GiST index; ~2,500–5,200 edges, **141 ms** in the database) as compact
+arrays with precision-6 encoded polylines. Checked on 24 trip × profile combinations: identical routes to the
+full graph. Server time per request is now ~0.9–2.2 s (several profiles routed); from a laptop 1.3–1.8 s when the
+app sends the condition (it does — the "Now" card's mode, so routes match the card and the HKO lookup is skipped).
+A further saving (skip the graph load for points outside the area) goes into the next deploy.
+
+**App:** computed options are listed first (requested profile, then Best now, then fastest; > 80 % overlap merged
+into one card with several roles), each labelled **"Computed"** with % covered, step-free / unconfirmed / stairs,
+lifts, "Much longer"; the selected one shows the template explanation ("Mostly covered: 82% under cover or indoors,
+through Festival Walk LG1. About as quick as the fastest route.") plus "air-conditioning is estimated … not yet
+confirmed by walkers", and our own directions ("Take the escalator up (Festival Walk)", "Go through the subway (Tat
+Chee Avenue)"). The standard street route stays as a baseline card. Any failure, `outside_area` (with a note),
+`no_route` or `no_graph` → only the standard route, silently. There is no `find-routes` function yet (Phase 4), so
+"merge community matches" happens there later; `smart-route` already returns the roles and overlap logic it needs.
+Example (13:00, rain, Exit C1 → YEUNG): sheltered 372 m / 82 % covered vs fastest 375 m / 78 %; heat → cool route
+425 m / 87 % covered / 53 % indoor; at 02:00 Festival Walk (07:00–24:00) is avoided.

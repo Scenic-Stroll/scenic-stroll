@@ -840,3 +840,40 @@ describe('walking graph (graph_builds, ped_nodes, ped_edges + loader)', () => {
     );
   });
 });
+
+describe('walking_graph_export (for smart-route)', () => {
+  it('returns the active build as compact arrays that shared/src/graph-export.ts can read', async () => {
+    const out = (await as(null, 'select public.walking_graph_export() as g')).rows[0].g;
+    assert.equal(out.source, 'lands_3dpn');
+    assert.ok(out.nodes.length > 0 && out.edges.length > 0);
+    const [id, source, target, length, kind] = out.edges[0];
+    assert.equal(typeof id, 'number');
+    assert.equal(typeof source, 'number');
+    assert.equal(typeof target, 'number');
+    assert.ok(length > 0);
+    assert.equal(kind, 'footway');
+    assert.equal(out.edges[0].length, 22, 'edge tuple has 22 fields');
+    assert.equal(typeof out.edges[0][18], 'string', 'field 18 is the encoded polyline');
+    assert.equal(out.nodes[0].length, 5);
+  });
+});
+
+describe('walking_graph_export with a box', () => {
+  it('returns only edges in the box, with the nodes they use', async () => {
+    const all = (await as(null, 'select public.walking_graph_export() as g')).rows[0].g;
+    // A tiny box far away from the test graph: nothing in it.
+    const none = (
+      await as(null, 'select public.walking_graph_export(114.0, 22.2, 114.001, 22.201) as g')
+    ).rows[0].g;
+    assert.ok(all.edges.length > 0);
+    assert.equal(none.edges.length, 0);
+    assert.equal(none.nodes.length, 0);
+    // A box around the whole test graph: everything.
+    const box = (
+      await as(null, 'select public.walking_graph_export(114.16, 22.33, 114.19, 22.34) as g')
+    ).rows[0].g;
+    assert.equal(box.edges.length, all.edges.length);
+    const nodeIds = new Set(box.nodes.map((n) => n[0]));
+    for (const e of box.edges) assert.ok(nodeIds.has(e[1]) && nodeIds.has(e[2]));
+  });
+});

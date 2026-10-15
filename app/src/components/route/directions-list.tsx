@@ -1,7 +1,8 @@
 /**
  * Step-by-step directions for the selected route option.
- * Standard routes get the routing provider's turn instructions; community routes will add
- * checkpoint instructions ("Take the lift to L2") in Phase 4.
+ * Standard routes get the routing provider's turn instructions; computed smart routes get ours
+ * from the walking graph ("Take the escalator up", "Go through the subway"); community routes will
+ * add checkpoint instructions in Phase 4.
  */
 import { formatDistance, type RouteStep } from '@scenic/shared';
 import { StyleSheet, Text, View } from 'react-native';
@@ -13,6 +14,12 @@ import { radius, space, type, useAppTheme } from '@/theme';
 function iconFor(instruction: string): IconName {
   const s = instruction.toLowerCase();
   if (s.startsWith('arrive') || s.includes('destination')) return 'flag-checkered';
+  if (s.includes('lift')) return 'elevator';
+  if (s.includes('escalator')) return 'escalator';
+  if (s.includes('stairs')) return 'stairs';
+  if (s.includes('footbridge')) return 'bridge';
+  if (s.includes('subway')) return 'tunnel';
+  if (s.includes('indoors')) return 'office-building';
   if (
     s.includes('sharp left') ||
     s.includes('slight left') ||
@@ -72,8 +79,9 @@ export function DirectionsList({
         </View>
       ))}
       <Text style={[type.caption, { color: t.textSecondary }]}>
-        Street directions from {provider === 'google' ? 'Google' : 'OpenRouteService'} — they don’t
-        know about lifts, malls or floors. Community routes add those.
+        {provider === 'walking-graph'
+          ? 'Computed from the Lands Department 3D Pedestrian Network. Follow the signs on the way — lifts and passages can close.'
+          : `Street directions from ${provider === 'google' ? 'Google' : 'OpenRouteService'} — they don’t know about lifts, malls or floors. Community routes add those.`}
       </Text>
     </View>
   );

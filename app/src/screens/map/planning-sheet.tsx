@@ -1,13 +1,15 @@
 /**
  * Bottom sheet, route planning state: the "Now" conditions card, From / To, mode tabs (Fastest ·
- * Sheltered · Shaded · Step-free) and the route options. The weather picks the starting tab. Community route options arrive with Phase 4 (find-routes);
- * until then each mode honestly says so and the standard walking route is listed.
+ * Sheltered · Shaded · Step-free) and the route options: our computed smart routes first, then the
+ * standard street route as a baseline. The weather picks the starting tab. If smart routing isn't
+ * available (offline, outside the area) only the standard route shows. Community routes: Phase 4.
  */
 import {
   buildSegments,
   type ConditionMode,
   type Conditions,
   type PlanRouteResponse,
+  type SmartRouteResponse,
 } from '@scenic/shared';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -19,6 +21,7 @@ import { SegmentedTabs } from '@/components/ui/segmented-tabs';
 import { radius, space, TAP_TARGET, type, useAppTheme } from '@/theme';
 
 import { ConditionsCard } from './conditions-card';
+import { SmartRouteOptions } from './smart-route-options';
 import type { Place } from './types';
 
 export const ROUTE_MODES = [
@@ -29,7 +32,7 @@ export const ROUTE_MODES = [
 ] as const;
 export type RouteMode = (typeof ROUTE_MODES)[number]['key'];
 
-/** Which tab opens first for each weather condition (until smart routes add "Best now"). */
+/** Which tab opens first for each weather condition. */
 export const ROUTE_MODE_FOR_CONDITION: Record<ConditionMode, RouteMode> = {
   normal: 'fastest',
   rain: 'sheltered',
@@ -66,6 +69,8 @@ export function PlanningSheet({
   onSelectOption,
   now,
   onConditionOverride,
+  smart,
+  smartLoading,
 }: {
   origin: Place | null;
   destination: Place | null;
@@ -83,10 +88,14 @@ export function PlanningSheet({
   onSelectOption: (id: string) => void;
   now: NowInfo;
   onConditionOverride: (mode: ConditionMode | null) => void;
+  /** Computed routes; null/undefined = not available (the standard route is still shown). */
+  smart: SmartRouteResponse | null | undefined;
+  smartLoading: boolean;
 }) {
   const t = useAppTheme();
   const ready = origin !== null && destination !== null;
-  const modeLabel = ROUTE_MODES.find((m) => m.key === mode)!.label.toLowerCase();
+  const smartOptions = smart?.status === 'ok' ? smart.options : [];
+  const stepFreeMissing = mode === 'step_free' && smart?.unavailable.includes('step_free');
 
   return (
     <View style={styles.container}>
@@ -133,18 +142,14 @@ export function PlanningSheet({
         </Text>
       ) : null}
 
-      {ready && mode !== 'fastest' ? (
-        <View style={[styles.note, { backgroundColor: t.surface }]}>
-          <Icon name="information-outline" size={20} color={t.textSecondary} />
-          <Text style={[type.small, styles.flex1, { color: t.textSecondary }]}>
-            No {modeLabel} community route covers this trip yet. They appear here once walkers log
-            and describe one. The standard walking route is below
-            {mode === 'step_free' ? ' — its accessibility is not confirmed' : ''}.
-          </Text>
-        </View>
+      {ready && smart?.status === 'outside_area' ? (
+        <Note text="Computed routes cover Kowloon Tong, Festival Walk and CityU. Outside that, only the standard street route is shown." />
+      ) : null}
+      {ready && stepFreeMissing ? (
+        <Note text="No step-free way was found in the map data for this trip. The routes below include stairs or escalators." />
       ) : null}
 
-      {ready && isLoading ? (
+      {ready && (isLoading || smartLoading) ? (
         <View style={styles.loadingRow}>
           <ActivityIndicator />
           <Text style={[type.small, { color: t.textSecondary }]}>Finding routes…</Text>
@@ -152,6 +157,14 @@ export function PlanningSheet({
       ) : null}
       {ready && error ? (
         <ErrorCard title="Couldn’t get a route" message={error.message} onRetry={onRetry} />
+      ) : null}
+
+      {ready ? (
+        <SmartRouteOptions
+          options={smartOptions}
+          selectedId={selectedOptionId}
+          onSelect={onSelectOption}
+        />
       ) : null}
 
       {ready && standardRoute ? (
@@ -175,6 +188,16 @@ export function PlanningSheet({
       {ready && standardRoute && selectedOptionId === STANDARD_OPTION_ID ? (
         <DirectionsList steps={standardRoute.steps ?? []} provider={standardRoute.provider} />
       ) : null}
+    </View>
+  );
+}
+
+function Note({ text }: { text: string }) {
+  const t = useAppTheme();
+  return (
+    <View style={[styles.note, { backgroundColor: t.surface }]}>
+      <Icon name="information-outline" size={20} color={t.textSecondary} />
+      <Text style={[type.small, styles.flex1, { color: t.textSecondary }]}>{text}</Text>
     </View>
   );
 }

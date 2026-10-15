@@ -12,32 +12,14 @@ import { haversineMeters } from './geo.ts';
 
 // ---- types ---------------------------------------------------------------------------------
 
-export const EDGE_KINDS = [
-  'footway',
-  'crossing',
-  'footbridge',
-  'subway',
-  'indoor_corridor',
-  'mall',
-  'lift',
-  'escalator',
-  'stairs',
-  'ramp',
-] as const;
-export type EdgeKind = (typeof EDGE_KINDS)[number];
-
-export const NODE_KINDS = [
-  'street',
-  'lift',
-  'escalator',
-  'stairs_top',
-  'stairs_bottom',
-  'mrt_exit',
-  'building_entrance',
-] as const;
-export type NodeKind = (typeof NODE_KINDS)[number];
-
-export type StepFree = 'yes' | 'no' | 'unknown';
+import type { EdgeKind, NodeKind, StepFree } from './graph-kinds.ts';
+export {
+  EDGE_KINDS,
+  NODE_KINDS,
+  type EdgeKind,
+  type NodeKind,
+  type StepFree,
+} from './graph-kinds.ts';
 
 /** The 3DPN fields we use (names as the Lands Department publishes them). */
 export type Dpn3Attributes = {

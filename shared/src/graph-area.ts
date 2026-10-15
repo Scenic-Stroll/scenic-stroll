@@ -38,3 +38,18 @@ export function graphDownloadBbox() {
     maxLng: GRAPH_BBOX.maxLng + dLng,
   };
 }
+
+/** Margin around a trip's start and end when loading part of the graph (detours rarely go further). */
+export const TRIP_MARGIN_M = 400;
+
+/** The box around origin + destination, grown by `marginM` — the part of the graph a trip needs. */
+export function tripBbox(a: LatLng, b: LatLng, marginM = TRIP_MARGIN_M) {
+  const dLat = marginM / 110_574;
+  const dLng = marginM / (111_320 * Math.cos((((a.lat + b.lat) / 2) * Math.PI) / 180));
+  return {
+    minLat: Math.min(a.lat, b.lat) - dLat,
+    maxLat: Math.max(a.lat, b.lat) + dLat,
+    minLng: Math.min(a.lng, b.lng) - dLng,
+    maxLng: Math.max(a.lng, b.lng) + dLng,
+  };
+}

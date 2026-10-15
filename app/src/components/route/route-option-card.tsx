@@ -1,12 +1,13 @@
 /**
  * One route option in the planning sheet: big duration, distance, segment strip, tag chips,
- * verified badge, contributors and last-confirmed date. Used for the standard route now and for
- * community routes once find-routes exists (Phase 4).
+ * verified badge, contributors and last-confirmed date. Used for the standard route, our computed
+ * smart routes ("Computed", % covered…) and community routes once find-routes exists (Phase 4).
  */
 import { formatDistance, formatDuration, TAXONOMY, isTag, type SegmentKind } from '@scenic/shared';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Chip } from '@/components/ui/chip';
+import type { IconName } from '@/components/ui/icon';
 import { radius, space, type, useAppTheme } from '@/theme';
 
 import { SegmentStrip } from './segment-strip';
@@ -26,6 +27,8 @@ export type RouteOption = {
   lastConfirmedAt?: string | null;
   /** Extra caution chips, e.g. "Step-free not confirmed". */
   notes?: string[];
+  /** Fact chips with an icon, e.g. "Computed", "72% covered", "Step-free". */
+  badges?: { label: string; icon: IconName }[];
 };
 
 function daysAgo(iso: string): string {
@@ -91,8 +94,11 @@ export function RouteOptionCard({
 
       <SegmentStrip segments={option.segments} />
 
-      {tags.length > 0 || option.notes?.length ? (
+      {tags.length > 0 || option.notes?.length || option.badges?.length ? (
         <View style={styles.chips}>
+          {option.badges?.map((b) => (
+            <Chip key={b.label} small icon={b.icon} label={b.label} />
+          ))}
           {tags.map((tag) => (
             <Chip key={tag} small label={TAXONOMY[tag].en} />
           ))}

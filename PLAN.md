@@ -79,7 +79,8 @@ Secrets are never committed and never go in the app — only into `supabase secr
 
 - [x] 1. Conditions service: `conditions` Edge Function (HKO current weather + warnings, cached in `conditions_cache`, suncalc sun position, mode rain / heat / night / severe / normal, fallbacks cache → time of day), "Now" card on route planning (tap to override), weather picks the starting tab, Diagnostics weather status + "Simulate weather" demo switch, HKO attribution
 - [x] 2. Walking graph from the Lands Dept 3D Pedestrian Network (bbox + 300 m margin): 9,372 nodes / 10,730 edges live (build 1), 99.2 % connected, all 9 MTR exits matched, doors marked where indoor meets outdoor; `graph:download/build/key/load` scripts, key-protected loader, 6 DB + 17 unit tests; Diagnostics "Walk map" + attribution. No manual seed links needed (see D24). pgRouting 3.4.1 available, enabled in step 3
-- [ ] 3. `smart-route` (time + covered/indoor + step-free + opening hours), merged with the standard route, silent fallback
+- [x] 3. `smart-route` Edge Function: Dijkstra in TypeScript on the walking graph (shared, unit-tested), profiles fastest / balanced / sheltered / shaded / cool / step-free (`shared/src/routing-profiles.ts`), opening hours at arrival time, one-way escalators, conservative step-free verdict, detour cap 1.4×, near-duplicate merging, template explanations; loads only the trip's part of the graph per request (~150 ms DB); app shows computed options (+ standard route as baseline), silent fallback; `npm run graph:try`. No `find-routes` yet (Phase 4) — community matches will merge in there
+  - [ ] TODO with the next smart-route deploy: skip loading the graph when a point is outside the area
 - [ ] 4. Shade precompute + shade in the cost + exposure bar + segment colouring
 - [ ] 5. Mode tabs (Best now · Fastest · Shaded · Sheltered · Cool · Step-free), departure time, diverse alternatives
 - [ ] 6. Re-routing while walking (rain starts, off-route, blocked edge)

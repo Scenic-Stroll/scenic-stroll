@@ -116,8 +116,9 @@ npx supabase secrets set ORS_API_KEY=xxxx GEMINI_API_KEY=xxxx --project-ref xelz
 
 ## 8. Deploy Edge Functions and check they work
 
-The map route (`plan-route`), place search (`geocode`) and live weather (`conditions`, Hong Kong Observatory —
-no key needed) run on Supabase, not on the phone. If the app
+The map route (`plan-route`), place search (`geocode`), live weather (`conditions`, Hong Kong Observatory —
+no key needed) and our computed routes (`smart-route`, on the walking graph — no key needed) run on Supabase, not
+on the phone. If the app
 says **“… isn’t deployed on the server yet”** (or the old “Requested function was not found”), run this:
 
 ```bash
@@ -161,6 +162,8 @@ GRAPH_LOADER_KEY=<key> npm run graph:load   # uploads (~15 s), then switches the
 - Read the build report: the biggest connected piece should be ~99 % of nodes and every MTR exit matched.
 - The old graph keeps serving until the last step of `graph:load`, so a failed upload changes nothing.
 - The key expires after 24 h; only its hash is stored. Never commit it.
+- Tuning routes: edit the weights in `shared/src/routing-profiles.ts`, then `npm run graph:try` prints the demo trips
+  (fastest / sheltered / cool / step-free / 2 am) from the local graph — no deploy needed to compare.
 - Phone check: **Profile → Diagnostics → Walk map** shows the data date and number of paths.
 
 ## 10. Before you push code

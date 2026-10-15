@@ -28,11 +28,12 @@ export function pathLengthMeters(points: readonly LatLng[]): number {
 }
 
 /**
- * Decodes a Google "encoded polyline" (precision 5) into points.
- * Google Routes returns routes in this format.
+ * Decodes a Google "encoded polyline" into points. Google Routes uses precision 5 (~1 m);
+ * our walking graph export uses precision 6 (~10 cm, PostGIS ST_AsEncodedPolyline(geom, 6)).
  * Algorithm: https://developers.google.com/maps/documentation/utilities/polylinealgorithm
  */
-export function decodePolyline(encoded: string): LatLng[] {
+export function decodePolyline(encoded: string, precision = 5): LatLng[] {
+  const factor = 10 ** precision;
   const points: LatLng[] = [];
   let index = 0;
   let lat = 0;
@@ -54,8 +55,8 @@ export function decodePolyline(encoded: string): LatLng[] {
   while (index < encoded.length) {
     lat += readValue();
     lng += readValue();
-    // Round to avoid floating-point noise like 40.70000000000001.
-    points.push({ lat: Math.round(lat) / 1e5, lng: Math.round(lng) / 1e5 });
+    // lat/lng are whole numbers here, so one division gives the nearest decimal (no 40.70000000000001).
+    points.push({ lat: lat / factor, lng: lng / factor });
   }
   return points;
 }

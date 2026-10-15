@@ -2,6 +2,7 @@
 //   1. sign in anonymously (needs "Anonymous sign-ins" ON in the Supabase dashboard)
 //   2. call plan-route: Kowloon Tong Exit A1 → Mong Man-wai Building
 //   3. call conditions: live HKO weather + sun, and which source it came from
+//   4. call smart-route: our computed sheltered route on the walking graph
 // Run: npm run smoke:routing
 // Note: each run creates one anonymous test user in Supabase Auth (harmless; delete in the dashboard).
 import fs from 'node:fs';
@@ -93,4 +94,19 @@ const facts = [
   .join(', ');
 console.log(
   `${cond.source === 'hko' ? '✓' : '!'} Conditions: mode "${cond.mode}"${facts ? ` (${facts})` : ''}, data from ${cond.source}${cond.stale ? ' — STALE, HKO unreachable' : ''}`,
+);
+
+// 5. Smart routing on our own walking graph (Exit A1 → MMW, sheltered, as if raining).
+const smartRes = await call(FUNCTIONS.smartRoute, {
+  method: 'POST',
+  body: JSON.stringify({ origin, destination, profile: 'sheltered', condition: 'rain' }),
+});
+const smart = await smartRes.json();
+if (!smartRes.ok || smart.status !== 'ok') {
+  console.error(`✗ smart-route failed (HTTP ${smartRes.status}): ${smart.error ?? smart.status}`);
+  process.exit(1);
+}
+const best = smart.options[0];
+console.log(
+  `✓ Smart route: ${smart.options.length} option(s); ${best.profile} ${Math.round(best.duration_s / 60)} min, ${best.distance_m} m, ${best.pct_covered}% covered (graph build ${smart.graph.build_id})`,
 );

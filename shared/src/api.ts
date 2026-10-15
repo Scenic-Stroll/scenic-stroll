@@ -75,6 +75,7 @@ export const FUNCTIONS = {
   planRoute: 'plan-route',
   geocode: 'geocode',
   conditions: 'conditions',
+  smartRoute: 'smart-route',
 } as const;
 export type FunctionName = (typeof FUNCTIONS)[keyof typeof FUNCTIONS];
 
