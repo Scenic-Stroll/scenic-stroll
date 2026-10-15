@@ -28,6 +28,11 @@ export function createOrsProvider(apiKey: string): RoutingProvider {
       const feature = json?.features?.[0];
       const line: [number, number][] | undefined = feature?.geometry?.coordinates;
       const summary = feature?.properties?.summary;
+      // Turn-by-turn steps (ORS includes them by default, in segments[].steps[]).
+      // deno-lint-ignore no-explicit-any
+      const rawSteps: any[] = (feature?.properties?.segments ?? []).flatMap(
+        (s: any) => s?.steps ?? [],
+      );
       if (!line || line.length < 2) throw new ProviderError('OpenRouteService returned no route');
 
       return {
@@ -36,6 +41,13 @@ export function createOrsProvider(apiKey: string): RoutingProvider {
         distance_m: summary?.distance ?? 0,
         duration_s: summary?.duration ?? 0,
         coordinates: line.map(([lng, lat]) => ({ lat, lng })),
+        steps: rawSteps
+          .filter((s) => typeof s?.instruction === 'string')
+          .map((s) => ({
+            instruction: s.instruction,
+            distance_m: Number(s.distance) || 0,
+            duration_s: Number(s.duration) || 0,
+          })),
       };
     },
 

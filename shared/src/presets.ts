@@ -131,3 +131,25 @@ export function nearestPreset(
   }
   return best;
 }
+
+/** Kind of place, for the place card ("MTR exit", "Shopping mall", "CityU building"). */
+export const PRESET_KIND_TYPE: Record<PresetKind, { en: string; zh: string }> = {
+  mtr_exit: { en: 'MTR exit', zh: '港鐵出口' },
+  mall: { en: 'Shopping mall', zh: '商場' },
+  cityu: { en: 'CityU building', zh: '城大建築' },
+};
+
+/**
+ * Landmarks closest to `point` (straight-line), nearest first — e.g. the MTR exits nearest a
+ * building. Landmarks at the point itself (< 1 m) are skipped so a place doesn't list itself.
+ */
+export function nearestPresets(
+  point: LatLng,
+  options: { kind?: PresetKind; limit?: number } = {},
+): { preset: Preset; distanceM: number }[] {
+  return PRESETS.filter((p) => !options.kind || p.kind === options.kind)
+    .map((preset) => ({ preset, distanceM: haversineMeters(point, preset.point) }))
+    .filter((r) => r.distanceM >= 1)
+    .sort((a, b) => a.distanceM - b.distanceM)
+    .slice(0, options.limit ?? 3);
+}

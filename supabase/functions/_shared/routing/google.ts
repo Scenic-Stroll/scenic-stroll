@@ -15,8 +15,14 @@ export function createGoogleProvider(apiKey: string): RoutingProvider {
           'Content-Type': 'application/json',
           'X-Goog-Api-Key': apiKey,
           // Only ask for the fields we use (Google bills by field mask tier).
-          'X-Goog-FieldMask':
-            'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline',
+          'X-Goog-FieldMask': [
+            'routes.distanceMeters',
+            'routes.duration',
+            'routes.polyline.encodedPolyline',
+            'routes.legs.steps.navigationInstruction.instructions',
+            'routes.legs.steps.distanceMeters',
+            'routes.legs.steps.staticDuration',
+          ].join(','),
         },
         body: JSON.stringify({
           origin: { location: { latLng: { latitude: origin.lat, longitude: origin.lng } } },
@@ -42,6 +48,21 @@ export function createGoogleProvider(apiKey: string): RoutingProvider {
         // Duration is a string like "754s".
         duration_s: Number.parseFloat(String(route.duration ?? '0').replace('s', '')) || 0,
         coordinates,
+        // deno-lint-ignore no-explicit-any
+        steps: (route.legs ?? [])
+          .flatMap((leg: any) => leg?.steps ?? [])
+          .flatMap((s: any) => {
+            const instruction = s?.navigationInstruction?.instructions;
+            if (typeof instruction !== 'string') return [];
+            return [
+              {
+                instruction,
+                distance_m: Number(s.distanceMeters) || 0,
+                duration_s:
+                  Number.parseFloat(String(s.staticDuration ?? '0').replace('s', '')) || 0,
+              },
+            ];
+          }),
       };
     },
 

@@ -40,13 +40,15 @@ import { MapControls, type MapLayers } from './map-controls';
 import { DARK_MAP_STYLE, LIGHT_MAP_STYLE } from './map-style';
 import { NearbySheet } from './nearby-sheet';
 import { PlacePicker } from './place-picker';
-import { PlanningSheet, type RouteMode } from './planning-sheet';
+import { PlaceSheet } from './place-sheet';
+import { PlanningSheet, STANDARD_OPTION_ID, type RouteMode } from './planning-sheet';
 import type { Place } from './types';
 
 const PITCH_3D = 55;
 const SNAP_POINTS = ['15%', '50%', '90%'];
 const SHEET_PEEK = 0;
 const SHEET_HALF = 1;
+const SHEET_FULL = 2;
 
 // CityU, Festival Walk and Kowloon Tong station on screen, flat (2D) by default.
 const DEMO_CAMERA: Camera = {
@@ -77,6 +79,12 @@ export function MapHome() {
     places: true,
   });
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
+  /** The place card being shown (landmark, search result or dropped pin). */
+  const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
+  /** The route option chosen in the planning sheet (shows its directions). */
+  const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
+  /** Where the place picker's result goes: the search bar opens a place card instead of routing. */
+  const [pickerFromSearchBar, setPickerFromSearchBar] = useState(false);
   const [userLocation, setUserLocation] = useState<LatLng | null>(null);
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
 
@@ -159,13 +167,35 @@ export function MapHome() {
     }
   };
 
+  /** Show the place card for `place` (replaces route planning, like tapping a pin in a map app). */
+  const openPlace = (place: Place) => {
+    setPlanning(false);
+    setSelectedPlace(place);
+    setSelectedRouteId(null);
+    mapRef.current?.animateCamera({ center: toMap(place.point) }, { duration: 400 });
+    sheetRef.current?.snapToIndex(SHEET_HALF);
+  };
+
   /** Start planning a trip to `place` (from your location when known). */
   const routeTo = (place: Place) => {
     setDestination(place);
     if (!origin && userLocation) setOrigin({ label: 'My location', point: userLocation });
     setPlanning(true);
+    setSelectedPlace(null);
     setSelectedRouteId(null);
+    setSelectedOptionId(null);
     sheetRef.current?.snapToIndex(SHEET_HALF);
+  };
+
+  /** Start planning a trip from `place`; then ask where to. */
+  const routeFrom = (place: Place) => {
+    setOrigin(place);
+    setDestination(null);
+    setPlanning(true);
+    setSelectedPlace(null);
+    setSelectedOptionId(null);
+    setPickerFromSearchBar(false);
+    setPicking('destination');
   };
 
   const closePlanning = () => {
@@ -173,7 +203,14 @@ export function MapHome() {
     setOrigin(null);
     setDestination(null);
     setMode('fastest');
+    setSelectedOptionId(null);
     sheetRef.current?.snapToIndex(SHEET_PEEK);
+  };
+
+  const selectOption = (id: string) => {
+    setSelectedOptionId(id);
+    if (id === STANDARD_OPTION_ID && standardRoute.data) fit(standardRoute.data.coordinates);
+    sheetRef.current?.snapToIndex(SHEET_FULL);
   };
 
   const selectCommunityRoute = (route: CommunityRoute) => {
@@ -208,7 +245,7 @@ export function MapHome() {
         toolbarEnabled={false}
         onLongPress={(e) => {
           const { latitude, longitude } = e.nativeEvent.coordinate;
-          routeTo({ label: 'Dropped pin', point: { lat: latitude, lng: longitude } });
+          openPlace({ label: 'Dropped pin', point: { lat: latitude, lng: longitude } });
         }}
       >
         {layers.communityRoutes
@@ -228,7 +265,7 @@ export function MapHome() {
           <Polyline
             coordinates={standardRoute.data.coordinates.map(toMap)}
             strokeColor={t.routeStandard}
-            strokeWidth={6}
+            strokeWidth={selectedOptionId === STANDARD_OPTION_ID ? 8 : 5}
             zIndex={1}
           />
         ) : null}
@@ -237,10 +274,10 @@ export function MapHome() {
               <Marker
                 key={p.id}
                 coordinate={toMap(p.point)}
-                title={p.en}
-                description={`${p.zh} · tap here to route`}
+                accessibilityLabel={p.en}
                 tracksViewChanges={false}
-                onCalloutPress={() => routeTo({ label: p.en, point: p.point })}
+                // Tapping a landmark opens its place card (no callout bubble).
+                onPress={() => openPlace({ label: p.en, point: p.point, presetId: p.id })}
               >
                 <View
                   style={[
@@ -273,7 +310,10 @@ export function MapHome() {
           <SearchBar
             floating
             placeholder="Search places, buildings, MTR exits…"
-            onPress={() => setPicking('destination')}
+            onPress={() => {
+              setPickerFromSearchBar(true);
+              setPicking('destination');
+            }}
             right={
               <Pressable
                 accessibilityRole="button"
@@ -321,18 +361,27 @@ export function MapHome() {
         enableDynamicSizing={false}
         backgroundStyle={{ backgroundColor: t.background, borderRadius: radius.sheet }}
         handleIndicatorStyle={{ backgroundColor: t.border, width: 40 }}
-        accessibilityLabel={planning ? 'Route planning' : 'Nearby routes'}
+        accessibilityLabel={
+          planning ? 'Route planning' : selectedPlace ? selectedPlace.label : 'Nearby routes'
+        }
       >
         <BottomSheetScrollView keyboardShouldPersistTaps="handled">
           {planning ? (
             <PlanningSheet
               origin={origin}
               destination={destination}
-              onPickOrigin={() => setPicking('origin')}
-              onPickDestination={() => setPicking('destination')}
+              onPickOrigin={() => {
+                setPickerFromSearchBar(false);
+                setPicking('origin');
+              }}
+              onPickDestination={() => {
+                setPickerFromSearchBar(false);
+                setPicking('destination');
+              }}
               onSwap={() => {
                 setOrigin(destination);
                 setDestination(origin);
+                setSelectedOptionId(null);
               }}
               onClose={closePlanning}
               mode={mode}
@@ -341,6 +390,20 @@ export function MapHome() {
               isLoading={standardRoute.isFetching}
               error={standardRoute.error}
               onRetry={() => void standardRoute.refetch()}
+              selectedOptionId={selectedOptionId}
+              onSelectOption={selectOption}
+            />
+          ) : selectedPlace ? (
+            <PlaceSheet
+              place={selectedPlace}
+              communityRoutes={community.data ?? []}
+              onRouteHere={() => routeTo(selectedPlace)}
+              onRouteFrom={() => routeFrom(selectedPlace)}
+              onClose={() => {
+                setSelectedPlace(null);
+                sheetRef.current?.snapToIndex(SHEET_PEEK);
+              }}
+              onSelectRoute={selectCommunityRoute}
             />
           ) : (
             <NearbySheet
@@ -368,8 +431,11 @@ export function MapHome() {
           setPicking(null);
           if (target === 'origin') {
             setOrigin(place);
+            setSelectedOptionId(null);
             setPlanning(true);
             sheetRef.current?.snapToIndex(SHEET_HALF);
+          } else if (pickerFromSearchBar) {
+            openPlace(place); // search bar → place card first, like a map app
           } else {
             routeTo(place);
           }

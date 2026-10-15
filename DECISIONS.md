@@ -133,3 +133,16 @@ Community routes come from `routes_public` (readable signed-out). Route modes ot
 that no community route covers the trip yet and list the standard route (step-free: "not confirmed") —
 real community options arrive with `find-routes` (Phase 4). Errors appear as `ErrorCard`s with Retry.
 Floor selector → step 7; follow mode → later.
+
+### D18 · Redesign step 3: place card, route option cards, directions (2026-10-16)
+
+Tapping a landmark, choosing a search-bar result or long-pressing opens a **place card** first (map-app
+pattern); picking a place inside From/To still sets it directly. The card shows only what we actually know:
+type, nearest MTR exits (straight-line, labelled as such), community routes ending within 100 m, and honest
+"no floor info / no photos yet" states — floors come from checkpoints. Save is on-device
+(`saved-places-store`); Share sends an OpenStreetMap link (no deep-link infrastructure yet).
+The **segment strip** is derived from checkpoint order (`buildSegments` in /shared, tested): entrances toggle
+indoor/outdoor; lifts/escalators/stairs/footbridges/underpasses are their own segments. The standard route is
+"outdoor" only. `plan-route` now also returns turn-by-turn `steps` (ORS default output; Google via field
+mask) — optional in the schema so old/new deployments interoperate; redeployed as version 3 and verified live
+(8 steps for Exit A1 → MMW). Directions state clearly that street directions don't know lifts or floors.

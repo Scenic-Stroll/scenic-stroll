@@ -25,12 +25,22 @@ export const PlanRouteRequestSchema = z.object({
 });
 export type PlanRouteRequest = z.infer<typeof PlanRouteRequestSchema>;
 
+/** One turn-by-turn instruction from the routing provider. */
+export const RouteStepSchema = z.object({
+  instruction: z.string(),
+  distance_m: z.number().nonnegative(),
+  duration_s: z.number().nonnegative(),
+});
+export type RouteStep = z.infer<typeof RouteStepSchema>;
+
 export const PlanRouteResponseSchema = z.object({
   provider: z.enum(['ors', 'google']),
   distance_m: z.number().nonnegative(),
   duration_s: z.number().nonnegative(),
   /** The walking line, start → end. Never empty. */
   coordinates: z.array(LatLngSchema).min(2),
+  /** Step-by-step directions. Optional so an older deployed function still validates. */
+  steps: z.array(RouteStepSchema).optional(),
 });
 export type PlanRouteResponse = z.infer<typeof PlanRouteResponseSchema>;
 

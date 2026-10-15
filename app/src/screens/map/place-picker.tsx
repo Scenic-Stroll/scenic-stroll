@@ -71,7 +71,7 @@ export function PlacePicker({
         key: p.id,
         title: p.en,
         subtitle: p.zh,
-        place: { label: p.en, point: p.point },
+        place: { label: p.en, point: p.point, presetId: p.id },
       }));
       if (rows.length > 0) out.push({ title: PRESET_KIND_LABELS[kind].en, data: rows });
     }

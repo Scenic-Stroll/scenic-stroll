@@ -33,7 +33,17 @@ Deno.test('ORS: parses a GeoJSON route and sends [lng, lat] order', async () => 
             [114.173197, 22.335892],
           ],
         },
-        properties: { summary: { distance: 287.4, duration: 206.9 } },
+        properties: {
+          summary: { distance: 287.4, duration: 206.9 },
+          segments: [
+            {
+              steps: [
+                { instruction: 'Head west on Tat Chee Avenue', distance: 150.2, duration: 108.1 },
+                { instruction: 'Arrive at your destination', distance: 0, duration: 0 },
+              ],
+            },
+          ],
+        },
       },
     ],
   });
@@ -44,6 +54,12 @@ Deno.test('ORS: parses a GeoJSON route and sends [lng, lat] order', async () => 
     assertEquals(route.duration_s, 206.9);
     assertEquals(route.coordinates[0], { lat: 22.336961, lng: 114.175531 });
     assertEquals(route.coordinates.length, 3);
+    assertEquals(route.steps?.length, 2);
+    assertEquals(route.steps?.[0], {
+      instruction: 'Head west on Tat Chee Avenue',
+      distance_m: 150.2,
+      duration_s: 108.1,
+    });
 
     const sent = JSON.parse(String(fake.calls[0]!.init!.body));
     assertEquals(sent.coordinates[0], [origin.lng, origin.lat]);
@@ -89,6 +105,18 @@ Deno.test('Google: decodes the polyline and parses "123s" durations', async () =
         distanceMeters: 310,
         duration: '245s',
         polyline: { encodedPolyline: '_p~iF~ps|U_ulLnnqC_mqNvxq`@' }, // Google's sample polyline
+        legs: [
+          {
+            steps: [
+              {
+                navigationInstruction: { instructions: 'Head north' },
+                distanceMeters: 120,
+                staticDuration: '90s',
+              },
+              { distanceMeters: 5 }, // no instruction → skipped
+            ],
+          },
+        ],
       },
     ],
   });
@@ -97,6 +125,7 @@ Deno.test('Google: decodes the polyline and parses "123s" durations', async () =
     assertEquals(route.provider, 'google');
     assertEquals(route.distance_m, 310);
     assertEquals(route.duration_s, 245);
+    assertEquals(route.steps, [{ instruction: 'Head north', distance_m: 120, duration_s: 90 }]);
     assertEquals(route.coordinates.length, 3);
     const sent = JSON.parse(String(fake.calls[0]!.init!.body));
     assertEquals(sent.travelMode, 'WALK');

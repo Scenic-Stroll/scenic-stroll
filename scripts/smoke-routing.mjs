@@ -74,5 +74,5 @@ if (!res.ok) {
   process.exit(1);
 }
 console.log(
-  `✓ Route Exit A1 → MMW: ${Math.round(route.distance_m)} m, ${Math.round(route.duration_s / 60)} min, ${route.coordinates.length} points (${route.provider})`,
+  `✓ Route Exit A1 → MMW: ${Math.round(route.distance_m)} m, ${Math.round(route.duration_s / 60)} min, ${route.coordinates.length} points, ${route.steps?.length ?? 0} directions (${route.provider})`,
 );

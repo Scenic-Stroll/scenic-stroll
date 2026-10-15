@@ -3,10 +3,11 @@
  * Step-free) and the route options. Community route options arrive with Phase 4 (find-routes);
  * until then each mode honestly says so and the standard walking route is listed.
  */
-import { formatDistance, formatDuration, type PlanRouteResponse } from '@scenic/shared';
+import { buildSegments, type PlanRouteResponse } from '@scenic/shared';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Chip } from '@/components/ui/chip';
+import { DirectionsList } from '@/components/route/directions-list';
+import { RouteOptionCard } from '@/components/route/route-option-card';
 import { ErrorCard } from '@/components/ui/error-card';
 import { Icon } from '@/components/ui/icon';
 import { SegmentedTabs } from '@/components/ui/segmented-tabs';
@@ -22,6 +23,9 @@ export const ROUTE_MODES = [
 ] as const;
 export type RouteMode = (typeof ROUTE_MODES)[number]['key'];
 
+/** Id of the standard (provider) route option; community options use their route id. */
+export const STANDARD_OPTION_ID = 'standard';
+
 export function PlanningSheet({
   origin,
   destination,
@@ -35,6 +39,8 @@ export function PlanningSheet({
   isLoading,
   error,
   onRetry,
+  selectedOptionId,
+  onSelectOption,
 }: {
   origin: Place | null;
   destination: Place | null;
@@ -48,6 +54,8 @@ export function PlanningSheet({
   isLoading: boolean;
   error: Error | null;
   onRetry: () => void;
+  selectedOptionId: string | null;
+  onSelectOption: (id: string) => void;
 }) {
   const t = useAppTheme();
   const ready = origin !== null && destination !== null;
@@ -110,32 +118,25 @@ export function PlanningSheet({
       ) : null}
 
       {ready && standardRoute ? (
-        <View
-          style={[styles.option, { borderColor: t.primary }]}
-          accessible
-          accessibilityLabel={`Standard walking route, ${formatDuration(standardRoute.duration_s)}, ${formatDistance(standardRoute.distance_m)}`}
-        >
-          <View style={styles.optionTop}>
-            <Text style={[type.heading, { color: t.textPrimary }]}>
-              {formatDuration(standardRoute.duration_s)}
-            </Text>
-            <Text style={[type.body, { color: t.textSecondary }]}>
-              {formatDistance(standardRoute.distance_m)}
-            </Text>
-          </View>
-          <View style={styles.optionLegend}>
-            <View style={[styles.legendLine, { backgroundColor: t.routeStandard }]} />
-            <Text style={[type.small, { color: t.textPrimary }]}>
-              Standard walking route (street map)
-            </Text>
-          </View>
-          <View style={styles.chips}>
-            <Chip small icon="road-variant" label="Outdoor streets" />
-            {mode === 'step_free' ? (
-              <Chip small icon="help-circle-outline" label="Step-free not confirmed" />
-            ) : null}
-          </View>
-        </View>
+        <RouteOptionCard
+          option={{
+            id: STANDARD_OPTION_ID,
+            title: 'Standard walking route (street map)',
+            durationS: standardRoute.duration_s,
+            distanceM: standardRoute.distance_m,
+            segments: buildSegments([]), // no checkpoints → outdoor only
+            tags: [],
+            color: t.routeStandard,
+            verified: null,
+            notes: mode === 'step_free' ? ['Step-free not confirmed'] : undefined,
+          }}
+          selected={selectedOptionId === STANDARD_OPTION_ID}
+          onPress={() => onSelectOption(STANDARD_OPTION_ID)}
+        />
+      ) : null}
+
+      {ready && standardRoute && selectedOptionId === STANDARD_OPTION_ID ? (
+        <DirectionsList steps={standardRoute.steps ?? []} provider={standardRoute.provider} />
       ) : null}
     </View>
   );
@@ -218,9 +219,4 @@ const styles = StyleSheet.create({
     gap: space.sm,
     paddingVertical: space.md,
   },
-  option: { borderWidth: 2, borderRadius: radius.md, padding: space.lg, gap: space.sm },
-  optionTop: { flexDirection: 'row', alignItems: 'baseline', gap: space.md },
-  optionLegend: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  legendLine: { width: 24, height: 5, borderRadius: 3 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.xs },
 });
