@@ -24,8 +24,16 @@ const light = {
   routeCommunity: '#1BA136',
   routeStandard: '#9AA0A6',
   routeStepFree: '#2D7FF9',
-  warning: '#E07B00',
+  /** The line you are recording (distinct from community green). 5.8:1 on white. */
+  trace: '#1565C0',
+  warning: '#B35C00', // 4.7:1 on white (the brighter #E07B00 was 2.9:1)
   danger: '#D93025',
+  onDanger: '#FFFFFF',
+  // Tinted backgrounds for status rows; text on them stays textPrimary, icons use the strong colour.
+  successSurface: '#E8F5EC',
+  warningSurface: '#FFF4E5',
+  dangerSurface: '#FDECEA',
+  infoSurface: '#E8F0FE',
   overlay: 'rgba(0,0,0,0.35)',
 };
 
@@ -45,8 +53,14 @@ const dark: Palette = {
   routeCommunity: '#34C152',
   routeStandard: '#8E949B',
   routeStepFree: '#5B9BFF',
+  trace: '#5B9BFF',
   warning: '#FFA43A',
   danger: '#FF6B5E',
+  onDanger: '#2B0B08', // dark text on bright red: 6.5:1 (white would be 2.8:1)
+  successSurface: '#14301D',
+  warningSurface: '#3A2A12',
+  dangerSurface: '#3B1A18',
+  infoSurface: '#16253D',
   overlay: 'rgba(0,0,0,0.55)',
 };
 

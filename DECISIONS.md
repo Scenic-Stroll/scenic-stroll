@@ -199,3 +199,17 @@ Verified: 9 PGlite tests (strangers, selected-only, non-friend recipients reject
 remove stop visibility, can't write others' rows, HK-only, snapping) + a live run (stranger saw 0, friend got a
 Realtime event, stop removed it). A follow-up migration replaced the "Walker ????" fallback name with one
 derived from the user id and indexed `friendships.requester_id` (performance advisor).
+
+### D22 · Redesign step 7: floor selector from real checkpoints; dark theme polish (2026-10-16)
+
+Floor selector: appears when the map is zoomed in (< ~400 m span) with its centre within 150 m of Festival Walk
+or a CityU building. Floors are **derived from community checkpoints near the building** (`checkpoints_near`,
+an INVOKER read of already-public data, radius capped at 500 m, flagged/retired routes excluded) — we don't
+have verified floor lists, so none are invented; with no data it shows "No floor info here yet". Floor names
+are normalised and sorted the Hong Kong way (B2 < B1 < LG2 < LG1 < G < UG < L1 … ; 1/F style understood) in
+`shared/src/floors.ts` (tested). Picking a floor shows only checkpoints on that floor (a lift G→L2 is on both).
+Dark theme: removed every hard-coded colour from the pre-redesign screens (Record, Review, My routes,
+checkpoint sheet, route trace, diagnostics). New tokens: `trace`, `onDanger`, and tinted
+`success/warning/danger/infoSurface`; `warning` darkened to #B35C00 (4.7:1 on white). Status rows (GPS quality,
+upload state) are now tinted backgrounds with normal text and coloured icons instead of white text on saturated
+colours (the old orange GPS row was 2.8:1). Only `shadowColor: '#000'` remains, intentionally.

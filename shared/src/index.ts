@@ -12,3 +12,4 @@ export * from './community-route.ts';
 export * from './segments.ts';
 export * from './levels.ts';
 export * from './friends.ts';
+export * from './floors.ts';

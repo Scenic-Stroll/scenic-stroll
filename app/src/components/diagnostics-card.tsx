@@ -12,6 +12,7 @@ import { Spacing } from '@/constants/theme';
 import { FunctionCallError, pingFunction } from '@/lib/api';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
+import { useAppTheme } from '@/theme';
 
 type Result = { name: FunctionName; ok: boolean; text: string };
 
@@ -23,6 +24,7 @@ function maskedUrl(): string {
 }
 
 export function DiagnosticsCard() {
+  const t = useAppTheme();
   const auth = useAuth();
   const [results, setResults] = useState<Result[] | null>(null);
   const [testing, setTesting] = useState(false);
@@ -76,9 +78,7 @@ export function DiagnosticsCard() {
 
       {results?.map((r) => (
         <View key={r.name} style={styles.result} accessibilityLiveRegion="polite">
-          <ThemedText style={{ color: r.ok ? '#2E7D32' : '#C62828' }}>
-            {r.ok ? '✓' : '✗'}
-          </ThemedText>
+          <ThemedText style={{ color: r.ok ? t.primary : t.danger }}>{r.ok ? '✓' : '✗'}</ThemedText>
           <View style={styles.flex1}>
             <ThemedText type="smallBold">{r.name}</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">

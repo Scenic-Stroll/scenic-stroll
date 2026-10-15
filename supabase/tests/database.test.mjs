@@ -591,3 +591,67 @@ describe('location sharing', () => {
     assert.equal((await sees(GUS)).length, 0);
   });
 });
+
+describe('checkpoints_near (floor selector)', () => {
+  const JOY = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const FW = { lat: 22.337331, lng: 114.174601 }; // Festival Walk
+  let routeId;
+
+  before(async () => {
+    await db.query('insert into auth.users (id) values ($1)', [JOY]);
+    routeId = crypto.randomUUID();
+    const route = payload({
+      id: routeId,
+      checkpoints: [
+        {
+          seq: 1,
+          kind: 'entrance',
+          point: { lat: FW.lat, lng: FW.lng + 0.0003 },
+          floor_from: null,
+          floor_to: 'UG',
+          note: null,
+        },
+        { seq: 2, kind: 'lift', point: FW, floor_from: 'UG', floor_to: 'L2', note: null },
+        // ~1 km away — must not be returned for Festival Walk
+        {
+          seq: 3,
+          kind: 'stairs',
+          point: { lat: 22.3465, lng: 114.1745 },
+          floor_from: 'G',
+          floor_to: 'L1',
+          note: null,
+        },
+      ],
+    });
+    await as(JOY, 'select public.create_route($1::jsonb)', [JSON.stringify(route)]);
+  });
+
+  it('returns checkpoints within the radius, with floors, for signed-out users too', async () => {
+    const rows = (
+      await as(null, 'select * from public.checkpoints_near($1, $2, 150)', [FW.lat, FW.lng])
+    ).rows;
+    assert.deepEqual(rows.map((r) => r.kind).sort(), ['entrance', 'lift']);
+    const lift = rows.find((r) => r.kind === 'lift');
+    assert.equal(lift.floor_from, 'UG');
+    assert.equal(lift.floor_to, 'L2');
+  });
+
+  it('leaves out checkpoints of flagged routes', async () => {
+    await db.query(`update public.routes set status = 'flagged' where id = $1`, [routeId]);
+    const rows = (
+      await as(null, 'select * from public.checkpoints_near($1, $2, 150)', [FW.lat, FW.lng])
+    ).rows;
+    assert.equal(rows.length, 0);
+    await db.query(`update public.routes set status = 'unverified' where id = $1`, [routeId]);
+  });
+
+  it('caps the radius at 500 m', async () => {
+    const rows = (
+      await as(null, 'select * from public.checkpoints_near($1, $2, 100000)', [FW.lat, FW.lng])
+    ).rows;
+    assert.equal(
+      rows.some((r) => r.kind === 'stairs'),
+      false,
+    );
+  });
+});

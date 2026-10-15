@@ -8,8 +8,7 @@ import { StyleSheet, View } from 'react-native';
 import { Marker, Polyline } from 'react-native-maps';
 
 import { CHECKPOINT_INFO, describeCheckpoint } from '@/constants/checkpoints';
-
-export const TRACE_COLOR = '#1565C0';
+import { useAppTheme } from '@/theme';
 
 type Checkpoint = {
   id: number;
@@ -46,6 +45,7 @@ export function RouteTrace({
   checkpoints: readonly Checkpoint[];
   onCheckpointPress?: (id: number) => void;
 }) {
+  const t = useAppTheme();
   const { solid, dashed } = splitAtGaps(points);
 
   return (
@@ -54,7 +54,7 @@ export function RouteTrace({
         <Polyline
           key={`solid-${i}`}
           coordinates={segment.map(toMap)}
-          strokeColor={TRACE_COLOR}
+          strokeColor={t.trace}
           strokeWidth={5}
         />
       ))}
@@ -62,7 +62,7 @@ export function RouteTrace({
         <Polyline
           key={`gap-${i}`}
           coordinates={segment.map(toMap)}
-          strokeColor={TRACE_COLOR}
+          strokeColor={t.trace}
           strokeWidth={3}
           lineDashPattern={[8, 8]}
         />
@@ -75,8 +75,12 @@ export function RouteTrace({
           tracksViewChanges={false}
           onPress={() => onCheckpointPress?.(c.id)}
         >
-          <View style={styles.badge}>
-            <MaterialCommunityIcons name={CHECKPOINT_INFO[c.kind].icon} size={18} color="#fff" />
+          <View style={[styles.badge, { backgroundColor: t.trace, borderColor: t.background }]}>
+            <MaterialCommunityIcons
+              name={CHECKPOINT_INFO[c.kind].icon}
+              size={18}
+              color={t.background}
+            />
           </View>
         </Marker>
       ))}
@@ -89,9 +93,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: TRACE_COLOR,
     borderWidth: 2,
-    borderColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
   },

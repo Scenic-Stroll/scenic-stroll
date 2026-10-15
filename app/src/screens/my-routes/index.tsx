@@ -17,16 +17,21 @@ import { BottomTabInset, Spacing } from '@/constants/theme';
 import { listRecordings, type RecordingSummary } from '@/lib/local-db';
 import { localKeys } from '@/lib/query-client';
 import { processUploadQueue } from '@/lib/upload-queue';
+import { useAppTheme } from '@/theme';
 
-const STATUS_LOOK: Record<RecordingSummary['status'], { label: string; color: string }> = {
-  recording: { label: 'Recording', color: '#C62828' },
-  draft: { label: 'Not saved yet', color: '#757575' },
-  pending: { label: 'Waiting to upload', color: '#E65100' },
-  uploaded: { label: 'Uploaded', color: '#2E7D32' },
+const STATUS_LOOK: Record<
+  RecordingSummary['status'],
+  { label: string; tone: 'danger' | 'neutral' | 'warning' | 'success' }
+> = {
+  recording: { label: 'Recording', tone: 'danger' },
+  draft: { label: 'Not saved yet', tone: 'neutral' },
+  pending: { label: 'Waiting to upload', tone: 'warning' },
+  uploaded: { label: 'Uploaded', tone: 'success' },
 };
 
 /** `header` is shown above the list and scrolls with it (the Routes tab puts its title + tabs there). */
 export function MyRoutes({ header }: { header?: ReactNode }) {
+  const t = useAppTheme();
   const recordings = useQuery({ queryKey: localKeys.recordings, queryFn: listRecordings });
   const net = useNetInfo();
   const [uploading, setUploading] = useState(false);
@@ -52,7 +57,7 @@ export function MyRoutes({ header }: { header?: ReactNode }) {
               {header}
               {pending > 0 ? (
                 <ThemedView type="backgroundElement" style={styles.queue}>
-                  <MaterialCommunityIcons name="cloud-upload" size={22} color="#E65100" />
+                  <MaterialCommunityIcons name="cloud-upload" size={22} color={t.warning} />
                   <ThemedText style={styles.flex1}>
                     {pending} waiting to upload
                     {offline ? ' — you’re offline, it will upload later' : ''}
@@ -90,7 +95,14 @@ export function MyRoutes({ header }: { header?: ReactNode }) {
 }
 
 function RouteRow({ item }: { item: RecordingSummary }) {
+  const t = useAppTheme();
   const look = STATUS_LOOK[item.status];
+  const toneBg = {
+    danger: t.dangerSurface,
+    neutral: t.surface,
+    warning: t.warningSurface,
+    success: t.successSurface,
+  }[look.tone];
   const date = new Date(item.startedAt);
   return (
     <Pressable
@@ -110,15 +122,13 @@ function RouteRow({ item }: { item: RecordingSummary }) {
             {formatDistance(item.distanceM)}
           </ThemedText>
           {item.lastError && item.status === 'pending' ? (
-            <ThemedText type="small" style={styles.error} numberOfLines={2}>
+            <ThemedText type="small" style={{ color: t.warning }} numberOfLines={2}>
               {item.lastError}
             </ThemedText>
           ) : null}
         </View>
-        <View style={[styles.status, { backgroundColor: look.color }]}>
-          <ThemedText type="small" style={styles.statusText}>
-            {look.label}
-          </ThemedText>
+        <View style={[styles.status, { backgroundColor: toneBg }]}>
+          <ThemedText type="small">{look.label}</ThemedText>
         </View>
       </ThemedView>
     </Pressable>
@@ -152,7 +162,5 @@ const styles = StyleSheet.create({
     minHeight: 64,
   },
   pressed: { opacity: 0.6 },
-  error: { color: '#E65100' },
   status: { paddingHorizontal: Spacing.two, paddingVertical: 2, borderRadius: 10 },
-  statusText: { color: '#fff' },
 });

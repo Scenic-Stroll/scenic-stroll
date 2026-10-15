@@ -73,7 +73,7 @@ Secrets are never committed and never go in the app — only into `supabase secr
 - [x] 4. Profile: name/level/progress, 2×2 stats, badges, saved places, show-my-name default, download/delete my data (photo upload + language switch deferred)
 - [x] 5. Friends: codes + QR, requests, accept/decline/remove/block, friend profiles, activity (public routes only), weekly leaderboard — migration `friends` applied, 11 DB tests
 - [x] 6. Live location sharing: who/how long/precision, foreground updates ~15 s, Realtime, friend markers + Route to friend, map banner — 9 DB tests + live check
-- [ ] 7. Floor selector, dark theme polish
+- [x] 7. Floor selector (floors from real checkpoints near Festival Walk / CityU buildings), dark theme polish (all hard-coded colours → tokens, AA contrast)
 
 ## Phase 3 — AI tagging (target Oct 12–13)
 

@@ -9,6 +9,9 @@ import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import {
   DEMO_CENTER,
   FILTERS,
+  floorsFromCheckpoints,
+  haversineMeters,
+  isOnFloor,
   matchesFilters,
   PRESETS,
   type CommunityRoute,
@@ -35,11 +38,14 @@ import { SearchBar } from '@/components/ui/search-bar';
 import { planRoute } from '@/lib/api';
 import { communityKeys, fetchCommunityRoutes } from '@/lib/community-routes';
 import { friendAsPlace, stopSharing, useFriendLocations, useSharing } from '@/lib/location-sharing';
+import { useCheckpointsNear } from '@/lib/checkpoints-near';
 import { useMapFocus } from '@/lib/map-focus-store';
+import { CHECKPOINT_INFO, describeCheckpoint } from '@/constants/checkpoints';
 import { ShareLocationSheet } from '@/screens/friends/share-location-sheet';
 import { useMyProfile } from '@/lib/profile';
 import { radius, shadow, space, TAP_TARGET, type, useAppTheme, useColorSchemeName } from '@/theme';
 
+import { FloorSelector } from './floor-selector';
 import { MapControls, type MapLayers } from './map-controls';
 import { DARK_MAP_STYLE, LIGHT_MAP_STYLE } from './map-style';
 import { NearbySheet } from './nearby-sheet';
@@ -53,6 +59,10 @@ const SNAP_POINTS = ['15%', '50%', '90%'];
 const SHEET_PEEK = 0;
 const SHEET_HALF = 1;
 const SHEET_FULL = 2;
+/** Map span (degrees of latitude) below which we count as "zoomed into a building" (~400 m). */
+const BUILDING_ZOOM_DELTA = 0.0036;
+/** The map centre must be this close to a building for its floors to show. */
+const BUILDING_FOCUS_METERS = 150;
 
 // CityU, Festival Walk and Kowloon Tong station on screen, flat (2D) by default.
 const DEMO_CAMERA: Camera = {
@@ -94,6 +104,20 @@ export function MapHome() {
   /** Where the place picker's result goes: the search bar opens a place card instead of routing. */
   const [pickerFromSearchBar, setPickerFromSearchBar] = useState(false);
   const [userLocation, setUserLocation] = useState<LatLng | null>(null);
+  // Floor selector: the building you're zoomed into (Festival Walk or a CityU building), and the
+  // floor picked for it (null = all floors). The floor is remembered per building.
+  const [focusedBuildingId, setFocusedBuildingId] = useState<string | null>(null);
+  const [floorByBuilding, setFloorByBuilding] = useState<Record<string, string | null>>({});
+  const focusedBuilding = PRESETS.find((p) => p.id === focusedBuildingId) ?? null;
+  const nearCheckpoints = useCheckpointsNear(focusedBuildingId, focusedBuilding?.point ?? null);
+  const floors = useMemo(
+    () => floorsFromCheckpoints(nearCheckpoints.data ?? []),
+    [nearCheckpoints.data],
+  );
+  const selectedFloor = focusedBuildingId ? (floorByBuilding[focusedBuildingId] ?? null) : null;
+  const visibleCheckpoints = (nearCheckpoints.data ?? []).filter(
+    (c) => selectedFloor === null || isOnFloor(c, selectedFloor),
+  );
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
 
   // Location once on open: the blue dot, and "nearby" measured from where you are.
@@ -289,6 +313,18 @@ export function MapHome() {
         showsMyLocationButton={false}
         showsCompass={false}
         toolbarEnabled={false}
+        // Zoomed in close to a building? Show its floors.
+        onRegionChangeComplete={(region) => {
+          const zoomedIn = region.latitudeDelta < BUILDING_ZOOM_DELTA;
+          const center = { lat: region.latitude, lng: region.longitude };
+          const building = zoomedIn
+            ? PRESETS.filter((p) => p.kind !== 'mtr_exit')
+                .map((p) => ({ p, d: haversineMeters(center, p.point) }))
+                .filter((x) => x.d <= BUILDING_FOCUS_METERS)
+                .sort((a, b) => a.d - b.d)[0]?.p
+            : undefined;
+          setFocusedBuildingId(building?.id ?? null);
+        }}
         onLongPress={(e) => {
           const { latitude, longitude } = e.nativeEvent.coordinate;
           openPlace({ label: 'Dropped pin', point: { lat: latitude, lng: longitude } });
@@ -334,6 +370,34 @@ export function MapHome() {
               </Marker>
             ))
           : null}
+        {visibleCheckpoints.map((c) => (
+          <Marker
+            key={`cp-${c.id}`}
+            coordinate={{ latitude: c.lat, longitude: c.lng }}
+            title={describeCheckpoint({
+              kind: c.kind,
+              floorFrom: c.floor_from,
+              floorTo: c.floor_to,
+              note: c.note,
+            })}
+            accessibilityLabel={describeCheckpoint({
+              kind: c.kind,
+              floorFrom: c.floor_from,
+              floorTo: c.floor_to,
+              note: c.note,
+            })}
+            zIndex={4}
+          >
+            <View
+              style={[
+                styles.checkpointDot,
+                { backgroundColor: t.background, borderColor: t.primary },
+              ]}
+            >
+              <Icon name={CHECKPOINT_INFO[c.kind].icon} size={16} color={t.primary} />
+            </View>
+          </Marker>
+        ))}
         {(friendLocations.data ?? []).map((f) => (
           <Marker
             key={`friend-${f.user_id}`}
@@ -439,6 +503,19 @@ export function MapHome() {
             onZoomOut={() => void zoomBy(false)}
             onMyLocation={() => void goToMyLocation()}
           />
+          {focusedBuilding ? (
+            <View style={styles.floors}>
+              <FloorSelector
+                buildingName={focusedBuilding.en}
+                floors={floors}
+                selected={selectedFloor}
+                loading={nearCheckpoints.isPending}
+                onSelect={(floor) =>
+                  setFloorByBuilding((prev) => ({ ...prev, [focusedBuilding.id]: floor }))
+                }
+              />
+            </View>
+          ) : null}
         </View>
       </SafeAreaView>
 
@@ -551,6 +628,15 @@ const styles = StyleSheet.create({
   controls: { alignItems: 'flex-end', paddingHorizontal: space.lg, marginTop: space.sm },
   placeDot: { width: 14, height: 14, borderRadius: 7, borderWidth: 3 },
   friendMarker: { padding: 2, borderRadius: radius.round, borderWidth: 3 },
+  checkpointDot: {
+    width: 30,
+    height: 30,
+    borderRadius: radius.round,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  floors: { marginTop: space.sm, alignItems: 'flex-end' },
   bannerRow: { paddingHorizontal: space.lg },
   sharingBanner: {
     minHeight: TAP_TARGET,

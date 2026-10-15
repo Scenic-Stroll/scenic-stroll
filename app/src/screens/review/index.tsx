@@ -45,9 +45,10 @@ import { localKeys, refreshLocalData } from '@/lib/query-client';
 import { startRecording } from '@/lib/recorder';
 import { useSettings } from '@/lib/settings-store';
 import { supabase } from '@/lib/supabase';
+import { useAppTheme } from '@/theme';
+import { PrimaryButton } from '@/components/ui/primary-button';
 import { processUploadQueue } from '@/lib/upload-queue';
 
-const BLUE = '#1565C0';
 /** Start/end labels snap to a landmark this close (build prompt: 60 m). */
 const SNAP_METERS = 60;
 const GAP_CHECKPOINT_KINDS: CheckpointKind[] = [
@@ -84,6 +85,7 @@ export function ReviewScreen({ id }: { id: string }) {
 
 function ReviewForm({ rec }: { rec: localDb.RecordingDetail }) {
   const theme = useTheme();
+  const t = useAppTheme();
   const mapRef = useRef<MapView>(null);
   const dataCollection = useSettings((s) => s.dataCollectionMode);
   const takeRouteNumber = useSettings((s) => s.takeRouteNumber);
@@ -319,12 +321,12 @@ function ReviewForm({ rec }: { rec: localDb.RecordingDetail }) {
                               setGapTarget(from);
                               setSheetKind(kind);
                             }}
-                            style={styles.kindChip}
+                            style={[styles.kindChip, { backgroundColor: t.infoSurface }]}
                           >
                             <MaterialCommunityIcons
                               name={CHECKPOINT_INFO[kind].icon}
                               size={18}
-                              color={BLUE}
+                              color={t.trace}
                             />
                             <ThemedText type="small">{CHECKPOINT_INFO[kind].en}</ThemedText>
                           </Pressable>
@@ -345,7 +347,7 @@ function ReviewForm({ rec }: { rec: localDb.RecordingDetail }) {
                   <MaterialCommunityIcons
                     name={CHECKPOINT_INFO[c.kind].icon}
                     size={20}
-                    color={BLUE}
+                    color={t.trace}
                   />
                   <ThemedText style={styles.flex1}>{describeCheckpoint(c)}</ThemedText>
                   {!uploaded ? (
@@ -431,29 +433,27 @@ function ReviewForm({ rec }: { rec: localDb.RecordingDetail }) {
           {error ? <Banner tone="error" text={error} /> : null}
           {!uploaded && !preview.ok && !error ? <Banner tone="warn" text={preview.error} /> : null}
 
-          <Pressable
-            accessibilityRole="button"
-            disabled={busy}
-            onPress={() => save(false)}
-            style={[styles.primary, busy && styles.disabled]}
-          >
-            <ThemedText style={styles.primaryText}>
-              {uploaded ? 'Save changes' : 'Save & upload'}
-            </ThemedText>
-          </Pressable>
+          <PrimaryButton
+            label={uploaded ? 'Save changes' : 'Save & upload'}
+            icon="cloud-upload"
+            loading={busy}
+            onPress={() => void save(false)}
+          />
           {dataCollection && !uploaded ? (
-            <Pressable
-              accessibilityRole="button"
+            <PrimaryButton
+              label="Save & record another"
+              icon="record-rec"
+              variant="secondary"
               disabled={busy}
-              onPress={() => save(true)}
-              style={[styles.primary, styles.primaryAlt, busy && styles.disabled]}
-            >
-              <ThemedText style={styles.primaryText}>Save & record another</ThemedText>
-            </Pressable>
+              onPress={() => void save(true)}
+            />
           ) : null}
-          <Pressable accessibilityRole="button" onPress={remove} style={styles.deleteButton}>
-            <ThemedText style={styles.deleteText}>Delete route</ThemedText>
-          </Pressable>
+          <PrimaryButton
+            label="Delete route"
+            icon="delete-outline"
+            variant="danger"
+            onPress={remove}
+          />
         </ScrollView>
 
         <CheckpointSheet
@@ -523,12 +523,9 @@ function ToggleRow({
 }
 
 function Banner({ tone, text }: { tone: 'ok' | 'warn' | 'error'; text: string }) {
+  const t = useAppTheme();
   const bg =
-    tone === 'ok'
-      ? 'rgba(46,125,50,0.12)'
-      : tone === 'warn'
-        ? 'rgba(230,81,0,0.12)'
-        : 'rgba(198,40,40,0.12)';
+    tone === 'ok' ? t.successSurface : tone === 'warn' ? t.warningSurface : t.dangerSurface;
   return (
     <View style={[styles.banner, { backgroundColor: bg }]} accessibilityLiveRegion="polite">
       <ThemedText type="small">{text}</ThemedText>
@@ -552,7 +549,6 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: Spacing.two,
     borderRadius: 20,
-    backgroundColor: 'rgba(21,101,192,0.1)',
   },
   cpRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, minHeight: 44 },
   iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
@@ -566,16 +562,4 @@ const styles = StyleSheet.create({
   multiline: { minHeight: 120, paddingTop: Spacing.three, textAlignVertical: 'top' },
   toggleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, minHeight: 56 },
   banner: { padding: Spacing.three, borderRadius: Spacing.two },
-  primary: {
-    minHeight: 56,
-    borderRadius: 28,
-    backgroundColor: BLUE,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryAlt: { backgroundColor: '#2E7D32' },
-  primaryText: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  disabled: { opacity: 0.5 },
-  deleteButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center' },
-  deleteText: { color: '#C62828' },
 });

@@ -10,7 +10,9 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { CHECKPOINT_INFO, FLOOR_CHOICES } from '@/constants/checkpoints';
 import { Spacing } from '@/constants/theme';
+import { PrimaryButton } from '@/components/ui/primary-button';
 import { useTheme } from '@/hooks/use-theme';
+import { useAppTheme } from '@/theme';
 
 export type CheckpointDetails = {
   floorFrom: string | null;
@@ -28,9 +30,10 @@ export function CheckpointSheet({
   onAdd: (details: CheckpointDetails) => void;
   onCancel: () => void;
 }) {
+  const overlay = useAppTheme().overlay;
   return (
     <Modal visible={kind !== null} transparent animationType="slide" onRequestClose={onCancel}>
-      <View style={styles.backdrop}>
+      <View style={[styles.backdrop, { backgroundColor: overlay }]}>
         {/* key resets the inputs every time the sheet opens for a new checkpoint */}
         {kind ? <SheetBody key={kind} kind={kind} onAdd={onAdd} onCancel={onCancel} /> : null}
       </View>
@@ -80,24 +83,18 @@ function SheetBody({
         />
       ) : null}
 
-      <View style={styles.actions}>
-        <Pressable accessibilityRole="button" onPress={onCancel} style={styles.secondary}>
-          <ThemedText>Cancel</ThemedText>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() =>
-            onAdd({
-              floorFrom: clean(floorFrom),
-              floorTo: clean(floorTo),
-              note: note.trim() ? note.trim() : null,
-            })
-          }
-          style={styles.primary}
-        >
-          <ThemedText style={styles.primaryText}>Add {info.en.toLowerCase()}</ThemedText>
-        </Pressable>
-      </View>
+      <PrimaryButton
+        label={`Add ${info.en.toLowerCase()}`}
+        icon="check"
+        onPress={() =>
+          onAdd({
+            floorFrom: clean(floorFrom),
+            floorTo: clean(floorTo),
+            note: note.trim() ? note.trim() : null,
+          })
+        }
+      />
+      <PrimaryButton label="Cancel" variant="secondary" onPress={onCancel} />
     </ThemedView>
   );
 }
@@ -113,6 +110,7 @@ function FloorRow({
   onChange: (v: string) => void;
 }) {
   const theme = useTheme();
+  const t = useAppTheme();
   return (
     <View style={styles.floorRow}>
       <ThemedText type="smallBold">{label}</ThemedText>
@@ -131,10 +129,12 @@ function FloorRow({
               onPress={() => onChange(selected ? '' : f)}
               style={[
                 styles.chip,
-                { backgroundColor: selected ? '#1565C0' : theme.backgroundElement },
+                { backgroundColor: selected ? t.primary : theme.backgroundElement },
               ]}
             >
-              <ThemedText style={selected ? styles.primaryText : undefined}>{f}</ThemedText>
+              <ThemedText style={selected ? { color: t.onPrimary, fontWeight: '600' } : undefined}>
+                {f}
+              </ThemedText>
             </Pressable>
           );
         })}
@@ -158,7 +158,7 @@ function FloorRow({
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
+  backdrop: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
     padding: Spacing.four,
     paddingBottom: Spacing.five,
@@ -184,14 +184,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     fontSize: 16,
   },
-  actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: Spacing.three },
-  secondary: { minHeight: 48, paddingHorizontal: Spacing.three, justifyContent: 'center' },
-  primary: {
-    minHeight: 48,
-    paddingHorizontal: Spacing.four,
-    borderRadius: 24,
-    justifyContent: 'center',
-    backgroundColor: '#1565C0',
-  },
-  primaryText: { color: '#fff', fontWeight: '600' },
 });

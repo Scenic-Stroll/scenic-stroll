@@ -35,9 +35,7 @@ import {
   useRecorder,
 } from '@/lib/recorder';
 import { useSettings } from '@/lib/settings-store';
-
-const RED = '#C62828';
-const BLUE = '#1565C0';
+import { useAppTheme, type Palette } from '@/theme';
 
 export function RecordHome() {
   const status = useRecorder((s) => s.status);
@@ -47,6 +45,7 @@ export function RecordHome() {
 // ---------------------------------------------------------------------------------------------
 
 function IdleView() {
+  const t = useAppTheme();
   const error = useRecorder((s) => s.error);
   const dataCollection = useSettings((s) => s.dataCollectionMode);
   const pending = useQuery({ queryKey: localKeys.pendingCount, queryFn: countPending });
@@ -66,10 +65,8 @@ function IdleView() {
           indoors, so checkpoints are how others will know which way to go.
         </ThemedText>
         {dataCollection ? (
-          <View style={[styles.badge, { backgroundColor: '#FFF3E0' }]}>
-            <ThemedText type="smallBold" style={{ color: '#E65100' }}>
-              Data collection mode is on
-            </ThemedText>
+          <View style={[styles.badge, { backgroundColor: t.warningSurface }]}>
+            <ThemedText type="smallBold">Data collection mode is on</ThemedText>
           </View>
         ) : null}
 
@@ -77,14 +74,22 @@ function IdleView() {
           accessibilityRole="button"
           accessibilityLabel="Start recording"
           onPress={start}
-          style={[styles.startButton, dataCollection && styles.startButtonBig]}
+          style={[
+            styles.startButton,
+            dataCollection && styles.startButtonBig,
+            { backgroundColor: t.danger },
+          ]}
         >
-          <MaterialCommunityIcons name="record-rec" size={dataCollection ? 48 : 36} color="#fff" />
-          <ThemedText style={styles.startText}>Start recording</ThemedText>
+          <MaterialCommunityIcons
+            name="record-rec"
+            size={dataCollection ? 48 : 36}
+            color={t.onDanger}
+          />
+          <ThemedText style={[styles.startText, { color: t.onDanger }]}>Start recording</ThemedText>
         </Pressable>
 
         {error ? (
-          <View style={styles.errorBox}>
+          <View style={[styles.errorBox, { backgroundColor: t.dangerSurface }]}>
             <ThemedText>{error}</ThemedText>
             {/permission/i.test(error) ? (
               <Pressable accessibilityRole="button" onPress={() => Linking.openSettings()}>
@@ -98,9 +103,9 @@ function IdleView() {
           <Pressable
             accessibilityRole="button"
             onPress={() => router.navigate('/routes')}
-            style={styles.pendingBanner}
+            style={[styles.pendingBanner, { backgroundColor: t.infoSurface }]}
           >
-            <MaterialCommunityIcons name="cloud-upload" size={20} color={BLUE} />
+            <MaterialCommunityIcons name="cloud-upload" size={20} color={t.trace} />
             <ThemedText type="small">
               {pending.data} route{pending.data === 1 ? '' : 's'} waiting to upload — see My routes
             </ThemedText>
@@ -114,6 +119,7 @@ function IdleView() {
 // ---------------------------------------------------------------------------------------------
 
 function RecordingView() {
+  const t = useAppTheme();
   const mapRef = useRef<MapView>(null);
   const points = useRecorder((s) => s.points);
   const checkpoints = useRecorder((s) => s.checkpoints);
@@ -175,7 +181,7 @@ function RecordingView() {
   };
 
   const seconds = startedAt ? Math.max(0, Math.floor((now - startedAt) / 1000)) : 0;
-  const gps = gpsStatus(now, lastFix, latest?.timestamp ?? null);
+  const gps = gpsStatus(now, lastFix, latest?.timestamp ?? null, t);
 
   return (
     <View style={styles.fill}>
@@ -217,8 +223,8 @@ function RecordingView() {
             <Stat label="Distance" value={formatDistance(pathLengthMeters(points))} />
             <Stat label="Checkpoints" value={String(checkpoints.length)} />
           </View>
-          <View style={[styles.gpsRow, { backgroundColor: gps.color }]}>
-            <MaterialCommunityIcons name="crosshairs-gps" size={16} color="#fff" />
+          <View style={[styles.gpsRow, { backgroundColor: gps.background }]}>
+            <MaterialCommunityIcons name="crosshairs-gps" size={16} color={gps.icon} />
             <ThemedText type="small" style={styles.gpsText} accessibilityLiveRegion="polite">
               {gps.text}
             </ThemedText>
@@ -229,9 +235,9 @@ function RecordingView() {
           <Pressable
             accessibilityRole="button"
             onPress={() => setFollow(true)}
-            style={[styles.followButton, styles.shadow]}
+            style={[styles.followButton, styles.shadow, { backgroundColor: t.background }]}
           >
-            <ThemedText type="smallBold" style={{ color: BLUE }}>
+            <ThemedText type="smallBold" style={{ color: t.trace }}>
               Follow me
             </ThemedText>
           </Pressable>
@@ -257,6 +263,7 @@ function RecordingView() {
               onPress={() => onCheckpointButton(kind)}
               style={({ pressed }) => [
                 styles.cpButton,
+                { backgroundColor: t.infoSurface },
                 big && styles.cpButtonBig,
                 pressed && { opacity: 0.6 },
               ]}
@@ -264,7 +271,7 @@ function RecordingView() {
               <MaterialCommunityIcons
                 name={CHECKPOINT_INFO[kind].icon}
                 size={big ? 32 : 26}
-                color={BLUE}
+                color={t.trace}
               />
               <ThemedText type="small">{CHECKPOINT_INFO[kind].en}</ThemedText>
             </Pressable>
@@ -278,10 +285,10 @@ function RecordingView() {
             accessibilityRole="button"
             accessibilityLabel="Stop recording"
             onPress={stop}
-            style={[styles.stopButton, big && styles.stopButtonBig]}
+            style={[styles.stopButton, big && styles.stopButtonBig, { backgroundColor: t.danger }]}
           >
-            <MaterialCommunityIcons name="stop" size={big ? 32 : 24} color="#fff" />
-            <ThemedText style={styles.startText}>Stop</ThemedText>
+            <MaterialCommunityIcons name="stop" size={big ? 32 : 24} color={t.onDanger} />
+            <ThemedText style={[styles.startText, { color: t.onDanger }]}>Stop</ThemedText>
           </Pressable>
         </View>
       </ThemedView>
@@ -323,23 +330,26 @@ function gpsStatus(
   now: number,
   lastFix: { accuracy: number | null; timestamp: number } | null,
   lastAcceptedAt: number | null,
-): { text: string; color: string } {
-  if (!lastFix) return { text: 'Waiting for GPS…', color: '#757575' };
+  t: Palette,
+): { text: string; background: string; icon: string } {
+  const neutral = { background: t.surface, icon: t.textSecondary };
+  const warn = { background: t.warningSurface, icon: t.warning };
+  if (!lastFix) return { text: 'Waiting for GPS…', ...neutral };
   const quietFor = lastAcceptedAt ? Math.round((now - lastAcceptedAt) / 1000) : null;
   if (quietFor !== null && quietFor > GPS_RULES.gapSeconds) {
     return {
       text: `No good GPS for ${quietFor} s — add a checkpoint for lifts, stairs or entrances`,
-      color: '#E65100',
+      ...warn,
     };
   }
   if (lastFix.accuracy !== null && lastFix.accuracy > GPS_RULES.maxAccuracyM) {
     return {
       text: `Weak GPS (±${Math.round(lastFix.accuracy)} m) — points are skipped`,
-      color: '#E65100',
+      ...warn,
     };
   }
   const acc = lastFix.accuracy === null ? '' : ` (±${Math.round(lastFix.accuracy)} m)`;
-  return { text: `GPS good${acc}`, color: '#2E7D32' };
+  return { text: `GPS good${acc}`, background: t.successSurface, icon: t.primary };
 }
 
 const styles = StyleSheet.create({
@@ -361,19 +371,17 @@ const styles = StyleSheet.create({
     marginTop: Spacing.four,
     minHeight: 72,
     borderRadius: 36,
-    backgroundColor: RED,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.two,
   },
   startButtonBig: { minHeight: 112, borderRadius: 56 },
-  startText: { color: '#fff', fontSize: 20, fontWeight: '700' },
+  startText: { fontSize: 20, fontWeight: '700' },
   errorBox: {
     gap: Spacing.two,
     padding: Spacing.three,
     borderRadius: Spacing.two,
-    backgroundColor: 'rgba(198,40,40,0.1)',
   },
   pendingBanner: {
     minHeight: 48,
@@ -382,7 +390,6 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     padding: Spacing.three,
     borderRadius: Spacing.two,
-    backgroundColor: 'rgba(21,101,192,0.1)',
   },
   topOverlay: {
     position: 'absolute',
@@ -409,14 +416,13 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.one,
     borderRadius: Spacing.two,
   },
-  gpsText: { color: '#fff', flex: 1 },
+  gpsText: { flex: 1 },
   followButton: {
     alignSelf: 'flex-end',
     minHeight: 44,
     paddingHorizontal: Spacing.three,
     borderRadius: 22,
     justifyContent: 'center',
-    backgroundColor: '#fff',
   },
   bottomPanel: {
     position: 'absolute',
@@ -438,7 +444,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 2,
-    backgroundColor: 'rgba(21,101,192,0.1)',
   },
   cpButtonBig: { width: 104, minHeight: 92 },
   controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -447,7 +452,6 @@ const styles = StyleSheet.create({
     minHeight: 56,
     paddingHorizontal: Spacing.five,
     borderRadius: 28,
-    backgroundColor: RED,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
