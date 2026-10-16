@@ -24,7 +24,8 @@ export const SmartRouteRequestSchema = z.object({
 });
 export type SmartRouteRequest = z.input<typeof SmartRouteRequestSchema>;
 
-export const SMART_ROUTE_ROLES = ['requested', 'best_now', 'fastest'] as const;
+/** Why a route is listed. "alternative" = a genuinely different way for the requested profile. */
+export const SMART_ROUTE_ROLES = ['requested', 'best_now', 'fastest', 'alternative'] as const;
 
 /** How each stretch of a route is drawn: sun = orange, shade = dark green, indoor = blue… */
 export const RUN_STYLES = [
@@ -40,7 +41,7 @@ export const RUN_STYLES = [
 export type RunStyle = (typeof RUN_STYLES)[number];
 
 export const SmartRouteOptionSchema = z.object({
-  /** Stable within a response, e.g. "sheltered". */
+  /** Stable within a response, e.g. "sheltered" or "sheltered-alt". */
   id: z.string(),
   profile: RoutingProfileSchema,
   /** Why it is listed. One route can be several: "requested" + "best_now". */

@@ -403,3 +403,24 @@ and the sun's position" under the explanation. Diagnostics → Shade shows the d
 redeployed a few minutes later — the app fell back to the standard route meanwhile, as designed. Tuples now accept
 extra trailing fields (`.rest`), so a newer database can't break an older function again. The function also skips
 loading the graph for trips outside the area now (0.3 s instead of ~1 s).
+
+### D27 · Smart routing step 5: mode tabs, departure time, alternatives (2026-10-17)
+
+**Tabs:** Best now · Fastest · Shaded · Sheltered · Cool · Step-free, a horizontally scrolling chip row
+(`app/src/screens/map/route-mode-tabs.tsx`). **Best now is the default** and maps to the profile for the current
+condition (`PROFILE_FOR_CONDITION`: normal → balanced, rain/severe → sheltered, heat → cool, night → fastest), so the
+weather still picks the route but the user always sees _which_ profile that is. Changing the "Now" card condition
+jumps back to Best now; closing planning resets tab and departure time.
+
+**Departure time:** chips Leave now / In 15 min / In 30 min / In 1 h / At… (`departure-picker.tsx`); "At…" opens
+`@react-native-community/datetimepicker` 9.1.0 (bundled in Expo Go, added with `npx expo install`). A past time of
+day means tomorrow. The time goes to `smart-route` as `departure_time`, so shade (nearest half hour) and opening hours
+(at the time you reach each link) are for then; a caption says so. "Now" sends nothing (server time).
+
+**Alternatives — penalty method, not k-shortest paths.** After the requested / best-now / fastest routes are picked
+and merged, one more search for the requested profile runs with every edge already used costing ×1.5. It is offered
+as "· another way" only if it shares at most 80 % of its length with every offered route (either direction) and takes
+at most 1.4× the fastest time; max 4 options. Why: Yen's k-shortest returns near-identical routes that differ by one
+kerb; the penalty search finds a genuinely different street in one extra Dijkstra (~50 ms). On the local graph it
+found an alternative in 22 of 30 demo runs. Live check (A1 → MMW, 13:00 heat): cool 9 min 81 % shaded, alternative
+10 min 81 % shaded via another street.

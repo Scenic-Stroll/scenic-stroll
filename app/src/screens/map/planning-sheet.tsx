@@ -1,7 +1,7 @@
 /**
- * Bottom sheet, route planning state: the "Now" conditions card, From / To, mode tabs (Fastest ·
- * Sheltered · Shaded · Step-free) and the route options: our computed smart routes first, then the
- * standard street route as a baseline. The weather picks the starting tab. If smart routing isn't
+ * Bottom sheet, route planning state: the "Now" conditions card, From / To, what to prefer (Best now ·
+ * Fastest · Shaded · Sheltered · Cool · Step-free), when you leave, and the route options: our
+ * computed smart routes first, then the standard street route as a baseline. If smart routing isn't
  * available (offline, outside the area) only the standard route shows. Community routes: Phase 4.
  */
 import {
@@ -17,29 +17,13 @@ import { DirectionsList } from '@/components/route/directions-list';
 import { RouteOptionCard } from '@/components/route/route-option-card';
 import { ErrorCard } from '@/components/ui/error-card';
 import { Icon } from '@/components/ui/icon';
-import { SegmentedTabs } from '@/components/ui/segmented-tabs';
 import { radius, space, TAP_TARGET, type, useAppTheme } from '@/theme';
 
 import { ConditionsCard } from './conditions-card';
+import { DeparturePicker } from './departure-picker';
+import { RouteModeTabs, type RouteMode } from './route-mode-tabs';
 import { SmartRouteOptions } from './smart-route-options';
 import type { Place } from './types';
-
-export const ROUTE_MODES = [
-  { key: 'fastest', label: 'Fastest' },
-  { key: 'sheltered', label: 'Sheltered' },
-  { key: 'shaded', label: 'Shaded' },
-  { key: 'step_free', label: 'Step-free' },
-] as const;
-export type RouteMode = (typeof ROUTE_MODES)[number]['key'];
-
-/** Which tab opens first for each weather condition. */
-export const ROUTE_MODE_FOR_CONDITION: Record<ConditionMode, RouteMode> = {
-  normal: 'fastest',
-  rain: 'sheltered',
-  heat: 'shaded',
-  night: 'fastest',
-  typhoon_or_black_rain: 'sheltered',
-};
 
 /** What the "Now" card needs (comes from useConditions()). */
 export type NowInfo = {
@@ -61,6 +45,8 @@ export function PlanningSheet({
   onClose,
   mode,
   onModeChange,
+  departure,
+  onDepartureChange,
   standardRoute,
   isLoading,
   error,
@@ -80,6 +66,9 @@ export function PlanningSheet({
   onClose: () => void;
   mode: RouteMode;
   onModeChange: (mode: RouteMode) => void;
+  /** null = leave now. */
+  departure: Date | null;
+  onDepartureChange: (when: Date | null) => void;
   standardRoute: PlanRouteResponse | undefined;
   isLoading: boolean;
   error: Error | null;
@@ -134,7 +123,8 @@ export function PlanningSheet({
         </View>
       </View>
 
-      <SegmentedTabs options={ROUTE_MODES} value={mode} onChange={onModeChange} />
+      <RouteModeTabs value={mode} onChange={onModeChange} />
+      <DeparturePicker value={departure} onChange={onDepartureChange} />
 
       {!ready ? (
         <Text style={[type.small, { color: t.textSecondary }]}>

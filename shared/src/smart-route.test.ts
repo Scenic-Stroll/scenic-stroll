@@ -118,8 +118,9 @@ describe('planSmartRoutes', () => {
 
   it('merges identical routes instead of listing them twice', () => {
     const res = planSmartRoutes(twoWayGraph(), input({ profile: 'fastest', condition: 'night' }));
-    expect(res.options).toHaveLength(1);
-    expect(res.options[0]!.roles).toEqual(['requested', 'best_now', 'fastest']);
+    const main = res.options.filter((o) => !o.roles.includes('alternative'));
+    expect(main).toHaveLength(1);
+    expect(main[0]!.roles).toEqual(['requested', 'best_now', 'fastest']);
   });
 
   it('flags a preference route over 1.4× the fastest time as much longer', () => {
@@ -217,7 +218,9 @@ describe('shade (step 4)', () => {
 
   it('after dark shade does not matter: shaded = fastest, and no % shaded is claimed', () => {
     const res = planSmartRoutes(shadeGraph(), input({ profile: 'shaded', departure: NIGHT_HK }));
-    expect(res.options).toHaveLength(1);
+    // One main route (the other street may still be offered as the alternative).
+    expect(res.options.filter((o) => !o.roles.includes('alternative'))).toHaveLength(1);
+    expect(res.options.every((o) => o.pct_shaded === null)).toBe(true);
     expect(res.options[0]!.pct_shaded).toBeNull();
     expect(res.options[0]!.runs.every((r) => r.style === 'open')).toBe(true);
   });
@@ -253,5 +256,62 @@ describe('shade (step 4)', () => {
     expect(s.runs.at(-1)!.to).toBe(s.coordinates.length - 1);
     s.runs.slice(1).forEach((run, i) => expect(run.from).toBe(s.runs[i]!.to));
     expect(s.markers.map((m) => m.kind)).toEqual(['stairs']);
+  });
+});
+
+describe('alternatives (step 5)', () => {
+  it('adds a genuinely different alternative when one exists within the detour cap', () => {
+    // Open north street 200 m vs open south street 260 m: no cover anywhere, so every profile picks
+    // the north street; the south one is offered as the alternative (1.3× the time).
+    const g = testGraph(
+      [
+        [0, 0],
+        [100, 50],
+        [100, -95],
+        [200, 0],
+      ],
+      [
+        { from: 0, to: 1 },
+        { from: 1, to: 3 },
+        { from: 0, to: 2 },
+        { from: 2, to: 3 },
+      ],
+    );
+    const res = planSmartRoutes(g, input({ profile: 'fastest' }));
+    expect(res.options.map((o) => [o.id, o.roles])).toEqual([
+      ['fastest', ['requested', 'best_now', 'fastest']],
+      ['fastest-alt', ['alternative']],
+    ]);
+  });
+
+  it('offers no alternative when the only other way is far too long', () => {
+    const g = testGraph(
+      [
+        [0, 0],
+        [200, 0],
+        [100, -400],
+      ],
+      [
+        { from: 0, to: 1 },
+        { from: 0, to: 2 },
+        { from: 2, to: 1 },
+      ],
+    );
+    const res = planSmartRoutes(g, input({ origin: at(0, 0), destination: at(200, 0) }));
+    expect(res.options.some((o) => o.roles.includes('alternative'))).toBe(false);
+  });
+
+  it('honours the departure time: the same trip avoids a closed mall at night', () => {
+    const g = twoWayGraph({ opening_hours: 'Mo-Su 07:00-24:00' });
+    const day = planSmartRoutes(
+      g,
+      input({ profile: 'sheltered', departure: new Date('2026-10-16T12:00:00+08:00') }),
+    );
+    const night = planSmartRoutes(
+      g,
+      input({ profile: 'sheltered', departure: new Date('2026-10-17T02:00:00+08:00') }),
+    );
+    expect(day.options[0]!.pct_indoor).toBeGreaterThan(50);
+    expect(night.options[0]!.pct_indoor).toBe(0);
   });
 });

@@ -53,12 +53,8 @@ import { DARK_MAP_STYLE, LIGHT_MAP_STYLE } from './map-style';
 import { NearbySheet } from './nearby-sheet';
 import { PlacePicker } from './place-picker';
 import { PlaceSheet } from './place-sheet';
-import {
-  PlanningSheet,
-  ROUTE_MODE_FOR_CONDITION,
-  STANDARD_OPTION_ID,
-  type RouteMode,
-} from './planning-sheet';
+import { PlanningSheet, STANDARD_OPTION_ID } from './planning-sheet';
+import { profileForMode, type RouteMode } from './route-mode-tabs';
 import { SmartRouteLine } from './smart-route-line';
 import type { Place } from './types';
 
@@ -99,9 +95,10 @@ export function MapHome() {
   const [planning, setPlanning] = useState(false);
   const now = useConditions();
   const setConditionOverride = useConditionsUi((s) => s.setModeOverride);
-  // null = the user hasn't picked a tab, so the weather decides (rain → Sheltered, heat → Shaded).
-  const [modeChoice, setModeChoice] = useState<RouteMode | null>(null);
-  const mode = modeChoice ?? ROUTE_MODE_FOR_CONDITION[now.mode];
+  // "Best now" follows the weather (rain → sheltered, heat → cool); the user can pick another tab.
+  const [mode, setMode] = useState<RouteMode>('best_now');
+  /** When you'll leave; null = now. */
+  const [departure, setDeparture] = useState<Date | null>(null);
   const [filters, setFilters] = useState<ReadonlySet<FilterKey>>(new Set());
   const [layers, setLayers] = useState<MapLayers>({
     threeD: false,
@@ -170,8 +167,9 @@ export function MapHome() {
   const smart = useSmartRoutes({
     origin: origin?.point ?? null,
     destination: destination?.point ?? null,
-    profile: mode, // the tab names are routing profile names
+    profile: profileForMode(mode, now.mode),
     condition: now.mode,
+    departure,
     enabled: planning,
   });
   const smartOptions = smart.data?.status === 'ok' ? smart.data.options : [];
@@ -304,7 +302,8 @@ export function MapHome() {
     setPlanning(false);
     setOrigin(null);
     setDestination(null);
-    setModeChoice(null);
+    setMode('best_now');
+    setDeparture(null);
     setSelectedOptionId(null);
     sheetRef.current?.snapToIndex(SHEET_PEEK);
   };
@@ -594,11 +593,13 @@ export function MapHome() {
               }}
               onClose={closePlanning}
               mode={mode}
-              onModeChange={setModeChoice}
+              onModeChange={setMode}
+              departure={departure}
+              onDepartureChange={setDeparture}
               now={now}
               onConditionOverride={(m) => {
                 setConditionOverride(m);
-                setModeChoice(null); // let the new priority choose the tab
+                setMode('best_now'); // show what the new priority suggests
               }}
               standardRoute={standardRoute.data}
               isLoading={standardRoute.isFetching}

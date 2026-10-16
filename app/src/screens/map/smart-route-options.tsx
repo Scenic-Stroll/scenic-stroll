@@ -18,6 +18,7 @@ import { radius, space, type, useAppTheme } from '@/theme';
 /** "Sheltered route · Best now", "Fastest route". */
 function titleOf(o: SmartRouteOption): string {
   const name = `${PROFILE_LABELS[o.profile].en} route`;
+  if (o.roles.includes('alternative')) return `${name} · another way`;
   if (o.roles.includes('best_now') && o.profile !== 'fastest') return `${name} · Best now`;
   if (o.roles.includes('fastest') && o.profile !== 'fastest') return `${name} · also the fastest`;
   return name;

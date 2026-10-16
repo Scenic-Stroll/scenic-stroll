@@ -1,6 +1,7 @@
 /**
  * Plans the smart route options for one trip: the profile the user picked, the best profile for
- * the weather ("Best now") and the fastest route — dropping near-duplicates (> 80 % shared).
+ * the weather ("Best now") and the fastest route — dropping near-duplicates (> 80 % shared) — plus,
+ * if there is room, one genuinely different alternative for the profile the user picked.
  * Pure function: the Edge Function, tests and the try-out script all call this.
  */
 import { CONDITIONS_POINT, type ConditionMode } from './conditions.ts';
@@ -16,6 +17,13 @@ import { sunPosition } from './sun.ts';
 export const SAME_ROUTE_OVERLAP = 0.8;
 /** A preference route longer than this × the fastest time is flagged "much longer". */
 export const DETOUR_CAP = 1.4;
+/** At most this many options (the brief: 2–4). */
+export const MAX_OPTIONS = 4;
+/**
+ * To find an alternative, edges of the routes already offered cost this much more; the search then
+ * prefers other streets where they are nearly as good (penalty-based alternatives).
+ */
+export const ALTERNATIVE_PENALTY = 1.5;
 
 export type PlanInput = {
   origin: LatLng;
@@ -95,6 +103,32 @@ export function planSmartRoutes(g: PreparedGraph | null, input: PlanInput): Smar
   }
 
   const fastestS = fastest.timeS;
+
+  // One alternative for the requested profile: only if it is really different from every route
+  // already offered (at most 80 % shared either way) and not much longer than the fastest.
+  if (picked.length < MAX_OPTIONS) {
+    const penalties = new Map<number, number>();
+    for (const p of picked)
+      for (const l of p.found.legs) penalties.set(l.edge.id, ALTERNATIVE_PENALTY);
+    const alt = findRoute(g, {
+      origin: input.origin,
+      destination: input.destination,
+      profile: input.profile,
+      departure: input.departure,
+      sun,
+      penalties,
+    });
+    const different =
+      alt !== null &&
+      picked.every(
+        (p) =>
+          Math.max(overlapRatio(alt, p.found), overlapRatio(p.found, alt)) <= SAME_ROUTE_OVERLAP,
+      );
+    if (alt && different && alt.timeS <= fastestS * DETOUR_CAP) {
+      picked.push({ profile: input.profile, roles: ['alternative'], found: alt });
+    }
+  }
+
   const options = picked.map(({ profile, roles, found }): SmartRouteOption => {
     const s = summarizeRoute(found, input.origin, input.destination, {
       departure: input.departure,
@@ -103,7 +137,7 @@ export function planSmartRoutes(g: PreparedGraph | null, input: PlanInput): Smar
     });
     const { edgeIds: _edgeIds, ...shown } = s;
     return {
-      id: profile,
+      id: roles.includes('alternative') ? `${profile}-alt` : profile,
       profile,
       roles,
       ...shown,
