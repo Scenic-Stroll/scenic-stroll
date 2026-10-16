@@ -10,6 +10,7 @@ import { withSupabase } from '@supabase/server';
 import { loadConditions } from '../_shared/conditions-service.ts';
 import { loadTripGraph } from '../_shared/graph-loader.ts';
 import { errorResponse, json, readBody } from '../_shared/http.ts';
+import { isInGraphArea } from '../_shared/scenic/graph-area.ts';
 import { planSmartRoutes } from '../_shared/scenic/smart-route.ts';
 import {
   SmartRouteRequestSchema,
@@ -35,8 +36,10 @@ export default {
 
     try {
       const started = Date.now();
+      const inArea = isInGraphArea(q.origin) && isInGraphArea(q.destination);
       const [graph, condition] = await Promise.all([
-        loadTripGraph(ctx.supabase, q.origin, q.destination),
+        // Outside our area there's nothing to load (the planner answers "outside_area").
+        inArea ? loadTripGraph(ctx.supabase, q.origin, q.destination) : Promise.resolve(null),
         // The app's choice (the "Now" card or demo simulation) wins over live weather.
         q.condition
           ? Promise.resolve(q.condition)

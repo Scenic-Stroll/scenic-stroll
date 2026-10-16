@@ -1,14 +1,18 @@
 /**
  * Turns a found route into what the app shows: line, time, distance, % covered / indoor /
- * air-conditioned, counts of stairs and lifts, the step-free verdict, the segment strip,
- * plain-English directions and a one-sentence explanation built from those facts by a template.
+ * air-conditioned / shaded, the sun-vs-shade split, coloured stretches for the map, counts of stairs
+ * and lifts, the step-free verdict, the segment strip, plain-English directions and a one-sentence
+ * explanation built from those facts by a template.
  */
 import type { RoutingEdge } from './graph-export.ts';
 import { formatDuration } from './format.ts';
-import type { FoundRoute, RouteLeg } from './router.ts';
-import { edgeTimeS, FLOOR_HEIGHT_M } from './routing-profiles.ts';
+import { hongKongTime } from './opening-hours.ts';
+import { accessTimeS, type FoundRoute, type RouteLeg } from './router.ts';
+import { edgeShadeAt, edgeTimeS, FLOOR_HEIGHT_M } from './routing-profiles.ts';
 import type { LatLng } from './schemas.ts';
 import type { SegmentKind } from './segments.ts';
+import type { ShadeMeta } from './shadows.ts';
+import type { RunStyle } from './smart-route-api.ts';
 
 export type StepFreeVerdict = 'yes' | 'unconfirmed' | 'no';
 
@@ -28,6 +32,10 @@ export type RouteSummary = {
   segments: SegmentKind[];
   steps: { instruction: string; distance_m: number; duration_s: number }[];
   data_sources: string[];
+  pct_shaded: number | null;
+  exposure: { sun_m: number; shade_m: number; covered_m: number; indoor_m: number; open_m: number };
+  runs: { style: RunStyle; from: number; to: number }[];
+  markers: { kind: 'stairs' | 'lift' | 'escalator'; point: LatLng }[];
   /** Edge ids, to compare routes (overlap) — not sent to the app. */
   edgeIds: number[];
 };
@@ -221,21 +229,94 @@ function buildSteps(legs: RouteLeg[], times: number[]) {
 
 // ---- the summary ---------------------------------------------------------------------------
 
+/** When the route is walked, for shade: departure time, the shade data's day/times, sun strength. */
+export type SummaryContext = { departure: Date; shadeMeta: ShadeMeta | null; sun: number };
+const NO_SUN: SummaryContext = { departure: new Date(0), shadeMeta: null, sun: 0 };
+
+const VERTICAL = ['stairs', 'lift', 'escalator'] as const;
+type Vertical = (typeof VERTICAL)[number];
+const isVertical = (kind: string): kind is Vertical =>
+  (VERTICAL as readonly string[]).includes(kind);
+
+/** How a stretch is drawn: a lift is a lift; otherwise indoor > covered > shade/sun (if sun is up). */
+function styleOf(e: RoutingEdge, shade: number | null, sunUp: boolean): RunStyle {
+  if (isVertical(e.kind)) return e.kind;
+  if (e.indoor) return 'indoor';
+  if (e.covered) return 'covered';
+  if (!sunUp || shade === null) return 'open';
+  return shade >= 0.5 ? 'shade' : 'sun';
+}
+
 export function summarizeRoute(
   route: FoundRoute,
   origin: LatLng,
   destination: LatLng,
+  ctx: SummaryContext = NO_SUN,
 ): RouteSummary {
   const { legs } = route;
+  const sunUp = ctx.sun > 0;
+
+  // Shade of each leg at the moment you'd reach it (same clock as the router).
+  let clock = accessTimeS(route.startAccess.distM);
+  const legShade = legs.map((l) => {
+    const shade = edgeShadeAt(
+      l.edge,
+      new Date(ctx.departure.getTime() + clock * 1000),
+      ctx.shadeMeta,
+    );
+    clock += edgeTimeS(l.edge);
+    return shade;
+  });
+
+  // The line, and which stretch of it is sun / shade / indoor… (index ranges into `coordinates`).
   const coordinates: LatLng[] = [origin];
-  for (const leg of legs) {
-    for (const p of legLine(leg)) {
-      const last = coordinates.at(-1)!;
-      if (last.lat !== p.lat || last.lng !== p.lng) coordinates.push(p);
+  const runs: RouteSummary['runs'] = [];
+  const pushPoint = (p: LatLng) => {
+    const last = coordinates.at(-1)!;
+    if (last.lat !== p.lat || last.lng !== p.lng) coordinates.push(p);
+    return coordinates.length - 1;
+  };
+  const addRun = (style: RunStyle, from: number, to: number) => {
+    if (to <= from) return;
+    const last = runs.at(-1);
+    if (last && last.style === style && last.to === from) last.to = to;
+    else runs.push({ style, from, to });
+  };
+  legs.forEach((leg, i) => {
+    const line = legLine(leg);
+    const before = coordinates.length - 1;
+    const start = pushPoint(line[0]!);
+    addRun('open', before, start); // the unmapped walk to the path
+    for (const p of line.slice(1)) pushPoint(p);
+    addRun(styleOf(leg.edge, legShade[i] ?? null, sunUp), start, coordinates.length - 1);
+  });
+  if (legs.length === 0) addRun('open', 0, pushPoint(route.startAccess.node));
+  const beforeEnd = coordinates.length - 1;
+  addRun('open', beforeEnd, pushPoint(destination));
+
+  // Metres by exposure, for the bar. The unmapped access walks count as "open" (unknown).
+  const exposure = { sun_m: 0, shade_m: 0, covered_m: 0, indoor_m: 0, open_m: 0 };
+  exposure.open_m += route.startAccess.distM + route.endAccess.distM;
+  legs.forEach(({ edge }, i) => {
+    const shade = legShade[i] ?? null;
+    if (edge.indoor) exposure.indoor_m += edge.length_m;
+    else if (edge.covered) exposure.covered_m += edge.length_m;
+    else if (!sunUp || shade === null) exposure.open_m += edge.length_m;
+    else {
+      exposure.shade_m += shade * edge.length_m;
+      exposure.sun_m += (1 - shade) * edge.length_m;
     }
-  }
-  if (legs.length === 0) coordinates.push(route.startAccess.node);
-  coordinates.push(destination);
+  });
+
+  // One marker per flight of stairs / lift ride / escalator, halfway along it.
+  const markers: RouteSummary['markers'] = [];
+  legs.forEach((leg, i) => {
+    const kind = leg.edge.kind;
+    if (isVertical(kind) && legs[i - 1]?.edge.kind !== kind) {
+      const line = legLine(leg);
+      markers.push({ kind, point: line[Math.floor(line.length / 2)]! });
+    }
+  });
 
   const access = route.startAccess.distM + route.endAccess.distM;
   const pathM = legs.reduce((s, l) => s + l.edge.length_m, 0);
@@ -286,6 +367,20 @@ export function summarizeRoute(
     step_free: stepFreeVerdict(route),
     segments: buildStrip(legs),
     steps,
+    // Only meaningful while the sun is up and shade has been computed.
+    pct_shaded:
+      sunUp && ctx.shadeMeta && total > 0
+        ? Math.round(((exposure.shade_m + exposure.covered_m + exposure.indoor_m) / total) * 100)
+        : null,
+    exposure: {
+      sun_m: Math.round(exposure.sun_m),
+      shade_m: Math.round(exposure.shade_m),
+      covered_m: Math.round(exposure.covered_m),
+      indoor_m: Math.round(exposure.indoor_m),
+      open_m: Math.round(exposure.open_m),
+    },
+    runs,
+    markers,
     data_sources: [...new Set(legs.map((l) => l.edge.data_source))],
     edgeIds: legs.map((l) => l.edge.id),
   };
@@ -297,6 +392,12 @@ export function overlapRatio(a: FoundRoute, b: FoundRoute): number {
   const lenA = a.legs.reduce((s, l) => s + l.edge.length_m, 0);
   if (lenA === 0) return 1;
   return a.legs.filter((l) => inB.has(l.edge.id)).reduce((s, l) => s + l.edge.length_m, 0) / lenA;
+}
+
+/** "13:05" in Hong Kong time. */
+function hhmm(d: Date): string {
+  const { minute } = hongKongTime(d);
+  return `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
 }
 
 /** Longest named indoor stretch, e.g. "Festival Walk LG1" — for the explanation. */
@@ -317,6 +418,7 @@ export function explain(
   s: RouteSummary,
   route: FoundRoute,
   fastestS: number | null,
+  departure: Date | null = null,
 ): { text: string; facts: Record<string, number | string | null> } {
   const indoorName = mainIndoorName(route);
   const parts: string[] = [];
@@ -326,6 +428,13 @@ export function explain(
   else parts.push(`Mostly in the open: ${s.pct_covered}% covered`);
   if (indoorName) parts[0] += `, through ${indoorName}`;
   const sentences = [`${parts[0]}.`];
+  // Shade is an estimate for the time you walk: say so, with the time.
+  const shadeTime = departure ? hhmm(departure) : null;
+  if (s.pct_shaded !== null) {
+    sentences.push(
+      `About ${s.pct_shaded}% in shade or under cover${shadeTime ? ` at ${shadeTime}` : ''} (estimated).`,
+    );
+  }
 
   const extra = fastestS === null ? null : s.duration_s - fastestS;
   if (extra !== null && extra >= 30)
@@ -349,6 +458,8 @@ export function explain(
       extra_s_vs_fastest: extra,
       via_indoor: indoorName,
       step_free: s.step_free,
+      pct_shaded: s.pct_shaded,
+      shade_time: s.pct_shaded !== null ? shadeTime : null,
     },
   };
 }

@@ -852,7 +852,7 @@ describe('walking_graph_export (for smart-route)', () => {
     assert.equal(typeof target, 'number');
     assert.ok(length > 0);
     assert.equal(kind, 'footway');
-    assert.equal(out.edges[0].length, 22, 'edge tuple has 22 fields');
+    assert.equal(out.edges[0].length, 23, 'edge tuple has 23 fields (22 = shade)');
     assert.equal(typeof out.edges[0][18], 'string', 'field 18 is the encoded polyline');
     assert.equal(out.nodes[0].length, 5);
   });
@@ -875,5 +875,46 @@ describe('walking_graph_export with a box', () => {
     assert.equal(box.edges.length, all.edges.length);
     const nodeIds = new Set(box.nodes.map((n) => n[0]));
     for (const e of box.edges) assert.ok(nodeIds.has(e[1]) && nodeIds.has(e[2]));
+  });
+});
+
+describe('walking graph shade', () => {
+  const KEY = 'test-loader-key-0123456789abcdef'; // registered in the walking graph tests above
+
+  it('the loader sets shade per edge, and the export includes it with the day it is for', async () => {
+    const build = (await db.query(`select id from public.graph_builds where status = 'active'`))
+      .rows[0].id;
+    const edgeId = (await db.query('select id from public.ped_edges limit 1')).rows[0].id;
+    const shade = Array.from({ length: 25 }, (_, i) => i * 4);
+    const n = (
+      await as(ALICE, 'select public.graph_set_shade($1, $2, $3, $4, $5, $6) as n', [
+        KEY,
+        build,
+        '2026-10-16',
+        420,
+        30,
+        JSON.stringify([[edgeId, shade, 12]]),
+      ])
+    ).rows[0].n;
+    assert.equal(n, 1);
+    const out = (await as(null, 'select public.walking_graph_export() as g')).rows[0].g;
+    assert.deepEqual(out.shade, { date: '2026-10-16', first_min: 420, bucket_min: 30 });
+    const edge = out.edges.find((e) => e[0] === edgeId);
+    assert.equal(edge.length, 23, 'shade is field 22');
+    assert.deepEqual(edge[22], shade);
+  });
+
+  it('refuses without the loader key, and nobody can write shade directly', async () => {
+    await assert.rejects(
+      as(
+        ALICE,
+        `select public.graph_set_shade('nope', 1, '2026-10-16', 420::smallint, 30::smallint, '[]')`,
+      ),
+      /loader key/,
+    );
+    await assert.rejects(
+      as(ALICE, 'update public.ped_edges set shade_pct = null'),
+      /permission denied/,
+    );
   });
 });

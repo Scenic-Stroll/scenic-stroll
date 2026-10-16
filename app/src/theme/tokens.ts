@@ -24,6 +24,13 @@ const light = {
   routeCommunity: '#1BA136',
   routeStandard: '#9AA0A6',
   routeStepFree: '#2D7FF9',
+  // Smart-route stretches on the map and in the exposure bar (lines/bars: need 3:1 vs the map).
+  routeSun: '#E07B00', // in the sun
+  routeShade: '#0F6B22', // in building/tree shade
+  routeCovered: '#2D7FF9', // under a cover (footbridge roof, canopy)
+  routeIndoor: '#6A4FD8', // indoors
+  routeOpen: '#9AA0A6', // outdoors, no sun to speak of (night) or shade unknown
+  routeStairs: '#D93025',
   /** The line you are recording (distinct from community green). 5.8:1 on white. */
   trace: '#1565C0',
   warning: '#B35C00', // 4.7:1 on white (the brighter #E07B00 was 2.9:1)
@@ -53,6 +60,12 @@ const dark: Palette = {
   routeCommunity: '#34C152',
   routeStandard: '#8E949B',
   routeStepFree: '#5B9BFF',
+  routeSun: '#FFA43A',
+  routeShade: '#34C152',
+  routeCovered: '#5B9BFF',
+  routeIndoor: '#A08BFF',
+  routeOpen: '#8E949B',
+  routeStairs: '#FF6B5E',
   trace: '#5B9BFF',
   warning: '#FFA43A',
   danger: '#FF6B5E',

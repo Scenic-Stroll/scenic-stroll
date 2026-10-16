@@ -7,6 +7,7 @@
 import type { RoutingEdge, RoutingNode } from './graph-export.ts';
 import { prepareGraph, type PreparedGraph } from './router.ts';
 import type { LatLng } from './schemas.ts';
+import type { ShadeMeta } from './shadows.ts';
 
 // The corner sits inside GRAPH_BBOX so smart-route accepts these points.
 const LNG0 = 114.17;
@@ -18,7 +19,11 @@ export const at = (x: number, y: number): LatLng => ({
 
 export type TestEdge = Partial<RoutingEdge> & { from: number; to: number };
 
-export function testGraph(points: [number, number, number?][], edges: TestEdge[]): PreparedGraph {
+export function testGraph(
+  points: [number, number, number?][],
+  edges: TestEdge[],
+  options: { shadeMeta?: ShadeMeta } = {},
+): PreparedGraph {
   const nodes: RoutingNode[] = points.map(([x, y, z = 10], id) => ({
     id,
     ...at(x, y),
@@ -30,6 +35,7 @@ export function testGraph(points: [number, number, number?][], edges: TestEdge[]
     source: 'test',
     version: 'test',
     nodes,
+    shadeMeta: options.shadeMeta ?? null,
     edges: edges.map(({ from, to, ...e }, id) => {
       const a = nodes[from]!;
       const b = nodes[to]!;
@@ -56,6 +62,7 @@ export function testGraph(points: [number, number, number?][], edges: TestEdge[]
         data_source: 'test',
         level_from: null,
         level_to: null,
+        shade: null,
         line: [
           { lng: a.lng, lat: a.lat },
           { lng: b.lng, lat: b.lat },

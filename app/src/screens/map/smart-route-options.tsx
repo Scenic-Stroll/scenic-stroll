@@ -1,12 +1,16 @@
 /**
  * Our computed route options (smart-route) in the planning sheet: one card per option, labelled
- * "Computed" with its facts (% covered, step-free…), and for the chosen one the explanation and
- * step-by-step directions. Every claim on screen comes from the route's facts — nothing is guessed.
+ * "Computed" with its facts (% covered, % shaded, step-free…) and an exposure bar (sun / shade /
+ * covered / indoors); for the chosen one the explanation, the map colour legend and step-by-step
+ * directions. Every claim on screen comes from the route's facts — nothing is guessed.
  */
 import { PROFILE_LABELS, type SmartRouteOption } from '@scenic/shared';
-import { StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { DirectionsList } from '@/components/route/directions-list';
+import { ExposureBar } from '@/components/route/exposure-bar';
+import { RUN_LABELS, runColor } from '@/components/route/route-colors';
 import { RouteOptionCard, type RouteOption } from '@/components/route/route-option-card';
 import { Icon } from '@/components/ui/icon';
 import { radius, space, type, useAppTheme } from '@/theme';
@@ -25,6 +29,9 @@ function badgesOf(o: SmartRouteOption): RouteOption['badges'] {
     { label: 'Computed', icon: 'map-marker-path' },
     { label: `${o.pct_covered}% covered`, icon: 'umbrella-outline' },
   ];
+  // Only claimed while the sun is up and shade is computed (pct_shaded is null otherwise).
+  if (o.pct_shaded !== null)
+    badges.push({ label: `${o.pct_shaded}% shaded`, icon: 'weather-sunny-off' });
   if (o.step_free === 'yes') badges.push({ label: 'Step-free', icon: 'wheelchair-accessibility' });
   if (o.lifts > 0)
     badges.push({ label: `${o.lifts} lift${o.lifts > 1 ? 's' : ''}`, icon: 'elevator' });
@@ -50,6 +57,7 @@ export function SmartRouteOptions({
 }) {
   const t = useAppTheme();
   const selected = options.find((o) => o.id === selectedId) ?? null;
+  const [legendOpen, setLegendOpen] = useState(false);
 
   return (
     <>
@@ -70,7 +78,9 @@ export function SmartRouteOptions({
           }}
           selected={o.id === selectedId}
           onPress={() => onSelect(o.id)}
-        />
+        >
+          <ExposureBar exposure={o.exposure} />
+        </RouteOptionCard>
       ))}
 
       {selected ? (
@@ -83,6 +93,9 @@ export function SmartRouteOptions({
               </Text>
               <Text style={[type.caption, { color: t.textSecondary }]}>
                 Computed from map data
+                {selected.estimated.includes('shade')
+                  ? ' · estimated shade, based on building heights, trees and the sun’s position'
+                  : ''}
                 {selected.estimated.includes('air_conditioned')
                   ? ' · air-conditioning is estimated for indoor walkways'
                   : ''}
@@ -90,6 +103,39 @@ export function SmartRouteOptions({
               </Text>
             </View>
           </View>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: legendOpen }}
+            onPress={() => setLegendOpen((v) => !v)}
+            style={styles.legendToggle}
+            hitSlop={8}
+          >
+            <Icon name="map-legend" size={18} color={t.textSecondary} />
+            <Text style={[type.small, { color: t.textSecondary }]}>
+              {legendOpen ? 'Hide map colours' : 'What do the map colours mean?'}
+            </Text>
+          </Pressable>
+          {legendOpen ? (
+            <View style={styles.legend} accessibilityRole="list">
+              {(['sun', 'shade', 'covered', 'indoor', 'open'] as const).map((k) => (
+                <View key={k} style={styles.legendItem}>
+                  <View style={[styles.swatch, { backgroundColor: runColor(k, t) }]} />
+                  <Text style={[type.caption, { color: t.textPrimary }]}>
+                    {k === 'open' ? 'Outdoors (after dark / not known)' : RUN_LABELS[k]}
+                  </Text>
+                </View>
+              ))}
+              <View style={styles.legendItem}>
+                <View style={[styles.dotSwatch, { backgroundColor: t.routeStairs }]} />
+                <Text style={[type.caption, { color: t.textPrimary }]}>Stairs</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <Icon name="elevator" size={14} color={t.routeIndoor} />
+                <Text style={[type.caption, { color: t.textPrimary }]}>Lift / escalator</Text>
+              </View>
+            </View>
+          ) : null}
           <DirectionsList steps={selected.steps} provider="walking-graph" />
         </>
       ) : null}
@@ -100,4 +146,9 @@ export function SmartRouteOptions({
 const styles = StyleSheet.create({
   flex1: { flex: 1 },
   explain: { flexDirection: 'row', gap: space.sm, padding: space.md, borderRadius: radius.md },
+  legendToggle: { flexDirection: 'row', alignItems: 'center', gap: space.xs, minHeight: 44 },
+  legend: { flexDirection: 'row', flexWrap: 'wrap', columnGap: space.lg, rowGap: space.sm },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
+  swatch: { width: 18, height: 5, borderRadius: 3 },
+  dotSwatch: { width: 8, height: 8, borderRadius: 4 },
 });

@@ -100,6 +100,14 @@ export function DiagnosticsCard() {
       <Row label="Weather" value={weatherStatus(now.conditions)} />
       <Row label="Walk map" value={graphStatus(graph.data, graph.isError)} />
       <Row
+        label="Shade"
+        value={
+          graph.data?.shade_date
+            ? `computed for ${graph.data.shade_date} (refresh every ~2 weeks)`
+            : 'not computed — shaded routes use covers only'
+        }
+      />
+      <Row
         label="Priority"
         value={`${CONDITION_MODE_INFO[now.mode].en}${now.isSimulated ? ' (simulated)' : ''}${
           now.isOverridden ? ' (your choice)' : ''

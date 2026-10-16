@@ -162,6 +162,16 @@ GRAPH_LOADER_KEY=<key> npm run graph:load   # uploads (~15 s), then switches the
 - Read the build report: the biggest connected piece should be ~99 % of nodes and every MTR exit matched.
 - The old graph keeps serving until the last step of `graph:load`, so a failed upload changes nothing.
 - The key expires after 24 h; only its hash is stored. Never commit it.
+- **Shade** (refresh every ~2 weeks, and the day before a demo — the sun's path moves):
+
+  ```bash
+  npm run graph:download-shade              # building heights (Lands Dept) + trees (OpenStreetMap)
+  npm run graph:shade -- 2026-10-24         # shade for that day, every 30 min 07:00–19:00 (~1 s)
+  GRAPH_LOADER_KEY=<key> npm run graph:load-shade   # onto the live graph; no rebuild needed
+  ```
+
+  Diagnostics → Shade shows the day it was computed for.
+
 - Tuning routes: edit the weights in `shared/src/routing-profiles.ts`, then `npm run graph:try` prints the demo trips
   (fastest / sheltered / cool / step-free / 2 am) from the local graph — no deploy needed to compare.
 - Phone check: **Profile → Diagnostics → Walk map** shows the data date and number of paths.

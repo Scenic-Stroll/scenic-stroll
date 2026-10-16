@@ -24,7 +24,10 @@
     "graph:build": "node scripts/graph/build-graph.mts",
     "graph:key": "node scripts/graph/new-loader-key.mts",
     "graph:load": "node scripts/graph/load-graph.mts",
-    "graph:try": "node scripts/graph/try-routes.mts"
+    "graph:try": "node scripts/graph/try-routes.mts",
+    "graph:download-shade": "node scripts/graph/download-shade-data.mts",
+    "graph:shade": "node scripts/graph/compute-shade.mts",
+    "graph:load-shade": "node scripts/graph/load-shade.mts"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",

@@ -59,6 +59,7 @@ import {
   STANDARD_OPTION_ID,
   type RouteMode,
 } from './planning-sheet';
+import { SmartRouteLine } from './smart-route-line';
 import type { Place } from './types';
 
 const PITCH_3D = 55;
@@ -386,13 +387,10 @@ export function MapHome() {
         ) : null}
         {planning
           ? smartOptions.map((o) => (
-              <Polyline
+              <SmartRouteLine
                 key={`smart-${o.id}`}
-                coordinates={o.coordinates.map(toMap)}
-                strokeColor={o.id === shownOptionId ? t.primary : t.accent}
-                strokeWidth={o.id === shownOptionId ? 8 : 4}
-                zIndex={o.id === shownOptionId ? 4 : 2}
-                tappable
+                option={o}
+                selected={o.id === shownOptionId}
                 onPress={() => selectOption(o.id)}
               />
             ))

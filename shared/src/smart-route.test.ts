@@ -178,3 +178,80 @@ describe('planSmartRoutes', () => {
     expect(overlapRatio(north, south)).toBe(0);
   });
 });
+
+describe('shade (step 4)', () => {
+  // Two streets from A to B: north 200 m in full sun at noon, south 260 m in building shadow.
+  // Shade values every 30 min from 07:00; index 10 = 12:00.
+  const META = { date: '2026-10-16', firstMin: 420, bucketMin: 30 };
+  const sunny = Array.from({ length: 25 }, () => 0);
+  const shady = Array.from({ length: 25 }, () => 100);
+  const shadeGraph = () =>
+    testGraph(
+      [
+        [0, 0],
+        [100, 50],
+        [100, -95],
+        [200, 0],
+      ],
+      [
+        { from: 0, to: 1, shade: sunny },
+        { from: 1, to: 3, shade: sunny },
+        { from: 0, to: 2, shade: shady },
+        { from: 2, to: 3, shade: shady },
+      ],
+      { shadeMeta: META },
+    );
+  const NOON_HK = new Date('2026-10-16T12:00:00+08:00');
+  const NIGHT_HK = new Date('2026-10-16T21:00:00+08:00');
+
+  it('at noon the shaded profile takes the shady street; fastest stays in the sun', () => {
+    const res = planSmartRoutes(shadeGraph(), input({ profile: 'shaded', departure: NOON_HK }));
+    const shaded = res.options.find((o) => o.profile === 'shaded')!;
+    const fastest = res.options.find((o) => o.roles.includes('fastest'))!;
+    expect(shaded.pct_shaded).toBeGreaterThan(90);
+    expect(fastest.pct_shaded).toBeLessThan(10);
+    expect(shaded.exposure.shade_m).toBeGreaterThan(250);
+    expect(shaded.estimated).toContain('shade');
+    expect(shaded.explanation.text).toContain('in shade or under cover at 12:00 (estimated)');
+  });
+
+  it('after dark shade does not matter: shaded = fastest, and no % shaded is claimed', () => {
+    const res = planSmartRoutes(shadeGraph(), input({ profile: 'shaded', departure: NIGHT_HK }));
+    expect(res.options).toHaveLength(1);
+    expect(res.options[0]!.pct_shaded).toBeNull();
+    expect(res.options[0]!.runs.every((r) => r.style === 'open')).toBe(true);
+  });
+
+  it('runs cover the whole line in order, and stairs get a marker', () => {
+    const g = testGraph(
+      [
+        [0, 0],
+        [100, 0],
+        [101, 0, 13],
+        [200, 0, 13],
+      ],
+      [
+        { from: 0, to: 1, shade: sunny },
+        { from: 1, to: 2, kind: 'stairs', step_free: 'no' },
+        { from: 2, to: 3, indoor: true, covered: true, kind: 'indoor_corridor' },
+      ],
+      { shadeMeta: META },
+    );
+    const r = findRoute(g, {
+      origin: at(0, 0),
+      destination: at(200, 0),
+      departure: NOON_HK,
+      profile: 'fastest',
+    })!;
+    const s = summarizeRoute(r, at(0, 0), at(200, 0), {
+      departure: NOON_HK,
+      shadeMeta: META,
+      sun: 1,
+    });
+    expect(s.runs.map((x) => x.style)).toEqual(['sun', 'stairs', 'indoor']);
+    expect(s.runs[0]!.from).toBe(0);
+    expect(s.runs.at(-1)!.to).toBe(s.coordinates.length - 1);
+    s.runs.slice(1).forEach((run, i) => expect(run.from).toBe(s.runs[i]!.to));
+    expect(s.markers.map((m) => m.kind)).toEqual(['stairs']);
+  });
+});

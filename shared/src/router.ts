@@ -12,7 +12,13 @@
 import { haversineMeters } from './geo.ts';
 import type { RoutingEdge, RoutingNode, WalkingGraph } from './graph-export.ts';
 import { isOpenAt } from './opening-hours.ts';
-import { edgeCost, edgeTimeS, WALK_SPEED_MPS, type RoutingProfile } from './routing-profiles.ts';
+import {
+  edgeCost,
+  edgeShadeAt,
+  edgeTimeS,
+  WALK_SPEED_MPS,
+  type RoutingProfile,
+} from './routing-profiles.ts';
 import type { LatLng } from './schemas.ts';
 
 /** The graph plus lookups the router needs (built once, reused for every request). */
@@ -117,6 +123,8 @@ export type RouteQuery = {
   departure: Date;
   /** Extra cost multipliers per edge id — used to find a DIFFERENT alternative route. */
   penalties?: Map<number, number>;
+  /** Sun strength 0–1 (sunStrength); default 1. */
+  sun?: number;
 };
 
 /** Tiny binary min-heap of [cost, node]. */
@@ -172,7 +180,7 @@ function accessCandidates(g: PreparedGraph, p: LatLng) {
 }
 
 /** Real walking time of a straight access walk. */
-const accessTimeS = (distM: number) => (distM * ACCESS_DETOUR) / WALK_SPEED_MPS;
+export const accessTimeS = (distM: number) => (distM * ACCESS_DETOUR) / WALK_SPEED_MPS;
 /** Its routing cost (see ACCESS_COST_FACTOR). */
 const accessCost = (distM: number) => accessTimeS(distM) * ACCESS_COST_FACTOR;
 
@@ -217,7 +225,8 @@ export function findRoute(g: PreparedGraph, q: RouteQuery): FoundRoute | null {
       const v = leg.forward ? leg.edge.target : leg.edge.source;
       if (done.has(v)) continue;
       if (!isOpenAt(leg.edge.opening_hours, arrival)) continue; // closed when we'd get there
-      const edgeC = edgeCost(leg.edge, q.profile);
+      const shade = edgeShadeAt(leg.edge, arrival, g.shadeMeta);
+      const edgeC = edgeCost(leg.edge, q.profile, { shade, sun: q.sun ?? 1 });
       if (edgeC === null) continue; // e.g. stairs on a step-free route
       const nc = c + edgeC * (q.penalties?.get(leg.edge.id) ?? 1);
       if (nc < (cost.get(v) ?? Infinity)) {

@@ -12,6 +12,8 @@ const ActiveGraphSchema = z.object({
   source_version: z.string(),
   edge_count: z.number(),
   activated_at: z.string().nullable(),
+  /** The day building/tree shade was computed for (null = no shade yet). */
+  shade_date: z.string().nullable(),
 });
 export type ActiveGraph = z.infer<typeof ActiveGraphSchema>;
 
@@ -23,7 +25,7 @@ export function useActiveGraph() {
     queryFn: async (): Promise<ActiveGraph | null> => {
       const { data, error } = await supabase
         .from('graph_builds')
-        .select('source, source_version, edge_count, activated_at')
+        .select('source, source_version, edge_count, activated_at, shade_date')
         .eq('status', 'active')
         .maybeSingle();
       if (error) {

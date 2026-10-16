@@ -3,7 +3,8 @@
  * THE place to tune smart routing: change a weight, run `npm test` and `npm run graph:try`.
  *
  * Cost of walking one edge = time in seconds × a few multipliers (1 = no change):
- *   × (1 + sun   × exposed)        exposed = 1 when not covered / indoor (real shade comes in step 4)
+ *   × (1 + sun   × exposed × sun strength)  exposed = 1 − shade at the time you walk it (0 under
+ *                                 cover/indoors; 0.5 when unknown); sun strength 0 at night
  *   × (1 + rain  × uncovered)      uncovered = 1 when not covered and not indoor
  *   × (1 − ac    × air-conditioned) never below 0.3, so a mall is preferred but not "free"
  *   × (1 + slope × (slope% − 5) / 10) only above 5 %
@@ -13,6 +14,7 @@
  */
 import type { ConditionMode } from './conditions.ts';
 import type { RoutingEdge } from './graph-export.ts';
+import { shadeBucket, type ShadeMeta } from './shadows.ts';
 
 export const ROUTING_PROFILES = [
   'fastest',
@@ -41,7 +43,7 @@ export const PROFILE_WEIGHTS: Record<RoutingProfile, ProfileWeights> = {
   balanced: { sun: 0.3, rain: 0.3, ac: 0.1, slope: 0.3, community: 0.2, stepFree: false },
   // Rain: an uncovered metre "feels" 4× as long as a covered one.
   sheltered: { sun: 0, rain: 3, ac: 0.1, slope: 0.2, community: 0.2, stepFree: false },
-  // Sun: stay out of it (step 3: covered/indoor counts as shade; step 4 adds building shadows).
+  // Sun: stay in the shade of buildings, trees and covers.
   shaded: { sun: 2, rain: 0, ac: 0.2, slope: 0.3, community: 0.2, stepFree: false },
   // Heat: shade AND air-conditioning.
   cool: { sun: 2, rain: 0, ac: 0.5, slope: 0.5, community: 0.2, stepFree: false },
@@ -99,17 +101,53 @@ export function edgeTimeS(e: RoutingEdge): number {
   }
 }
 
+/**
+ * How strong the sun is, 0–1: 0 when it is down, 1 when it is 45° or higher. Weights the "sun"
+ * term, so at 5 pm (low sun) a sunny street matters less than at noon, and not at all at night.
+ */
+export function sunStrength(altitudeDeg: number): number {
+  if (altitudeDeg <= 0) return 0;
+  return Math.min(1, Math.sin((altitudeDeg * Math.PI) / 180) / Math.sin(Math.PI / 4));
+}
+
+/**
+ * How shaded an edge is (0–1) at a moment: 1 under cover or indoors; else the precomputed value for
+ * the nearest half hour; null when unknown (no shade computed, or before 07:00 / after 19:00).
+ */
+export function edgeShadeAt(e: RoutingEdge, when: Date, meta: ShadeMeta | null): number | null {
+  if (e.covered || e.indoor) return 1;
+  if (!meta || !e.shade) return null;
+  const i = shadeBucket(when, meta, e.shade.length);
+  return i === null ? null : (e.shade[i] ?? 0) / 100;
+}
+
+/** What edgeCost needs to know about the moment you walk the edge. */
+export type CostContext = {
+  /** 0–1 from edgeShadeAt; null = unknown. */
+  shade: number | null;
+  /** 0–1 from sunStrength. */
+  sun: number;
+};
+
+/** Without shade data or a time: covered/indoor is shade, other paths count as half-exposed. */
+const DEFAULT_CONTEXT: CostContext = { shade: null, sun: 1 };
+
 /** Lifts, stairs and escalators have their own speeds, so slope doesn't apply to them. */
 const HAS_OWN_SPEED = new Set(['lift', 'stairs', 'escalator']);
 
 /** The routing cost of an edge for a profile, or null if the profile can't use it. */
-export function edgeCost(e: RoutingEdge, profile: RoutingProfile): number | null {
+export function edgeCost(
+  e: RoutingEdge,
+  profile: RoutingProfile,
+  ctx: CostContext = DEFAULT_CONTEXT,
+): number | null {
   const w = PROFILE_WEIGHTS[profile];
   if (w.stepFree && e.step_free === 'no') return null;
 
   const sheltered = e.covered || e.indoor;
+  const exposed = sheltered ? 0 : ctx.shade === null ? 0.5 : 1 - ctx.shade;
   let factor = 1;
-  factor *= 1 + w.sun * (sheltered ? 0 : 1);
+  factor *= 1 + w.sun * exposed * ctx.sun;
   factor *= 1 + w.rain * (sheltered ? 0 : 1);
   factor *= Math.max(0.3, 1 - w.ac * (e.air_conditioned ? 1 : 0));
   if (!HAS_OWN_SPEED.has(e.kind)) factor *= 1 + (w.slope * Math.max(0, e.slope_pct - 5)) / 10;

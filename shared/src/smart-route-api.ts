@@ -26,6 +26,19 @@ export type SmartRouteRequest = z.input<typeof SmartRouteRequestSchema>;
 
 export const SMART_ROUTE_ROLES = ['requested', 'best_now', 'fastest'] as const;
 
+/** How each stretch of a route is drawn: sun = orange, shade = dark green, indoor = blue… */
+export const RUN_STYLES = [
+  'sun',
+  'shade',
+  'covered',
+  'indoor',
+  'open', // outdoors, but no sun to speak of (night) or shade unknown
+  'stairs',
+  'lift',
+  'escalator',
+] as const;
+export type RunStyle = (typeof RUN_STYLES)[number];
+
 export const SmartRouteOptionSchema = z.object({
   /** Stable within a response, e.g. "sheltered". */
   id: z.string(),
@@ -56,6 +69,24 @@ export const SmartRouteOptionSchema = z.object({
     text: z.string(),
     facts: z.record(z.string(), z.union([z.number(), z.string(), z.null()])),
   }),
+  /** % of the route in shade (incl. covered/indoor) at the time you walk it; null after dark. */
+  pct_shaded: z.number().min(0).max(100).nullable(),
+  /** Metres in the sun / in shade / under cover / indoors / outdoors-without-sun, for the bar. */
+  exposure: z.object({
+    sun_m: z.number(),
+    shade_m: z.number(),
+    covered_m: z.number(),
+    indoor_m: z.number(),
+    open_m: z.number(),
+  }),
+  /** Stretches of `coordinates` (inclusive index ranges) and how to draw them. */
+  runs: z.array(
+    z.object({ style: z.enum(RUN_STYLES), from: z.number().int(), to: z.number().int() }),
+  ),
+  /** Stairs, lifts and escalators along the way, for map markers. */
+  markers: z.array(
+    z.object({ kind: z.enum(['stairs', 'lift', 'escalator']), point: LatLngSchema }),
+  ),
   data_sources: z.array(z.string()),
   /** Attributes that are estimates, so the app can say so (e.g. "air_conditioned"). */
   estimated: z.array(z.string()),
@@ -74,7 +105,15 @@ export const SmartRouteResponseSchema = z.object({
   best_profile: RoutingProfileSchema,
   /** Profiles that found no route (e.g. no step-free way exists). */
   unavailable: z.array(RoutingProfileSchema),
-  graph: z.object({ build_id: z.number(), source: z.string(), version: z.string() }).nullable(),
+  graph: z
+    .object({
+      build_id: z.number(),
+      source: z.string(),
+      version: z.string(),
+      /** The day shade was computed for; null = no shade data. */
+      shade_date: z.string().nullable().optional(),
+    })
+    .nullable(),
   options: z.array(SmartRouteOptionSchema),
 });
 export type SmartRouteResponse = z.infer<typeof SmartRouteResponseSchema>;

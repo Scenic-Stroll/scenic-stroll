@@ -3,13 +3,14 @@
  * the weather ("Best now") and the fastest route — dropping near-duplicates (> 80 % shared).
  * Pure function: the Edge Function, tests and the try-out script all call this.
  */
-import type { ConditionMode } from './conditions.ts';
+import { CONDITIONS_POINT, type ConditionMode } from './conditions.ts';
 import { isInGraphArea } from './graph-area.ts';
 import { explain, overlapRatio, summarizeRoute } from './route-summary.ts';
 import { findRoute, type FoundRoute, type PreparedGraph } from './router.ts';
-import { PROFILE_FOR_CONDITION, type RoutingProfile } from './routing-profiles.ts';
+import { PROFILE_FOR_CONDITION, sunStrength, type RoutingProfile } from './routing-profiles.ts';
 import type { LatLng } from './schemas.ts';
 import type { SmartRouteOption, SmartRouteResponse } from './smart-route-api.ts';
+import { sunPosition } from './sun.ts';
 
 /** Routes sharing more than this much of their length count as the same route. */
 export const SAME_ROUTE_OVERLAP = 0.8;
@@ -32,20 +33,33 @@ export function planSmartRoutes(g: PreparedGraph | null, input: PlanInput): Smar
     condition_source: input.conditionSource,
     best_profile: best,
     unavailable: [] as RoutingProfile[],
-    graph: g ? { build_id: g.buildId, source: g.source, version: g.version } : null,
+    graph: g
+      ? {
+          build_id: g.buildId,
+          source: g.source,
+          version: g.version,
+          shade_date: g.shadeMeta?.date ?? null,
+        }
+      : null,
     options: [] as SmartRouteOption[],
   };
-  if (!g) return { ...base, status: 'no_graph' };
+  // Area first: the Edge Function doesn't even load the graph for trips outside it.
   if (!isInGraphArea(input.origin) || !isInGraphArea(input.destination)) {
     return { ...base, status: 'outside_area' };
   }
+  if (!g) return { ...base, status: 'no_graph' };
 
+  // The sun barely moves during a walk of a few minutes, so its strength is read once.
+  const sun = sunStrength(
+    sunPosition(input.departure, CONDITIONS_POINT.lat, CONDITIONS_POINT.lng).altitude_deg,
+  );
   const route = (profile: RoutingProfile) =>
     findRoute(g, {
       origin: input.origin,
       destination: input.destination,
       profile,
       departure: input.departure,
+      sun,
     });
 
   const fastest = route('fastest');
@@ -82,7 +96,11 @@ export function planSmartRoutes(g: PreparedGraph | null, input: PlanInput): Smar
 
   const fastestS = fastest.timeS;
   const options = picked.map(({ profile, roles, found }): SmartRouteOption => {
-    const s = summarizeRoute(found, input.origin, input.destination);
+    const s = summarizeRoute(found, input.origin, input.destination, {
+      departure: input.departure,
+      shadeMeta: g.shadeMeta,
+      sun,
+    });
     const { edgeIds: _edgeIds, ...shown } = s;
     return {
       id: profile,
@@ -91,8 +109,11 @@ export function planSmartRoutes(g: PreparedGraph | null, input: PlanInput): Smar
       ...shown,
       much_longer: found.timeS > fastestS * DETOUR_CAP,
       extra_s_vs_fastest: Math.round(found.timeS - fastestS),
-      explanation: explain(s, found, profile === 'fastest' ? null : fastestS),
-      estimated: s.pct_air_conditioned > 0 ? ['air_conditioned'] : [],
+      explanation: explain(s, found, profile === 'fastest' ? null : fastestS, input.departure),
+      estimated: [
+        ...(s.pct_air_conditioned > 0 ? ['air_conditioned'] : []),
+        ...(s.pct_shaded !== null ? ['shade'] : []),
+      ],
     };
   });
 

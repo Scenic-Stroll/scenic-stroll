@@ -4,6 +4,7 @@
  * load in one request: ~2.5 MB, ~0.6 MB gzipped, parsed in ~50 ms).
  *
  * If you add a column to the export, add it at the END of the tuple here and in the SQL function.
+ * Extra trailing fields are accepted (`.rest`), so a newer database never breaks an older function.
  */
 import { z } from 'zod';
 
@@ -16,6 +17,7 @@ import {
   type StepFree,
 } from './graph-kinds.ts';
 import type { LatLng } from './schemas.ts';
+import type { ShadeMeta } from './shadows.ts';
 
 export type RoutingNode = { id: number; lng: number; lat: number; z: number; kind: NodeKind };
 
@@ -41,6 +43,8 @@ export type RoutingEdge = {
   data_source: string;
   level_from: string | null;
   level_to: string | null;
+  /** % shaded every 30 min from 07:00 (see ShadeMeta); null = not computed. Covered/indoor = 100. */
+  shade: number[] | null;
   /** The line drawn source → target. */
   line: LatLng[];
 };
@@ -51,34 +55,41 @@ export type WalkingGraph = {
   version: string;
   nodes: RoutingNode[];
   edges: RoutingEdge[];
+  /** Which day and times `shade` is for; null = no shade computed yet. */
+  shadeMeta: ShadeMeta | null;
 };
 
-const NodeTuple = z.tuple([z.number(), z.number(), z.number(), z.number(), z.enum(NODE_KINDS)]);
+const NodeTuple = z
+  .tuple([z.number(), z.number(), z.number(), z.number(), z.enum(NODE_KINDS)])
+  .rest(z.unknown());
 
-const EdgeTuple = z.tuple([
-  z.number(), // 0 id
-  z.number(), // 1 source
-  z.number(), // 2 target
-  z.number(), // 3 length_m
-  z.enum(EDGE_KINDS), // 4 kind
-  z.boolean(), // 5 covered
-  z.boolean(), // 6 indoor
-  z.boolean(), // 7 air_conditioned
-  z.enum(['yes', 'no', 'unknown']), // 8 step_free
-  z.number(), // 9 slope_pct
-  z.number().nullable(), // 10 z_from
-  z.number().nullable(), // 11 z_to
-  z.number(), // 12 crossing_wait_s
-  z.string().nullable(), // 13 opening_hours
-  z.number(), // 14 confidence
-  z.boolean(), // 15 bidirectional
-  z.string().nullable(), // 16 name_en
-  z.string().nullable(), // 17 name_zh
-  z.string(), // 18 encoded polyline, precision 6
-  z.string(), // 19 data_source
-  z.string().nullable(), // 20 level_from
-  z.string().nullable(), // 21 level_to
-]);
+const EdgeTuple = z
+  .tuple([
+    z.number(), // 0 id
+    z.number(), // 1 source
+    z.number(), // 2 target
+    z.number(), // 3 length_m
+    z.enum(EDGE_KINDS), // 4 kind
+    z.boolean(), // 5 covered
+    z.boolean(), // 6 indoor
+    z.boolean(), // 7 air_conditioned
+    z.enum(['yes', 'no', 'unknown']), // 8 step_free
+    z.number(), // 9 slope_pct
+    z.number().nullable(), // 10 z_from
+    z.number().nullable(), // 11 z_to
+    z.number(), // 12 crossing_wait_s
+    z.string().nullable(), // 13 opening_hours
+    z.number(), // 14 confidence
+    z.boolean(), // 15 bidirectional
+    z.string().nullable(), // 16 name_en
+    z.string().nullable(), // 17 name_zh
+    z.string(), // 18 encoded polyline, precision 6
+    z.string(), // 19 data_source
+    z.string().nullable(), // 20 level_from
+    z.string().nullable(), // 21 level_to
+    z.array(z.number()).nullable().optional(), // 22 shade_pct (step 4)
+  ])
+  .rest(z.unknown());
 
 export const GraphExportSchema = z.object({
   build_id: z.number(),
@@ -86,6 +97,10 @@ export const GraphExportSchema = z.object({
   version: z.string(),
   nodes: z.array(NodeTuple),
   edges: z.array(EdgeTuple),
+  shade: z
+    .object({ date: z.string(), first_min: z.number(), bucket_min: z.number() })
+    .nullable()
+    .optional(),
 });
 
 /** Turns the database export into router objects. Throws if the shape is wrong. */
@@ -95,6 +110,9 @@ export function parseGraphExport(raw: unknown): WalkingGraph {
     buildId: g.build_id,
     source: g.source,
     version: g.version,
+    shadeMeta: g.shade
+      ? { date: g.shade.date, firstMin: g.shade.first_min, bucketMin: g.shade.bucket_min }
+      : null,
     nodes: g.nodes.map(([id, lng, lat, z, kind]) => ({ id, lng, lat, z, kind })),
     edges: g.edges.map((e) => ({
       id: e[0],
@@ -119,6 +137,7 @@ export function parseGraphExport(raw: unknown): WalkingGraph {
       data_source: e[19],
       level_from: e[20],
       level_to: e[21],
+      shade: e[22] ?? null,
     })),
   };
 }

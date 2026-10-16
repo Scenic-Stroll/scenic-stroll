@@ -4,6 +4,7 @@
  * smart routes ("Computed", % covered…) and community routes once find-routes exists (Phase 4).
  */
 import { formatDistance, formatDuration, TAXONOMY, isTag, type SegmentKind } from '@scenic/shared';
+import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Chip } from '@/components/ui/chip';
@@ -42,10 +43,13 @@ export function RouteOptionCard({
   option,
   selected,
   onPress,
+  children,
 }: {
   option: RouteOption;
   selected: boolean;
   onPress: () => void;
+  /** Extra content under the chips, e.g. the exposure bar of a computed route. */
+  children?: ReactNode;
 }) {
   const t = useAppTheme();
   const tags = option.tags.filter(isTag);
@@ -107,6 +111,8 @@ export function RouteOptionCard({
           ))}
         </View>
       ) : null}
+
+      {children}
 
       {meta.length > 0 ? (
         <Text style={[type.caption, { color: t.textSecondary }]}>{meta.join(' · ')}</Text>

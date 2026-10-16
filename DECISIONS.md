@@ -357,3 +357,49 @@ Chee Avenue)"). The standard street route stays as a baseline card. Any failure,
 "merge community matches" happens there later; `smart-route` already returns the roles and overlap logic it needs.
 Example (13:00, rain, Exit C1 → YEUNG): sheltered 372 m / 82 % covered vs fastest 375 m / 78 %; heat → cool route
 425 m / 87 % covered / 53 % indoor; at 02:00 Festival Walk (07:00–24:00) is avoided.
+
+### D26 · Smart routing step 4: building and tree shade (2026-10-17)
+
+**Data (checked 2026-10-16):** Lands Department **Building** dataset on CSDI
+(`landsd_rcd_1637211194312_35158`, ArcGIS MapServer, DATA.GOV.HK terms — same attribution as the walking network):
+footprints with `BaseHeight` / `TopHeight` in metres above sea level (mPD). 3,324 active buildings in the area +
+margin. Footprints without heights (311, mostly "Open-sided Structure": covered walkways, shelters) are treated as
+**canopies** — shade right underneath only. Trees from OpenStreetMap via Overpass (241 trees, 21 tree rows, 63 woods;
+ODbL, already credited); Overpass rejects requests without a descriptive User-Agent (HTTP 406), so the script sends one.
+
+**Height above the street, not above sea level.** A shadow on the pavement comes from the roof's height above the
+pavement. Ground level = the nearest street-level node of our walking graph within 60 m (3DPN heights are mPD too),
+else `BaseHeight`. Without this, a CityU hall on the hill (top 127.5 mPD) would have cast a 127 m-tall shadow.
+
+**Geometry** (`shared/src/shadows.ts`, no libraries, tested with a synthetic 30 m block: exactly 30 m of shadow at
+45°, 52 m at 30°, west in the morning, none at night): shadow = convex hull of the footprint and the footprint moved
+`height / tan(altitude)` away from the sun, capped at 250 m. Over-shades L-shaped buildings slightly — fine for an
+estimate the app labels "estimated". Tree crowns: 4 m circles (rows: a 3 m crown every 5 m), woods as polygons.
+Each edge is sampled every 2 m; covered/indoor edges are 100 %. Elevated footbridges are treated as if at street
+level (2D) — a known simplification.
+
+**One day, every 30 minutes, reused ~2 weeks.** The brief suggested a table row per edge per time bucket for today +
+2 days (~800,000 rows). Instead each edge stores 25 numbers (07:00–19:00) in `ped_edges.shade_pct`, with
+`graph_builds.shade_date` — the sun's path moves < 0.4° a day in October, so one day's shade is good for about two
+weeks; recompute the day before the pitch. Computing takes ~1 s on a laptop; uploading uses the same one-day
+loader key (`graph_set_shade`, only for loading/active builds). Typical result for 16 Oct: open-air paths are
+42 % shaded at 09:00 and 15:00, 28 % at 13:00 (high sun), 71 % at 17:00.
+
+**Routing:** `exposed = 1 − shade` at the moment you'd reach the edge (nearest half hour), times **sun strength**
+(`sin(altitude) / sin 45°`, capped at 1, 0 at night), times the profile's sun weight. Unknown shade counts as half
+exposed (neutral), as the brief asks. At night shade drops out entirely (no "% shaded" is claimed after dark).
+Live check: Exit A1 → MMW at 13:00, heat: the cool route is 73 % shaded vs 56 % for the fastest (2 min longer);
+Exit A1 → AC2 at 10:00: shaded route 55 % vs 45 %, and no stairs instead of three.
+
+**Response additions:** `pct_shaded` (null after dark), `exposure` metres (sun / shade / covered / indoor /
+"open" = outdoors with no sun or unknown, incl. the unmapped access walks), `runs` (index ranges into the line with a
+style) and `markers` (stairs, lifts, escalators); the explanation adds "About 73% in shade or under cover at
+13:00 (estimated)." **App:** exposure bar on every computed card, "% shaded" badge, the selected route drawn in
+stretches (sun orange, shade green, covered blue, indoor purple, dashed grey where unknown) with red dots at stairs
+and icons at lifts, a "What do the map colours mean?" legend, and "estimated shade, based on building heights, trees
+and the sun's position" under the explanation. Diagnostics → Shade shows the day shade is for.
+
+**Lesson:** adding the export's 23rd field broke the already-deployed `smart-route` (strict zod tuple) until it was
+redeployed a few minutes later — the app fell back to the standard route meanwhile, as designed. Tuples now accept
+extra trailing fields (`.rest`), so a newer database can't break an older function again. The function also skips
+loading the graph for trips outside the area now (0.3 s instead of ~1 s).
