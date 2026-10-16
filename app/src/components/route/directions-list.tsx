@@ -11,7 +11,7 @@ import { Icon, type IconName } from '@/components/ui/icon';
 import { radius, space, type, useAppTheme } from '@/theme';
 
 /** Picks an arrow icon from the instruction text (works for ORS and Google wording). */
-function iconFor(instruction: string): IconName {
+export function iconFor(instruction: string): IconName {
   const s = instruction.toLowerCase();
   if (s.startsWith('arrive') || s.includes('destination')) return 'flag-checkered';
   if (s.includes('lift')) return 'elevator';

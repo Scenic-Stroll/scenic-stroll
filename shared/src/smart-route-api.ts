@@ -91,6 +91,21 @@ export const SmartRouteOptionSchema = z.object({
   data_sources: z.array(z.string()),
   /** Attributes that are estimates, so the app can say so (e.g. "air_conditioned"). */
   estimated: z.array(z.string()),
+  /** Walking-graph edge ids in order, so follow mode can tell if a blocked-path report hits it. */
+  edge_ids: z.array(z.number().int()).default([]),
+  /** Indoor links you'd reach less than 20 min before they close (step 6). */
+  closing: z
+    .array(
+      z.object({
+        name: z.string().nullable(),
+        closes_at: z.string(),
+        reach_at: z.string(),
+        point: LatLngSchema,
+      }),
+    )
+    .default([]),
+  /** An alternative planned around those closing links. */
+  avoids_closing: z.boolean().default(false),
 });
 export type SmartRouteOption = z.infer<typeof SmartRouteOptionSchema>;
 
@@ -116,5 +131,7 @@ export const SmartRouteResponseSchema = z.object({
     })
     .nullable(),
   options: z.array(SmartRouteOptionSchema),
+  /** Paths in this area walkers reported blocked (last 3 h); every option goes around them. */
+  blocked_paths: z.number().int().nonnegative().default(0),
 });
 export type SmartRouteResponse = z.infer<typeof SmartRouteResponseSchema>;

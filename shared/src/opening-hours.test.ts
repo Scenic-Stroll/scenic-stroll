@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { hongKongTime, isOpenAt, parseOpeningHours } from './opening-hours.ts';
+import { closesAt, hongKongTime, isOpenAt, parseOpeningHours } from './opening-hours.ts';
 
 /** A moment in Hong Kong time, e.g. hk('2026-10-14 10:00') (that day is a Wednesday). */
 const hk = (local: string) => new Date(`${local.replace(' ', 'T')}:00+08:00`);
@@ -64,5 +64,31 @@ describe('isOpenAt', () => {
 
   it('unreadable hours count as open', () => {
     expect(isOpenAt('sunrise-sunset', hk('2026-10-14 03:00'))).toBe(true);
+  });
+});
+
+describe('closesAt', () => {
+  const hk = (s: string) => new Date(`${s}+08:00`);
+
+  it('gives the next closing time, rounded to the minute', () => {
+    expect(closesAt('Mo-Su 07:00-22:00', hk('2026-10-16T21:41:30'))).toEqual(
+      hk('2026-10-16T22:00:00'),
+    );
+  });
+
+  it('handles midnight and maintenance windows', () => {
+    expect(closesAt('Mo-Su 07:00-24:00', hk('2026-10-16T23:40:00'))).toEqual(
+      hk('2026-10-17T00:00:00'),
+    );
+    // 2026-10-21 is a Wednesday: lift off 09:00–11:00.
+    expect(closesAt('Mo-Su 00:00-24:00; We 09:00-11:00 off', hk('2026-10-21T08:30:00'))).toEqual(
+      hk('2026-10-21T09:00:00'),
+    );
+  });
+
+  it('is null when always open, open for 24 h, or already closed', () => {
+    expect(closesAt(null, hk('2026-10-16T12:00:00'))).toBeNull();
+    expect(closesAt('Mo-Su 00:00-24:00', hk('2026-10-16T12:00:00'))).toBeNull();
+    expect(closesAt('Mo-Su 07:00-22:00', hk('2026-10-16T23:00:00'))).toBeNull();
   });
 });

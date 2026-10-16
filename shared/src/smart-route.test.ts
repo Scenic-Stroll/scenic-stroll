@@ -25,6 +25,7 @@ describe('cleanName', () => {
       'City University of Hong Kong',
     );
     expect(cleanName('Footway')).toBeNull();
+    expect(cleanName('Festival Walk UG')).toBe('Festival Walk UG'); // floor codes stay
     expect(cleanName(null)).toBeNull();
   });
 });
@@ -313,5 +314,61 @@ describe('alternatives (step 5)', () => {
     );
     expect(day.options[0]!.pct_indoor).toBeGreaterThan(50);
     expect(night.options[0]!.pct_indoor).toBe(0);
+  });
+});
+
+describe('blocked paths and closing links (step 6)', () => {
+  it('never uses a path walkers reported blocked, and says how many were avoided', () => {
+    // Rain → sheltered would take the covered south way (edges 2, 3); edge 2 is reported blocked.
+    const res = planSmartRoutes(
+      twoWayGraph(),
+      input({ profile: 'sheltered', condition: 'rain', blocked: new Set([2]) }),
+    );
+    expect(res.status).toBe('ok');
+    expect(res.blocked_paths).toBe(1);
+    for (const o of res.options) expect(o.edge_ids).not.toContain(2);
+    expect(SmartRouteResponseSchema.safeParse(res).success).toBe(true);
+  });
+
+  it('a blocked report outside the trip area counts for nothing', () => {
+    const res = planSmartRoutes(twoWayGraph(), input({ blocked: new Set([999]) }));
+    expect(res.blocked_paths).toBe(0);
+  });
+
+  it('warns when a link closes soon after you would reach it, and offers a way around it', () => {
+    const g = twoWayGraph({ opening_hours: 'Mo-Su 07:00-22:00' });
+    const res = planSmartRoutes(
+      g,
+      input({
+        profile: 'sheltered',
+        condition: 'rain',
+        departure: new Date('2026-10-16T21:50:00+08:00'),
+      }),
+    );
+    const sheltered = res.options.find((o) => o.roles.includes('requested'))!;
+    expect(sheltered.closing).toHaveLength(1); // one warning for the whole mall stretch
+    expect(sheltered.closing[0]!.name).toBe('Festival Walk LG1');
+    expect(new Date(sheltered.closing[0]!.closes_at)).toEqual(
+      new Date('2026-10-16T22:00:00+08:00'),
+    );
+    expect(sheltered.explanation.text).toMatch(/Festival Walk LG1 closes at 22:00/);
+    // The way around it is the open-air north way — the fastest route, marked as avoiding it
+    // rather than listed twice.
+    const around = res.options.filter((o) => o.avoids_closing);
+    expect(around).toHaveLength(1);
+    expect(around[0]!.closing).toHaveLength(0);
+    expect(around[0]!.edge_ids).not.toContain(2);
+    expect(
+      res.options.filter((o) => o.edge_ids.join() === around[0]!.edge_ids.join()),
+    ).toHaveLength(1);
+  });
+
+  it('no warning when the link stays open well after you pass', () => {
+    const g = twoWayGraph({ opening_hours: 'Mo-Su 07:00-22:00' });
+    const res = planSmartRoutes(g, input({ profile: 'sheltered', condition: 'rain' }));
+    for (const o of res.options) {
+      expect(o.closing).toEqual([]);
+      expect(o.avoids_closing).toBe(false);
+    }
   });
 });

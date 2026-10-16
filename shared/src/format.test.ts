@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { agoLabel, formatDistance, formatDuration } from './format.ts';
+import { agoLabel, formatDistance, formatDuration, formatHkTime } from './format.ts';
 
 describe('formatDuration', () => {
   it.each([
@@ -39,5 +39,12 @@ describe('agoLabel', () => {
   });
   it('accepts a millisecond timestamp', () => {
     expect(agoLabel(now - 5 * 60_000, now)).toBe('5 min ago');
+  });
+});
+
+describe('formatHkTime', () => {
+  it('shows Hong Kong clock time', () => {
+    expect(formatHkTime('2026-10-16T14:00:00.000Z')).toBe('22:00');
+    expect(formatHkTime(new Date('2026-10-16T09:05:00+08:00'))).toBe('09:05');
   });
 });

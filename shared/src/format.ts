@@ -25,3 +25,10 @@ export function agoLabel(when: string | number, now: number = Date.now()): strin
   if (min < 60) return `${min} min ago`;
   return `${Math.floor(min / 60)} h ago`;
 }
+
+/** "21:52" — the clock time in Hong Kong (UTC+8), whatever time zone the phone is set to. */
+export function formatHkTime(when: Date | string): string {
+  const hk = new Date(new Date(when).getTime() + 8 * 60 * 60_000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(hk.getUTCHours())}:${pad(hk.getUTCMinutes())}`;
+}

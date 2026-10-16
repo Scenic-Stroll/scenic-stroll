@@ -17,6 +17,7 @@ import { DirectionsList } from '@/components/route/directions-list';
 import { RouteOptionCard } from '@/components/route/route-option-card';
 import { ErrorCard } from '@/components/ui/error-card';
 import { Icon } from '@/components/ui/icon';
+import { PrimaryButton } from '@/components/ui/primary-button';
 import { radius, space, TAP_TARGET, type, useAppTheme } from '@/theme';
 
 import { ConditionsCard } from './conditions-card';
@@ -57,6 +58,7 @@ export function PlanningSheet({
   onConditionOverride,
   smart,
   smartLoading,
+  onStart,
 }: {
   origin: Place | null;
   destination: Place | null;
@@ -80,6 +82,8 @@ export function PlanningSheet({
   /** Computed routes; null/undefined = not available (the standard route is still shown). */
   smart: SmartRouteResponse | null | undefined;
   smartLoading: boolean;
+  /** Start walking the selected option (follow mode). */
+  onStart: () => void;
 }) {
   const t = useAppTheme();
   const ready = origin !== null && destination !== null;
@@ -135,6 +139,11 @@ export function PlanningSheet({
       {ready && smart?.status === 'outside_area' ? (
         <Note text="Computed routes cover Kowloon Tong, Festival Walk and CityU. Outside that, only the standard street route is shown." />
       ) : null}
+      {ready && smart && smart.blocked_paths > 0 ? (
+        <Note
+          text={`Avoiding ${smart.blocked_paths === 1 ? 'a path' : `${smart.blocked_paths} paths`} walkers reported blocked in the last 3 hours.`}
+        />
+      ) : null}
       {ready && stepFreeMissing ? (
         <Note text="No step-free way was found in the map data for this trip. The routes below include stairs or escalators." />
       ) : null}
@@ -147,6 +156,15 @@ export function PlanningSheet({
       ) : null}
       {ready && error ? (
         <ErrorCard title="Couldn’t get a route" message={error.message} onRetry={onRetry} />
+      ) : null}
+
+      {ready && selectedOptionId ? (
+        <PrimaryButton
+          label="Start walking"
+          icon="navigation-variant"
+          onPress={onStart}
+          accessibilityHint="Step-by-step directions; re-plans if you leave the route or the weather changes"
+        />
       ) : null}
 
       {ready ? (

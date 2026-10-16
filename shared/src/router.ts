@@ -8,6 +8,7 @@
  * - Time matters: an indoor link is only used if it is open at the moment you'd reach it
  *   (departure time + walking time so far).
  * - One-way edges (escalators) are only walked the allowed way.
+ * - Edges walkers reported blocked (public.path_reports) are skipped.
  */
 import { haversineMeters } from './geo.ts';
 import type { RoutingEdge, RoutingNode, WalkingGraph } from './graph-export.ts';
@@ -125,6 +126,8 @@ export type RouteQuery = {
   penalties?: Map<number, number>;
   /** Sun strength 0–1 (sunStrength); default 1. */
   sun?: number;
+  /** Edge ids that can't be used: reported blocked by walkers, or a link we're routing around. */
+  blocked?: ReadonlySet<number>;
 };
 
 /** Tiny binary min-heap of [cost, node]. */
@@ -224,6 +227,7 @@ export function findRoute(g: PreparedGraph, q: RouteQuery): FoundRoute | null {
     for (const leg of g.out[u] ?? []) {
       const v = leg.forward ? leg.edge.target : leg.edge.source;
       if (done.has(v)) continue;
+      if (q.blocked?.has(leg.edge.id)) continue; // reported blocked
       if (!isOpenAt(leg.edge.opening_hours, arrival)) continue; // closed when we'd get there
       const shade = edgeShadeAt(leg.edge, arrival, g.shadeMeta);
       const edgeC = edgeCost(leg.edge, q.profile, { shade, sun: q.sun ?? 1 });

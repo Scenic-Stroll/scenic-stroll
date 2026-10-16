@@ -424,3 +424,52 @@ at most 1.4× the fastest time; max 4 options. Why: Yen's k-shortest returns nea
 kerb; the penalty search finds a genuinely different street in one extra Dijkstra (~50 ms). On the local graph it
 found an alternative in 22 of 30 demo runs. Live check (A1 → MMW, 13:00 heat): cool 9 min 81 % shaded, alternative
 10 min 81 % shaded via another street.
+
+### D28 · Smart routing step 6: re-routing while walking (2026-10-17)
+
+**Follow mode came first.** Phase 4's follow mode didn't exist yet, so step 6 adds a small one: "Start walking" on
+the chosen computed or standard route. The bottom sheet shows the current and next instruction, time left, distance
+left and arrival time. All rules are plain functions in `shared/src/follow.ts` (unit-tested); the app's
+`follow-engine.tsx` only wires GPS, Realtime and the conditions into them. Checkpoint instructions for community
+routes stay in Phase 4.
+
+**Off route** = more than 40 m from the line for 20 s (the brief's numbers), then re-plan from the current position
+with the same profile; a countdown shows meanwhile. **GPS fixes worse than ±50 m are ignored.** Why: inside Festival
+Walk or an MTR concourse the phone can be 100 m out, and a re-plan every 20 s indoors would be worse than none. After
+a re-plan (or a failed one) the 20 s start again, so a phone outside Hong Kong doesn't hammer the server.
+
+**Weather change.** The conditions query already refreshes every 5 min. When its mode changes while walking (live
+weather, the "Now" card or the demo switch), we ask smart-route for the best route for the new condition _from where
+you are_. Then we show either "It's started raining — a sheltered route via Festival Walk LG1 adds 2 min. Switch?"
+or "you're already on the best route for it" (> 80 % of its edges are yours). We never switch without asking.
+
+**Blocked paths: a new `path_reports` table, not the spec's per-route `reports`.** The spec's reports flag a whole
+community route; re-routing needs to know _which path_ is blocked. "Report blocked path ahead" sends the point
+30 m ahead on your route. `report_blocked_path()` snaps it to the nearest edge of the active graph (≤ 30 m) and keeps
+it 3 hours; a second report on the same path extends it. Each person gets 10 reports per hour. Reports are
+**anonymous**: the public table has no user column, and the reporter sits in `private.path_report_authors` (only for
+the rate limit and "Clear my reports"). smart-route reads active reports with the trip graph and treats those edges as
+impassable. Followers get new reports through Realtime and re-plan if the edge is on the part of their route still
+ahead. Computed routes now include `edge_ids`; for the standard route we fall back to "within 15 m of the line". The
+planning sheet says when routes avoid reported paths. Realtime sends PostGIS points as GeoJSON (checked live), not
+EWKB, hence `pointFromPostgis()`. Lesson: without a way to undo, one demo run would block a real path for 3 hours, so
+there is "Undo report" and Diagnostics → "Clear my blocked-path reports" (only reports nobody else confirmed).
+
+**Closing indoor links.** The router already never uses a link that is closed when you'd reach it. The new case is a
+link that closes **less than 20 min after** you'd reach it. Each such link gets a warning on the card and in the
+explanation ("Festival Walk LG1 closes at 00:00 — you'd pass at 23:50"), and the alternative slot goes to a route
+around it. Routing around one Festival Walk floor often leads through another with the same hours, so the planner
+repeats up to 4 times, blocking each newly found closing link. If no clear way exists, there's no alternative, only
+the warning (e.g. starting inside Festival Walk). If an offered route is already clear, it's marked "Avoids a closing
+indoor link" instead of being listed twice. While walking, if you won't reach a closing link at walking speed with
+2 min to spare, follow mode re-plans once. `closesAt()` parses the hours once and the summary only looks 20 min
+ahead, so this adds no measurable time (the 30 demo runs on the local graph are all still ≤ 30 ms).
+
+**Demo:** Diagnostics → "Simulate walk" moves a pretend walker along the route at 4× walking speed instead of GPS.
+The follow panel then offers "Step off route" (the walker stands 60 m to the side), "Make it rain" and "Make it hot",
+so every re-routing case can be shown on stage. Live check (A1 → MMW, rain): a report in the middle of the sheltered
+route arrived by Realtime in < 1 s; the next plan avoided the edge (14 → 23 min, that path is a key link) and showed
+`blocked_paths: 1`; "Clear my reports" restored the 14-min route.
+
+Small fix found on the way: `cleanName()` turned floor codes into "Festival Walk Ug"; floor codes and
+abbreviations (UG, LG, GF, MTR…) now stay in capitals.

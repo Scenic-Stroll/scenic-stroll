@@ -4,7 +4,7 @@
  * covered / indoors); for the chosen one the explanation, the map colour legend and step-by-step
  * directions. Every claim on screen comes from the route's facts — nothing is guessed.
  */
-import { PROFILE_LABELS, type SmartRouteOption } from '@scenic/shared';
+import { formatHkTime, PROFILE_LABELS, type SmartRouteOption } from '@scenic/shared';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -44,6 +44,12 @@ function notesOf(o: SmartRouteOption): string[] {
   if (o.step_free === 'unconfirmed') notes.push('Step-free unconfirmed');
   if (o.stairs > 0) notes.push(`${o.stairs}× stairs`);
   if (o.much_longer) notes.push('Much longer');
+  // Indoor links that close soon after you'd reach them (the explanation has the details).
+  const closing = o.closing[0];
+  if (closing) {
+    notes.push(`${closing.name ?? 'Indoor link'} closes ${formatHkTime(closing.closes_at)}`);
+  }
+  if (o.avoids_closing) notes.push('Avoids a closing indoor link');
   return notes;
 }
 

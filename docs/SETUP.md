@@ -175,6 +175,11 @@ GRAPH_LOADER_KEY=<key> npm run graph:load   # uploads (~15 s), then switches the
 - Tuning routes: edit the weights in `shared/src/routing-profiles.ts`, then `npm run graph:try` prints the demo trips
   (fastest / sheltered / cool / step-free / 2 am) from the local graph — no deploy needed to compare.
 - Phone check: **Profile → Diagnostics → Walk map** shows the data date and number of paths.
+- **Showing re-routing away from Kowloon Tong** (follow mode, step 6): Profile → Diagnostics → **Simulate walk: On**.
+  Plan a route, tap **Start walking**, and a pretend walker follows the route at 4× speed. The panel then has
+  **Step off route** (re-plans after 20 s), **Make it rain** (offers the sheltered route) and
+  **Report blocked path ahead**. A blocked-path report really blocks that path for everyone for 3 hours, so
+  after a demo tap **Diagnostics → Clear my blocked-path reports**.
 
 ## 10. Before you push code
 

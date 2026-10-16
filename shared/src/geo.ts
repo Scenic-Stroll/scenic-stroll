@@ -60,3 +60,33 @@ export function decodePolyline(encoded: string, precision = 5): LatLng[] {
   }
   return points;
 }
+
+/**
+ * Reads a point from PostGIS's hex EWKB, the way Realtime sends geometry columns, e.g.
+ * "0101000020E6100000<lng: 8 bytes><lat: 8 bytes>". Returns null for anything that isn't a point.
+ */
+export function pointFromEwkbHex(hex: string): LatLng | null {
+  if (!/^[0-9a-f]+$/i.test(hex) || hex.length < 42) return null;
+  const bytes = new Uint8Array(hex.match(/../g)!.map((b) => parseInt(b, 16)));
+  const view = new DataView(bytes.buffer);
+  const little = bytes[0] === 1;
+  const type = view.getUint32(1, little);
+  if ((type & 0xff) !== 1) return null; // 1 = Point
+  const offset = type & 0x20000000 ? 9 : 5; // the SRID flag adds 4 bytes
+  if (bytes.length < offset + 16) return null;
+  return { lng: view.getFloat64(offset, little), lat: view.getFloat64(offset + 8, little) };
+}
+
+/**
+ * A point from a PostGIS geometry the way Supabase hands it over: GeoJSON
+ * ({ type: 'Point', coordinates: [lng, lat] } — what Realtime sends) or hex EWKB. null otherwise.
+ */
+export function pointFromPostgis(value: unknown): LatLng | null {
+  if (typeof value === 'string') return pointFromEwkbHex(value);
+  if (!value || typeof value !== 'object') return null;
+  const g = value as { type?: unknown; coordinates?: unknown };
+  const c = g.coordinates;
+  if (g.type !== 'Point' || !Array.isArray(c)) return null;
+  const [lng, lat] = c;
+  return typeof lng === 'number' && typeof lat === 'number' ? { lng, lat } : null;
+}

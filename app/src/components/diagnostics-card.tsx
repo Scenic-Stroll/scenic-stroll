@@ -1,7 +1,7 @@
 /**
  * Profile → Diagnostics: which Supabase project the app talks to, whether we're signed in,
  * and a "Test backend" button that pings every Edge Function and shows OK / the problem.
- * Also the live-weather status and the demo "Simulate weather" switch for the pitch.
+ * Also the live-weather status and the demo "Simulate weather" / "Simulate walk" switches.
  */
 import {
   agoLabel,
@@ -14,6 +14,7 @@ import {
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
+import { FollowDemoControls } from '@/components/follow-demo-controls';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Chip } from '@/components/ui/chip';
@@ -130,6 +131,7 @@ export function DiagnosticsCard() {
           />
         ))}
       </View>
+      <FollowDemoControls />
 
       <Pressable
         accessibilityRole="button"

@@ -37,24 +37,27 @@ export default {
     try {
       const started = Date.now();
       const inArea = isInGraphArea(q.origin) && isInGraphArea(q.destination);
-      const [graph, condition] = await Promise.all([
+      const [trip, condition] = await Promise.all([
         // Outside our area there's nothing to load (the planner answers "outside_area").
-        inArea ? loadTripGraph(ctx.supabase, q.origin, q.destination) : Promise.resolve(null),
+        inArea
+          ? loadTripGraph(ctx.supabase, q.origin, q.destination)
+          : Promise.resolve({ graph: null, blocked: new Set<number>() }),
         // The app's choice (the "Now" card or demo simulation) wins over live weather.
         q.condition
           ? Promise.resolve(q.condition)
           : loadConditions(ctx.supabaseAdmin).then((c) => c.mode),
       ]);
-      const result = planSmartRoutes(graph, {
+      const result = planSmartRoutes(trip.graph, {
         origin: q.origin,
         destination: q.destination,
         profile: q.profile,
         departure: q.departure_time ? new Date(q.departure_time) : new Date(),
         condition,
         conditionSource: q.condition ? 'given' : 'live',
+        blocked: trip.blocked,
       });
       console.log(
-        `smart-route ${result.status}, ${result.options.length} options, ${Date.now() - started} ms`,
+        `smart-route ${result.status}, ${result.options.length} options, ${result.blocked_paths} blocked, ${Date.now() - started} ms`,
       );
       return json(SmartRouteResponseSchema.parse(result));
     } catch (err) {

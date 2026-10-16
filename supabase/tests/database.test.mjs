@@ -918,3 +918,90 @@ describe('walking graph shade', () => {
     );
   });
 });
+
+describe('path reports ("this path is blocked")', () => {
+  // The active test graph from the walking graph tests: edges along lat 22.335 near lng 114.171–114.175.
+  const ON_PATH = [22.33501, 114.1715];
+
+  it('snaps a report to the nearest edge, and signed-in users can read it (without a reporter)', async () => {
+    const r = (await as(ALICE, 'select * from public.report_blocked_path($1, $2)', ON_PATH))
+      .rows[0];
+    assert.ok(r.id && Number.isInteger(r.edge_id));
+    const seen = (await as(BOB, 'select * from public.path_reports')).rows;
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0].edge_id, r.edge_id);
+    assert.ok(!('user_id' in seen[0]), 'no reporter column in the public table');
+    await rejects(as(BOB, 'select * from private.path_report_authors'), /permission denied/);
+    await rejects(as(null, 'select * from public.path_reports'), /permission denied/);
+  });
+
+  it('a second report on the same path extends it instead of duplicating', async () => {
+    const before = (await db.query('select id, expires_at from public.path_reports')).rows;
+    const r = (await as(BOB, 'select * from public.report_blocked_path($1, $2)', ON_PATH)).rows[0];
+    assert.equal(r.id, before[0].id);
+    const { rows } = await db.query('select count(*)::int as n from public.path_reports');
+    assert.equal(rows[0].n, 1);
+  });
+
+  it('refuses points far from any path, unknown reasons and signed-out users', async () => {
+    await rejects(
+      as(ALICE, 'select * from public.report_blocked_path(22.3400, 114.1715)'),
+      /No path within 30 m/,
+    );
+    await rejects(
+      as(ALICE, `select * from public.report_blocked_path($1, $2, 'ugly')`, ON_PATH),
+      /Reason must be/,
+    );
+    await rejects(
+      as(null, 'select * from public.report_blocked_path($1, $2)', ON_PATH),
+      /permission denied/,
+    );
+  });
+
+  it('nobody can write reports directly', async () => {
+    await rejects(
+      as(ALICE, "update public.path_reports set expires_at = now() + interval '1 year'"),
+      /permission denied/,
+    );
+    await rejects(as(ALICE, 'delete from public.path_reports'), /permission denied/);
+  });
+
+  it('"clear my reports" keeps reports someone else confirmed, removes my own', async () => {
+    // Alice + Bob both reported the first one → it stays when Alice clears hers.
+    assert.equal((await as(ALICE, 'select public.clear_my_path_reports() as n')).rows[0].n, 0);
+    // A report only Bob made (on a second edge, added here 500 m away) → removed.
+    await db.exec(`
+      insert into public.ped_nodes (build_id, id, geom, z_m, kind)
+      select b.id, n.id, extensions.st_setsrid(extensions.st_makepoint(n.lng, 22.3395), 4326), 10, 'street'
+      from public.graph_builds b, (values (9001, 114.1700), (9002, 114.1710)) as n(id, lng)
+      where b.status = 'active';
+      insert into public.ped_edges (build_id, id, source, target, geom, length_m, kind, covered, indoor,
+        air_conditioned, step_free, data_source, confidence, bidirectional)
+      select b.id, 9001, 9001, 9002,
+        extensions.st_setsrid(extensions.st_makeline(extensions.st_makepoint(114.1700, 22.3395),
+          extensions.st_makepoint(114.1710, 22.3395)), 4326),
+        103, 'footway', false, false, false, 'yes', 'lands_3dpn', 0.9, true
+      from public.graph_builds b where b.status = 'active';`);
+    const other = { lat: 22.3395, lng: 114.1705 };
+    await as(BOB, 'select * from public.report_blocked_path($1, $2)', [other.lat, other.lng]);
+    assert.equal((await as(BOB, 'select public.clear_my_path_reports() as n')).rows[0].n, 1);
+    const { rows } = await db.query('select count(*)::int as n from public.path_reports');
+    assert.equal(rows[0].n, 1);
+  });
+
+  it('expired reports are hidden', async () => {
+    await db.query(`update public.path_reports set expires_at = now() - interval '1 minute'`);
+    assert.equal((await as(BOB, 'select * from public.path_reports')).rows.length, 0);
+  });
+
+  it('allows 10 reports per hour per person, then refuses', async () => {
+    // Alice has made 1 so far; 9 more (re-reports count too) are fine, the 11th is refused.
+    for (let i = 0; i < 9; i++) {
+      await as(ALICE, 'select * from public.report_blocked_path($1, $2)', ON_PATH);
+    }
+    await rejects(
+      as(ALICE, 'select * from public.report_blocked_path($1, $2)', ON_PATH),
+      /Too many reports/,
+    );
+  });
+});

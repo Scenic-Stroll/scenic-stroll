@@ -6,7 +6,7 @@
  */
 import type { RoutingEdge } from './graph-export.ts';
 import { formatDuration } from './format.ts';
-import { hongKongTime } from './opening-hours.ts';
+import { closesAt, hongKongTime } from './opening-hours.ts';
 import { accessTimeS, type FoundRoute, type RouteLeg } from './router.ts';
 import { edgeShadeAt, edgeTimeS, FLOOR_HEIGHT_M } from './routing-profiles.ts';
 import type { LatLng } from './schemas.ts';
@@ -32,12 +32,29 @@ export type RouteSummary = {
   segments: SegmentKind[];
   steps: { instruction: string; distance_m: number; duration_s: number }[];
   data_sources: string[];
+  /** Indoor links you'd reach less than CLOSING_SOON_MIN before they close (see closingWarnings). */
+  closing: ClosingWarning[];
+  /** Their edge ids, to plan an alternative around them — not sent to the app. */
+  closingEdgeIds: number[];
   pct_shaded: number | null;
   exposure: { sun_m: number; shade_m: number; covered_m: number; indoor_m: number; open_m: number };
   runs: { style: RunStyle; from: number; to: number }[];
   markers: { kind: 'stairs' | 'lift' | 'escalator'; point: LatLng }[];
   /** Edge ids, to compare routes (overlap) — not sent to the app. */
   edgeIds: number[];
+};
+
+/** A link that closes this soon after you'd reach it gets a warning (and an alternative). */
+export const CLOSING_SOON_MIN = 20;
+
+export type ClosingWarning = {
+  /** e.g. "Festival Walk LG1"; null when the link has no name. */
+  name: string | null;
+  /** ISO times: when it closes, and when you'd get there. */
+  closes_at: string;
+  reach_at: string;
+  /** Where the link starts, so follow mode can tell whether you've passed it. */
+  point: LatLng;
 };
 
 /** A start/end this far from the path is more than "where you tapped vs the door": can't vouch for it. */
@@ -114,12 +131,16 @@ const GENERIC_NAMES = new Set([
 const NAME_SUFFIX =
   / (Crossing|Staircase|Footbridge|Subway|Ramp|Lift|Escalator|RunIn|Traffic Island|Footway)$/i;
 
+/** Floor codes and abbreviations that stay in capitals ("Festival Walk UG", not "Ug"). */
+const KEEP_UPPER = new Set(['UG', 'LG', 'GF', 'MTR', 'HK', 'MMW', 'AC']);
+
 /** "TAT CHEE AVENUE Subway" → "Tat Chee Avenue"; "Footway" → null. */
 export function cleanName(name: string | null): string | null {
   if (!name) return null;
   let n = name.trim();
   while (NAME_SUFFIX.test(n)) n = n.replace(NAME_SUFFIX, '').trim();
-  n = n.replace(/\b[A-Z]{2,}\b/g, (w) => w[0] + w.slice(1).toLowerCase()); // SHOUTING → Title
+  // SHOUTING → Title
+  n = n.replace(/\b[A-Z]{2,}\b/g, (w) => (KEEP_UPPER.has(w) ? w : w[0] + w.slice(1).toLowerCase()));
   n = n.replace(/ (Of|The|And) /g, (w) => w.toLowerCase()); // "City University Of" → "of"
   return n && !GENERIC_NAMES.has(n.toLowerCase()) ? n : null;
 }
@@ -258,15 +279,15 @@ export function summarizeRoute(
 
   // Shade of each leg at the moment you'd reach it (same clock as the router).
   let clock = accessTimeS(route.startAccess.distM);
+  const reachAt: Date[] = [];
   const legShade = legs.map((l) => {
-    const shade = edgeShadeAt(
-      l.edge,
-      new Date(ctx.departure.getTime() + clock * 1000),
-      ctx.shadeMeta,
-    );
+    const at = new Date(ctx.departure.getTime() + clock * 1000);
+    reachAt.push(at);
     clock += edgeTimeS(l.edge);
-    return shade;
+    return edgeShadeAt(l.edge, at, ctx.shadeMeta);
   });
+  // Without a real departure time (tests' default context) there is nothing to warn about.
+  const closing = ctx === NO_SUN ? { warnings: [], edgeIds: [] } : closingWarnings(legs, reachAt);
 
   // The line, and which stretch of it is sun / shade / indoor… (index ranges into `coordinates`).
   const coordinates: LatLng[] = [origin];
@@ -383,7 +404,41 @@ export function summarizeRoute(
     markers,
     data_sources: [...new Set(legs.map((l) => l.edge.data_source))],
     edgeIds: legs.map((l) => l.edge.id),
+    closing: closing.warnings,
+    closingEdgeIds: closing.edgeIds,
   };
+}
+
+/**
+ * Links with opening hours that you'd reach less than CLOSING_SOON_MIN before they close. The router
+ * already avoids links that are closed when you'd get there; this catches the near misses — leave a
+ * few minutes late and the door is shut. One warning per stretch (a mall drawn as 20 edges is one).
+ */
+function closingWarnings(legs: RouteLeg[], reachAt: Date[]) {
+  const warnings: ClosingWarning[] = [];
+  const edgeIds: number[] = [];
+  legs.forEach((leg, i) => {
+    const hours = leg.edge.opening_hours;
+    const reach = reachAt[i]!;
+    const closes = closesAt(hours, reach, CLOSING_SOON_MIN); // only the next 20 min matter here
+    if (!closes) return;
+    edgeIds.push(leg.edge.id);
+    const name = cleanName(leg.edge.name_en);
+    const last = warnings.at(-1);
+    const sameStretch =
+      last && legs[i - 1]?.edge.opening_hours === hours && last.closes_at === closes.toISOString();
+    if (sameStretch) {
+      last.name ??= name;
+      return;
+    }
+    warnings.push({
+      name,
+      closes_at: closes.toISOString(),
+      reach_at: reach.toISOString(),
+      point: legLine(leg)[0]!,
+    });
+  });
+  return { warnings, edgeIds };
 }
 
 /** Share of route `a`'s length that is also in route `b` (0–1). Used to drop near-duplicates. */
@@ -441,6 +496,13 @@ export function explain(
     sentences.push(`${formatDuration(extra)} longer than the fastest route.`);
   else if (extra !== null) sentences.push('About as quick as the fastest route.');
 
+  const closing = s.closing[0];
+  if (closing) {
+    sentences.push(
+      `${closing.name ?? 'An indoor link on this route'} closes at ${hhmm(new Date(closing.closes_at))} — you’d pass at ${hhmm(new Date(closing.reach_at))}.`,
+    );
+  }
+
   if (s.step_free === 'yes') sentences.push('No stairs or escalators.');
   else if (s.step_free === 'unconfirmed')
     sentences.push('Step-free access not confirmed for every part.');
@@ -460,6 +522,7 @@ export function explain(
       step_free: s.step_free,
       pct_shaded: s.pct_shaded,
       shade_time: s.pct_shaded !== null ? shadeTime : null,
+      closes_at: closing?.closes_at ?? null,
     },
   };
 }

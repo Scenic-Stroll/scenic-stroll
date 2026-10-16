@@ -81,10 +81,33 @@ function covers(rule: OpeningRule, day: number, minute: number): boolean {
 /** null / empty hours = always open. Unparseable hours also count as open (never strand a route). */
 export function isOpenAt(hours: string | null, date: Date): boolean {
   if (!hours) return true;
-  const rules = parseOpeningHours(hours);
+  return openUnder(parseOpeningHours(hours), date);
+}
+
+/** isOpenAt for rules that are already parsed. */
+function openUnder(rules: OpeningRule[], date: Date): boolean {
   const openRules = rules.filter((r) => !r.off);
   if (rules.length === 0) return true;
   const { day, minute } = hongKongTime(date);
   const open = openRules.length === 0 || openRules.some((r) => covers(r, day, minute));
   return open && !rules.some((r) => r.off && covers(r, day, minute));
+}
+
+/**
+ * When a walkway that is open at `from` next closes, within the next `withinMin` minutes (default
+ * 24 hours); null = it stays open that long (or is closed already). Checked minute by minute, so
+ * "Mo-Su 07:00-24:00" at 23:40 gives midnight. Used to warn "Festival Walk closes at 22:00 — you'd
+ * pass at 21:52".
+ */
+export function closesAt(hours: string | null, from: Date, withinMin = 24 * 60): Date | null {
+  if (!hours) return null;
+  const rules = parseOpeningHours(hours); // once, not once per minute
+  if (!openUnder(rules, from)) return null;
+  // Start at the next whole minute, so the answer is a round time like 22:00.
+  const start = Math.ceil(from.getTime() / 60_000) * 60_000;
+  for (let m = 0; m <= withinMin; m++) {
+    const t = new Date(start + m * 60_000);
+    if (!openUnder(rules, t)) return t;
+  }
+  return null;
 }

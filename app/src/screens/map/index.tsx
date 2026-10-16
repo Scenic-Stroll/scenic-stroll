@@ -38,6 +38,8 @@ import { SearchBar } from '@/components/ui/search-bar';
 import { planRoute } from '@/lib/api';
 import { communityKeys, fetchCommunityRoutes } from '@/lib/community-routes';
 import { useConditions, useConditionsUi } from '@/lib/conditions';
+import { fromSmartOption, fromStandardRoute } from '@/lib/follow-route';
+import { useFollow } from '@/lib/follow-store';
 import { useSmartRoutes } from '@/lib/smart-routes';
 import { friendAsPlace, stopSharing, useFriendLocations, useSharing } from '@/lib/location-sharing';
 import { useCheckpointsNear } from '@/lib/checkpoints-near';
@@ -48,6 +50,9 @@ import { useMyProfile } from '@/lib/profile';
 import { radius, shadow, space, TAP_TARGET, type, useAppTheme, useColorSchemeName } from '@/theme';
 
 import { FloorSelector } from './floor-selector';
+import { FollowEngine } from './follow/follow-engine';
+import { FollowLayer } from './follow/follow-layer';
+import { FollowPanel } from './follow/follow-panel';
 import { MapControls, type MapLayers } from './map-controls';
 import { DARK_MAP_STYLE, LIGHT_MAP_STYLE } from './map-style';
 import { NearbySheet } from './nearby-sheet';
@@ -128,6 +133,10 @@ export function MapHome() {
     (c) => selectedFloor === null || isOnFloor(c, selectedFloor),
   );
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
+  // Follow mode (walking a route): its state lives in the follow store (see follow-engine.tsx).
+  const followSession = useFollow((s) => s.session);
+  const following = followSession !== null;
+  const followHere = followSession?.followCamera ? followSession.here : null;
 
   // Location once on open: the blue dot, and "nearby" measured from where you are.
   useEffect(() => {
@@ -188,6 +197,11 @@ export function MapHome() {
     if (firstSmartLine) fit(firstSmartLine);
     else if (standardRoute.data) fit(standardRoute.data.coordinates);
   }, [firstSmartLine, standardRoute.data, fit]);
+
+  // While walking, keep the map centred on you (until you pan it yourself).
+  useEffect(() => {
+    if (followHere) mapRef.current?.animateCamera({ center: toMap(followHere) }, { duration: 500 });
+  }, [followHere]);
 
   // 2D ↔ 3D tilt.
   useEffect(() => {
@@ -316,6 +330,20 @@ export function MapHome() {
     sheetRef.current?.snapToIndex(SHEET_FULL);
   };
 
+  /** "Start" on the chosen route option: switch the sheet to follow mode. */
+  const startFollowing = () => {
+    if (!destination) return;
+    const option = smartOptions.find((o) => o.id === shownOptionId);
+    const route = option
+      ? fromSmartOption(option)
+      : shownOptionId === STANDARD_OPTION_ID && standardRoute.data
+        ? fromStandardRoute(standardRoute.data)
+        : null;
+    if (!route) return;
+    useFollow.getState().start(route, destination.point, destination.label);
+    sheetRef.current?.snapToIndex(SHEET_HALF);
+  };
+
   const selectCommunityRoute = (route: CommunityRoute) => {
     setSelectedRouteId(route.id);
     fit(route.line);
@@ -358,6 +386,10 @@ export function MapHome() {
             : undefined;
           setFocusedBuildingId(building?.id ?? null);
         }}
+        // Panning the map yourself stops it following you (the panel offers "Re-centre map").
+        onPanDrag={() => {
+          if (followSession?.followCamera) useFollow.getState().patch({ followCamera: false });
+        }}
         onLongPress={(e) => {
           const { latitude, longitude } = e.nativeEvent.coordinate;
           openPlace({ label: 'Dropped pin', point: { lat: latitude, lng: longitude } });
@@ -376,7 +408,8 @@ export function MapHome() {
               />
             ))
           : null}
-        {planning && standardRoute.data ? (
+        {following ? <FollowLayer /> : null}
+        {planning && !following && standardRoute.data ? (
           <Polyline
             coordinates={standardRoute.data.coordinates.map(toMap)}
             strokeColor={t.routeStandard}
@@ -384,7 +417,7 @@ export function MapHome() {
             zIndex={1}
           />
         ) : null}
-        {planning
+        {planning && !following
           ? smartOptions.map((o) => (
               <SmartRouteLine
                 key={`smart-${o.id}`}
@@ -459,14 +492,14 @@ export function MapHome() {
             </View>
           </Marker>
         ))}
-        {planning && origin ? (
+        {planning && !following && origin ? (
           <Marker
             coordinate={toMap(origin.point)}
             title={`Start: ${origin.label}`}
             pinColor={t.primary}
           />
         ) : null}
-        {planning && destination ? (
+        {planning && !following && destination ? (
           <Marker
             coordinate={toMap(destination.point)}
             title={`Destination: ${destination.label}`}
@@ -570,11 +603,19 @@ export function MapHome() {
         backgroundStyle={{ backgroundColor: t.background, borderRadius: radius.sheet }}
         handleIndicatorStyle={{ backgroundColor: t.border, width: 40 }}
         accessibilityLabel={
-          planning ? 'Route planning' : selectedPlace ? selectedPlace.label : 'Nearby routes'
+          following
+            ? 'Walking directions'
+            : planning
+              ? 'Route planning'
+              : selectedPlace
+                ? selectedPlace.label
+                : 'Nearby routes'
         }
       >
         <BottomSheetScrollView keyboardShouldPersistTaps="handled">
-          {planning ? (
+          {following ? (
+            <FollowPanel onRecentre={() => useFollow.getState().patch({ followCamera: true })} />
+          ) : planning ? (
             <PlanningSheet
               origin={origin}
               destination={destination}
@@ -609,6 +650,7 @@ export function MapHome() {
               onSelectOption={selectOption}
               smart={smart.data}
               smartLoading={smart.isFetching}
+              onStart={startFollowing}
             />
           ) : selectedPlace ? (
             <PlaceSheet
@@ -637,6 +679,8 @@ export function MapHome() {
           )}
         </BottomSheetScrollView>
       </BottomSheet>
+
+      {followSession ? <FollowEngine key={followSession.id} conditionMode={now.mode} /> : null}
 
       <ShareLocationSheet visible={sharingSheetOpen} onClose={() => setSharingSheetOpen(false)} />
 

@@ -24,3 +24,4 @@ export * from './router.ts';
 export * from './route-summary.ts';
 export * from './smart-route-api.ts';
 export * from './smart-route.ts';
+export * from './follow.ts';
