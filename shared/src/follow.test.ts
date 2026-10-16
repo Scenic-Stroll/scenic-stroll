@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   conditionChangeMessage,
+  edgesUpTo,
+  lineUpTo,
   locateOnRoute,
   missedClosing,
   OFF_ROUTE_S,
@@ -163,5 +165,19 @@ describe('conditionChangeMessage', () => {
       same: false,
     });
     expect(m.text).toBe('The rain has stopped — a different route saves 3 min. Switch?');
+  });
+});
+
+describe('what was walked before a re-plan', () => {
+  it('lineUpTo keeps the line up to exactly that point', () => {
+    const part = lineUpTo(LINE, 250);
+    expect(part).toHaveLength(3); // start, corner, the point 50 m up
+    expect(locateOnRoute(LINE, part.at(-1)!).alongM).toBeCloseTo(250, 0);
+    expect(lineUpTo(LINE, 0)).toHaveLength(1);
+  });
+
+  it('edgesUpTo estimates the edges walked from the share of the distance', () => {
+    expect(edgesUpTo([1, 2, 3, 4], { distM: 0, alongM: 150, totalM: 300 })).toEqual([1, 2]);
+    expect(edgesUpTo([1, 2, 3, 4], null)).toEqual([]);
   });
 });

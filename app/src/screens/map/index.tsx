@@ -335,12 +335,16 @@ export function MapHome() {
     if (!destination) return;
     const option = smartOptions.find((o) => o.id === shownOptionId);
     const route = option
-      ? fromSmartOption(option)
+      ? fromSmartOption(option, smart.data?.graph?.build_id ?? null)
       : shownOptionId === STANDARD_OPTION_ID && standardRoute.data
         ? fromStandardRoute(standardRoute.data)
         : null;
     if (!route) return;
-    useFollow.getState().start(route, destination.point, destination.label);
+    useFollow.getState().start(route, {
+      originLabel: origin?.label ?? 'Start',
+      destination: destination.point,
+      destinationLabel: destination.label,
+    });
     sheetRef.current?.snapToIndex(SHEET_HALF);
   };
 

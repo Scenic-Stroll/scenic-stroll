@@ -402,7 +402,10 @@ export function summarizeRoute(
     },
     runs,
     markers,
-    data_sources: [...new Set(legs.map((l) => l.edge.data_source))],
+    data_sources: [
+      ...new Set(legs.map((l) => l.edge.data_source)),
+      ...(legs.some((l) => l.edge.community) ? ['walker_feedback'] : []),
+    ],
     edgeIds: legs.map((l) => l.edge.id),
     closing: closing.warnings,
     closingEdgeIds: closing.edgeIds,
@@ -503,6 +506,14 @@ export function explain(
     );
   }
 
+  // Honest about corrections: walkers said the map was wrong somewhere on this route.
+  const corrected = route.legs.filter((l) => (l.edge.disputed?.length ?? 0) > 0).length;
+  if (corrected > 0) {
+    sentences.push(
+      `Walkers corrected the map for ${corrected === 1 ? '1 part' : `${corrected} parts`} of this route.`,
+    );
+  }
+
   if (s.step_free === 'yes') sentences.push('No stairs or escalators.');
   else if (s.step_free === 'unconfirmed')
     sentences.push('Step-free access not confirmed for every part.');
@@ -523,6 +534,7 @@ export function explain(
       pct_shaded: s.pct_shaded,
       shade_time: s.pct_shaded !== null ? shadeTime : null,
       closes_at: closing?.closes_at ?? null,
+      corrected_by_walkers: corrected,
     },
   };
 }

@@ -29,9 +29,11 @@ export type FollowRoute = {
   closing: ClosingWarning[];
   /** The computed option, to draw it in coloured stretches; null for the standard route. */
   option: SmartRouteOption | null;
+  /** Which walking-map build the edge ids belong to (feedback is stored per build). */
+  buildId: number | null;
 };
 
-export function fromSmartOption(o: SmartRouteOption): FollowRoute {
+export function fromSmartOption(o: SmartRouteOption, buildId: number | null): FollowRoute {
   return {
     title: `${PROFILE_LABELS[o.profile].en} route`,
     profile: o.profile,
@@ -42,6 +44,7 @@ export function fromSmartOption(o: SmartRouteOption): FollowRoute {
     edgeIds: o.edge_ids,
     closing: o.closing,
     option: o,
+    buildId,
   };
 }
 
@@ -56,6 +59,7 @@ export function fromStandardRoute(r: PlanRouteResponse): FollowRoute {
     edgeIds: [],
     closing: [],
     option: null,
+    buildId: null,
   };
 }
 
@@ -84,7 +88,7 @@ export async function planFrom(args: {
         res.status === 'ok'
           ? (res.options.find((o) => o.roles.includes('requested')) ?? res.options[0])
           : undefined;
-      if (option) return fromSmartOption(option);
+      if (option) return fromSmartOption(option, res.graph?.build_id ?? null);
     } catch (err) {
       console.warn('[follow] smart re-plan failed, using the standard route', err);
     }
@@ -97,7 +101,7 @@ export async function bestRouteFor(args: {
   from: LatLng;
   to: LatLng;
   condition: ConditionMode;
-}): Promise<SmartRouteOption | null> {
+}): Promise<FollowRoute | null> {
   try {
     const res = await smartRoute({
       origin: args.from,
@@ -105,8 +109,8 @@ export async function bestRouteFor(args: {
       profile: PROFILE_FOR_CONDITION[args.condition],
       condition: args.condition,
     });
-    if (res.status !== 'ok') return null;
-    return res.options.find((o) => o.roles.includes('best_now')) ?? null;
+    const best = res.options.find((o) => o.roles.includes('best_now'));
+    return res.status === 'ok' && best ? fromSmartOption(best, res.graph?.build_id ?? null) : null;
   } catch (err) {
     console.warn('[follow] could not check the route for the new weather', err);
     return null;

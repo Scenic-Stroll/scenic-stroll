@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { GpsSample } from './gps.ts';
-import { buildRouteUpload, type LocalRecording } from './route-upload.ts';
+import { buildPlannedRouteUpload, buildRouteUpload, type LocalRecording } from './route-upload.ts';
 
 const START = { lat: 22.336961, lng: 114.175531 };
 const T0 = 1_760_000_000_000;
@@ -122,5 +122,43 @@ describe('buildRouteUpload', () => {
   it('rejects an empty title', () => {
     const result = buildRouteUpload(recording({ title: '   ' }));
     expect(result.ok).toBe(false);
+  });
+});
+
+describe('buildPlannedRouteUpload (save a walked computed route)', () => {
+  const walkDone = {
+    id: '6b0d3c1e-8a4f-4e2b-9c1d-2f3a4b5c6d7e',
+    title: '  Exit A1 to MMW (sheltered)  ',
+    startLabel: 'Kowloon Tong Exit A1',
+    endLabel: '',
+    description: null,
+    showAuthor: false,
+    line: [START, { lat: 22.3365, lng: 114.1745 }, { lat: 22.3354, lng: 114.1728 }],
+    durationS: 540.4,
+    markers: [{ kind: 'lift' as const, point: { lat: 22.3365, lng: 114.1745 } }],
+  };
+
+  it('is marked "planned", with stairs/lifts as checkpoints and blank labels dropped', () => {
+    const r = buildPlannedRouteUpload(walkDone);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.upload.origin).toBe('planned');
+    expect(r.upload.title).toBe('Exit A1 to MMW (sheltered)');
+    expect(r.upload.end_label).toBeNull();
+    expect(r.upload.duration_s).toBe(540);
+    expect(r.upload.checkpoints).toEqual([
+      {
+        seq: 1,
+        kind: 'lift',
+        point: walkDone.markers[0]!.point,
+        floor_from: null,
+        floor_to: null,
+        note: null,
+      },
+    ]);
+  });
+
+  it('an empty title is refused', () => {
+    expect(buildPlannedRouteUpload({ ...walkDone, title: ' ' }).ok).toBe(false);
   });
 });

@@ -151,6 +151,10 @@ function RouteRow({
             icon={verified ? 'check-decagram' : 'clock-outline'}
             label={verified ? 'Verified' : 'Unverified'}
           />
+          {/* Saved from a route the app planned (and a walker completed), not a GPS recording. */}
+          {route.origin === 'planned' ? (
+            <Chip small icon="map-marker-path" label="Planned, then walked" />
+          ) : null}
           {tags.map((tag) => (
             <Chip key={tag} small label={TAXONOMY[tag].en} />
           ))}

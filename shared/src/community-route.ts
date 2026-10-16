@@ -8,7 +8,7 @@ import { RouteStatusSchema, type LatLng } from './schemas.ts';
 
 /** Columns the app selects from routes_public (keep in sync with the view in supabase/migrations). */
 export const COMMUNITY_ROUTE_COLUMNS =
-  'id,title,start_label,end_label,distance_m,duration_s,status,last_confirmed_at,created_at,geojson,author_name';
+  'id,title,start_label,end_label,distance_m,duration_s,status,last_confirmed_at,created_at,geojson,author_name,origin';
 
 const GeoJsonLineSchema = z.object({
   type: z.literal('LineString'),
@@ -27,6 +27,8 @@ export const CommunityRouteRowSchema = z.object({
   created_at: z.string(),
   geojson: GeoJsonLineSchema,
   author_name: z.string().nullable(),
+  /** 'planned' = saved from a computed route a walker completed (step 7). Default for old rows. */
+  origin: z.enum(['recorded', 'planned']).default('recorded'),
 });
 
 export type CommunityRoute = {
@@ -40,6 +42,7 @@ export type CommunityRoute = {
   lastConfirmedAt: string | null;
   createdAt: string;
   authorName: string | null;
+  origin: 'recorded' | 'planned';
   line: LatLng[];
   /** Taxonomy tags; filled by AI tagging (Phase 3) — empty until then. */
   tags: string[];
@@ -68,6 +71,7 @@ export function parseCommunityRoutes(rows: unknown): { routes: CommunityRoute[];
       lastConfirmedAt: r.last_confirmed_at,
       createdAt: r.created_at,
       authorName: r.author_name,
+      origin: r.origin,
       line: r.geojson.coordinates.map(([lng, lat]) => ({ lat, lng })),
       tags: [],
     });

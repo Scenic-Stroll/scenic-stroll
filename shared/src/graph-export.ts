@@ -8,6 +8,7 @@
  */
 import { z } from 'zod';
 
+import { applyFeedback, FEEDBACK_ASPECTS, type FeedbackAspect } from './edge-feedback.ts';
 import { decodePolyline } from './geo.ts';
 import {
   EDGE_KINDS,
@@ -47,6 +48,10 @@ export type RoutingEdge = {
   shade: number[] | null;
   /** The line drawn source → target. */
   line: LatLng[];
+  /** Walkers' agreement per aspect, −1…1 (edge-feedback.ts); missing = no feedback. */
+  community?: Partial<Record<FeedbackAspect, number>>;
+  /** Aspects where walkers overruled the map (e.g. a "cover" that isn't one). */
+  disputed?: FeedbackAspect[];
 };
 
 export type WalkingGraph = {
@@ -88,6 +93,10 @@ const EdgeTuple = z
     z.string().nullable(), // 20 level_from
     z.string().nullable(), // 21 level_to
     z.array(z.number()).nullable().optional(), // 22 shade_pct (step 4)
+    z // 23 walker feedback {aspect: [ups, partly, downs]} (step 7)
+      .partialRecord(z.enum(FEEDBACK_ASPECTS), z.tuple([z.number(), z.number(), z.number()]))
+      .nullable()
+      .optional(),
   ])
   .rest(z.unknown());
 
@@ -114,30 +123,36 @@ export function parseGraphExport(raw: unknown): WalkingGraph {
       ? { date: g.shade.date, firstMin: g.shade.first_min, bucketMin: g.shade.bucket_min }
       : null,
     nodes: g.nodes.map(([id, lng, lat, z, kind]) => ({ id, lng, lat, z, kind })),
-    edges: g.edges.map((e) => ({
-      id: e[0],
-      source: e[1],
-      target: e[2],
-      length_m: e[3],
-      kind: e[4],
-      covered: e[5],
-      indoor: e[6],
-      air_conditioned: e[7],
-      step_free: e[8],
-      slope_pct: e[9],
-      z_from: e[10] ?? 0,
-      z_to: e[11] ?? 0,
-      crossing_wait_s: e[12],
-      opening_hours: e[13],
-      confidence: e[14],
-      bidirectional: e[15],
-      name_en: e[16],
-      name_zh: e[17],
-      line: decodePolyline(e[18], 6),
-      data_source: e[19],
-      level_from: e[20],
-      level_to: e[21],
-      shade: e[22] ?? null,
-    })),
+    // Walkers' feedback is applied here, so the router and summaries only ever see the result.
+    edges: g.edges.map((e) =>
+      applyFeedback(
+        {
+          id: e[0],
+          source: e[1],
+          target: e[2],
+          length_m: e[3],
+          kind: e[4],
+          covered: e[5],
+          indoor: e[6],
+          air_conditioned: e[7],
+          step_free: e[8],
+          slope_pct: e[9],
+          z_from: e[10] ?? 0,
+          z_to: e[11] ?? 0,
+          crossing_wait_s: e[12],
+          opening_hours: e[13],
+          confidence: e[14],
+          bidirectional: e[15],
+          name_en: e[16],
+          name_zh: e[17],
+          line: decodePolyline(e[18], 6),
+          data_source: e[19],
+          level_from: e[20],
+          level_to: e[21],
+          shade: e[22] ?? null,
+        },
+        e[23],
+      ),
+    ),
   };
 }

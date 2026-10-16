@@ -21,6 +21,7 @@ import { useConditionsUi } from '@/lib/conditions';
 import { useFollow, useFollowDemo, type FollowSession } from '@/lib/follow-store';
 import { radius, space, type, useAppTheme } from '@/theme';
 
+import { ArrivedPanel } from './arrived-panel';
 import { FollowBanner } from './follow-banner';
 
 export function FollowPanel({ onRecentre }: { onRecentre: () => void }) {
@@ -34,19 +35,7 @@ export function FollowPanel({ onRecentre }: { onRecentre: () => void }) {
   const setSimulated = useConditionsUi((c) => c.setSimulated);
   if (!s) return null;
 
-  if (s.arrived) {
-    return (
-      <View style={styles.container}>
-        <View style={[styles.arrived, { backgroundColor: t.successSurface }]}>
-          <Icon name="flag-checkered" size={28} color={t.primary} />
-          <Text style={[type.title, styles.flex1, { color: t.textPrimary }]}>
-            You’ve arrived at {s.destinationLabel}
-          </Text>
-        </View>
-        <PrimaryButton label="Done" icon="check" onPress={stop} />
-      </View>
-    );
-  }
+  if (s.arrived) return <ArrivedPanel session={s} />;
 
   return (
     <View style={styles.container}>
@@ -181,13 +170,6 @@ function Summary({ session: s }: { session: FollowSession }) {
 const styles = StyleSheet.create({
   container: { gap: space.md, paddingHorizontal: space.lg, paddingBottom: space.xl },
   flex1: { flex: 1 },
-  arrived: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.md,
-    padding: space.lg,
-    borderRadius: radius.md,
-  },
   offRoute: {
     flexDirection: 'row',
     alignItems: 'center',

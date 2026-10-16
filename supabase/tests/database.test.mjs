@@ -852,7 +852,7 @@ describe('walking_graph_export (for smart-route)', () => {
     assert.equal(typeof target, 'number');
     assert.ok(length > 0);
     assert.equal(kind, 'footway');
-    assert.equal(out.edges[0].length, 23, 'edge tuple has 23 fields (22 = shade)');
+    assert.equal(out.edges[0].length, 24, 'edge tuple has 24 fields (22 = shade, 23 = feedback)');
     assert.equal(typeof out.edges[0][18], 'string', 'field 18 is the encoded polyline');
     assert.equal(out.nodes[0].length, 5);
   });
@@ -900,7 +900,7 @@ describe('walking graph shade', () => {
     const out = (await as(null, 'select public.walking_graph_export() as g')).rows[0].g;
     assert.deepEqual(out.shade, { date: '2026-10-16', first_min: 420, bucket_min: 30 });
     const edge = out.edges.find((e) => e[0] === edgeId);
-    assert.equal(edge.length, 23, 'shade is field 22');
+    assert.equal(edge.length, 24, 'shade is field 22 (23 = walker feedback, step 7)');
     assert.deepEqual(edge[22], shade);
   });
 
@@ -1002,6 +1002,140 @@ describe('path reports ("this path is blocked")', () => {
     await rejects(
       as(ALICE, 'select * from public.report_blocked_path($1, $2)', ON_PATH),
       /Too many reports/,
+    );
+  });
+});
+
+describe('walk feedback ("was it sheltered as promised?")', () => {
+  const WALK_A = '44444444-4444-4444-8444-444444444441';
+  const WALK_B = '44444444-4444-4444-8444-444444444442';
+  let build;
+  let edges;
+  const submit = (user, walk, aspect, verdict, simulated = false, buildId = build) =>
+    as(user, 'select public.submit_walk_feedback($1, $2, $3, $4, $5, $6, $7) as n', [
+      walk,
+      buildId,
+      edges,
+      'sheltered',
+      aspect,
+      verdict,
+      simulated,
+    ]).then((r) => r.rows[0].n);
+  const counts = async () =>
+    (
+      await as(
+        BOB,
+        `select edge_id, ups, partly, downs from public.edge_feedback where aspect = 'overall' order by edge_id`,
+      )
+    ).rows;
+
+  before(async () => {
+    build = (await db.query(`select id from public.graph_builds where status = 'active'`)).rows[0]
+      .id;
+    edges = (
+      await db.query('select id from public.ped_edges where build_id = $1 order by id', [build])
+    ).rows.map((r) => r.id);
+  });
+
+  it('a 👍 counts once per path; answering the same walk again replaces it', async () => {
+    assert.equal(await submit(ALICE, WALK_A, 'overall', 'yes'), edges.length);
+    assert.ok((await counts()).every((c) => c.ups === 1 && c.downs === 0));
+    assert.equal(await submit(ALICE, WALK_A, 'overall', 'no'), edges.length);
+    assert.ok((await counts()).every((c) => c.ups === 0 && c.downs === 1));
+  });
+
+  it('one vote per person per path: a second walk by the same person replaces, others add', async () => {
+    await submit(ALICE, WALK_B, 'overall', 'no');
+    assert.ok((await counts()).every((c) => c.downs === 1));
+    await submit(BOB, WALK_A, 'overall', 'partly');
+    assert.ok((await counts()).every((c) => c.downs === 1 && c.partly === 1));
+  });
+
+  it('the graph export carries the counts per edge (field 23) for smart-route', async () => {
+    const out = (await as(BOB, 'select public.walking_graph_export() as g')).rows[0].g;
+    const edge = out.edges.find((e) => e[0] === edges[0]);
+    assert.deepEqual(edge[23], { overall: [0, 1, 1] }); // [ups, partly, downs]
+  });
+
+  it('only paths the question is about get a vote (shelter → covered/indoor paths)', async () => {
+    // The test graph has no covered paths.
+    assert.equal(await submit(BOB, WALK_B, 'shelter', 'no'), 0);
+  });
+
+  it('demo (simulated) walks are recorded but never counted', async () => {
+    const before = await counts();
+    assert.equal(
+      await submit(BOB, '44444444-4444-4444-8444-444444444443', 'overall', 'yes', true),
+      0,
+    );
+    assert.deepEqual(await counts(), before);
+  });
+
+  it('refuses bad answers, old maps and signed-out users', async () => {
+    await rejects(submit(ALICE, WALK_A, 'vibes', 'yes'), /Unknown feedback aspect/);
+    await rejects(submit(ALICE, WALK_A, 'overall', 'maybe'), /yes, partly or no/);
+    await rejects(submit(ALICE, WALK_A, 'overall', 'yes', false, 999999), /out of date/);
+    await rejects(submit(null, WALK_A, 'overall', 'yes'), /permission denied/);
+  });
+
+  it('voters stay private, counts are public, and nobody writes the counts directly', async () => {
+    await rejects(as(ALICE, 'select * from private.edge_votes'), /permission denied/);
+    await rejects(as(ALICE, 'select * from private.walk_feedback'), /permission denied/);
+    await rejects(as(ALICE, 'update public.edge_feedback set ups = 100'), /permission denied/);
+    // The counts themselves are anonymous: anyone may read them (the graph export includes them).
+    assert.ok((await as(null, 'select * from public.edge_feedback')).rows.length > 0);
+  });
+
+  it('allows 20 answered walks an hour', async () => {
+    // Alice has answered 2 walks; 18 more are fine, the next is refused.
+    for (let i = 0; i < 18; i++) {
+      await submit(
+        ALICE,
+        `55555555-5555-4555-8555-${String(i).padStart(12, '0')}`,
+        'overall',
+        'yes',
+      );
+    }
+    await rejects(
+      submit(ALICE, '55555555-5555-4555-8555-999999999999', 'overall', 'yes'),
+      /Too many answers/,
+    );
+  });
+});
+
+describe('community routes saved from a planned route', () => {
+  const PLANNED = '66666666-6666-4666-8666-666666666666';
+  // A fresh user: Bob used up his 60 routes an hour in the rate-limit test.
+  const CAROL = '99999999-9999-4999-8999-999999999991';
+  before(async () => {
+    await db.query('insert into auth.users (id) values ($1)', [CAROL]);
+  });
+
+  it('origin defaults to "recorded" and can be "planned"; routes_public shows it', async () => {
+    const RECORDED = '99999999-9999-4999-8999-999999999992';
+    await as(CAROL, 'select public.create_route($1)', [payload({ id: RECORDED })]);
+    await as(CAROL, 'select public.create_route($1)', [
+      payload({ id: PLANNED, origin: 'planned' }),
+    ]);
+    const rows = (
+      await as(
+        null,
+        'select id, origin from public.routes_public where id in ($1, $2) order by id',
+        [RECORDED, PLANNED],
+      )
+    ).rows;
+    assert.deepEqual(
+      rows.map((r) => r.origin),
+      ['planned', 'recorded'], // ordered by id: 6666… then 9999…
+    );
+  });
+
+  it('rejects an unknown origin', async () => {
+    await rejects(
+      as(CAROL, 'select public.create_route($1)', [
+        payload({ id: '77777777-7777-4777-8777-777777777777', origin: 'invented' }),
+      ]),
+      /routes_origin_check/,
     );
   });
 });

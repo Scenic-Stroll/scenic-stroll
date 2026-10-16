@@ -64,6 +64,8 @@ export const RouteUploadSchema = z.object({
     )
     .max(100),
   description: z.string().trim().min(1).max(2000).nullable(),
+  /** 'recorded' = GPS recording; 'planned' = a route the app planned that the walker completed. */
+  origin: z.enum(['recorded', 'planned']).default('recorded'),
 });
 export type RouteUpload = z.infer<typeof RouteUploadSchema>;
 
@@ -136,4 +138,53 @@ export function buildRouteUpload(rec: LocalRecording): BuildResult {
 /** Length of the uploaded line in metres (the server recomputes this; used for display). */
 export function uploadLengthMeters(upload: RouteUpload): number {
   return pathLengthMeters(upload.line);
+}
+
+/** A walked route the app planned (follow mode → "Save as a community route"). */
+export type PlannedWalk = {
+  id: string;
+  title: string;
+  startLabel: string | null;
+  endLabel: string | null;
+  description: string | null;
+  showAuthor: boolean;
+  /** The line actually walked (incl. the parts before any re-plan). */
+  line: { lat: number; lng: number }[];
+  durationS: number;
+  /** Stairs, lifts and escalators on the way (from the computed route), as checkpoints. */
+  markers: { kind: 'stairs' | 'lift' | 'escalator'; point: { lat: number; lng: number } }[];
+};
+
+/**
+ * The upload for a planned walk. No privacy trim: the line is the app's planned path (not a GPS
+ * trace), but it does start where you started — the save screen says so and the walker chooses.
+ */
+export function buildPlannedRouteUpload(walk: PlannedWalk): BuildResult {
+  const parsed = RouteUploadSchema.safeParse({
+    id: walk.id,
+    title: walk.title.trim(),
+    start_label: blankToNull(walk.startLabel),
+    end_label: blankToNull(walk.endLabel),
+    show_author: walk.showAuthor,
+    duration_s: Math.round(walk.durationS),
+    line: walk.line.map((p) => ({ lat: p.lat, lng: p.lng })),
+    checkpoints: walk.markers.slice(0, 100).map((m, i) => ({
+      seq: i + 1,
+      kind: m.kind,
+      point: m.point,
+      floor_from: null,
+      floor_to: null,
+      note: null,
+    })),
+    description: blankToNull(walk.description),
+    origin: 'planned',
+  });
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return {
+      ok: false,
+      error: `Can't save: ${issue?.path.join('.') || 'route'} — ${issue?.message}`,
+    };
+  }
+  return { ok: true, upload: parsed.data };
 }

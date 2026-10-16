@@ -180,6 +180,9 @@ GRAPH_LOADER_KEY=<key> npm run graph:load   # uploads (~15 s), then switches the
   **Step off route** (re-plans after 20 s), **Make it rain** (offers the sheltered route) and
   **Report blocked path ahead**. A blocked-path report really blocks that path for everyone for 3 hours, so
   after a demo tap **Diagnostics → Clear my blocked-path reports**.
+- **At the end of a walk** (step 7) the app asks "Was it sheltered as promised?" and offers **Save as a community
+  route**. Answers from a simulated walk are recorded but never counted, so demos can't change real routing. A route
+  saved during a demo really appears on the map; delete it under My routes afterwards.
 
 ## 10. Before you push code
 

@@ -87,6 +87,30 @@ export function pointAlong(line: LatLng[], alongM: number, sidewaysM = 0): LatLn
   });
 }
 
+/**
+ * The part of the line from the start to `alongM` metres (ends exactly there). Used to keep the
+ * stretch already walked when a re-plan replaces the route.
+ */
+export function lineUpTo(line: LatLng[], alongM: number): LatLng[] {
+  if (line.length < 2 || alongM <= 0) return line.slice(0, 1);
+  const { cum } = measure(line);
+  const kept = line.filter((_, i) => cum[i]! < alongM);
+  return [...kept, pointAlong(line, alongM)];
+}
+
+/**
+ * The edges of a route walked so far, estimated by the share of the distance walked. Edge ids are in
+ * walking order but we don't have each edge's length here, so this is approximate — good enough for
+ * feedback votes, which are averaged over many walkers anyway.
+ */
+export function edgesUpTo(edgeIds: number[], pos: RoutePosition | null): number[] {
+  if (!pos || pos.totalM <= 0) return [];
+  return edgeIds.slice(
+    0,
+    Math.round((edgeIds.length * Math.min(pos.alongM, pos.totalM)) / pos.totalM),
+  );
+}
+
 // ---- off route -----------------------------------------------------------------------------
 
 /** When you first went off route (ms), or null while you're on it. */

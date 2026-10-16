@@ -473,3 +473,54 @@ route arrived by Realtime in < 1 s; the next plan avoided the edge (14 → 23 mi
 
 Small fix found on the way: `cleanName()` turned floor codes into "Festival Walk Ug"; floor codes and
 abbreviations (UG, LG, GF, MTR…) now stay in capitals.
+
+### D29 · Smart routing step 7: walkers' feedback and "Save as a community route" (2026-10-17)
+
+**One question, matched to the promise.** At the end of a computed walk, the question depends on what the route promised:
+sheltered → "Was this route sheltered as promised?", shaded/cool → "Was it shaded as promised?", step-free → "Was it
+really step-free?", others → "Was the route as described?". Answers are 👍 / Partly / 👎. One tap, so people
+actually answer. The standard street route makes no promises, so it gets no question.
+
+**Votes per path, one per person.** The answer counts as a vote on the walk's _relevant_ paths: shelter → covered or
+indoor paths; shade → open-air paths; step-free → paths not already known to have steps; overall → all. The server
+picks the relevant paths itself. A walk with re-plans counts the earlier routes' edges too, estimated by the share of
+distance walked (edge lengths aren't on the phone; votes are averaged over many walkers anyway).
+`private.edge_votes` keeps one vote per person, path and aspect, so a later answer replaces an earlier one and one
+person can't push a path around alone. `public.edge_feedback` holds only the counts. Voters are never readable, the
+counts are anonymous and public, and each person can answer 20 walks an hour. **Demo walks are recorded but never
+counted**, so a pitch rehearsal can't change real routing.
+
+**How feedback changes routing — deliberately small and slow** (`shared/src/edge-feedback.ts`):
+
+- _Score_ = (👍 − 👎) / (votes + 2), from −1 to 1. It replaces the old "community × confidence" term in the cost, using
+  the score for the promise the route makes (a sheltered route uses shelter votes). The profiles' existing community
+  weight of 0.2 caps the effect at ±20 %; fastest ignores it.
+- _Dispute_: once ≥ 3 people say no (Partly counts half), and at least twice as many as say yes, the map is treated as
+  wrong. A "covered" path counts as not covered (indoors stays indoors), shade becomes unknown, and "step-free" becomes
+  unconfirmed. **Feedback never upgrades anything to step-free**: that promise stays with the map data (the
+  conservative rule from step 3). The explanation says so: "Walkers corrected the map for N parts of this route", and
+  `data_sources` gains `walker_feedback`.
+- The brief said to lower or raise each edge's `confidence`. The score per promise does that job more precisely: a
+  path can be well covered but badly shaded. `ped_edges.confidence` stays what the source data says.
+
+**Feedback travels inside the graph export (field 23)**, not as a separate read: it arrives already filtered to the
+trip's box in the same call, and a plain API read silently stops at 1,000 rows. Older functions ignore the extra field
+(their tuples accept trailing fields, see D26). Since the export can run signed out, the anonymous counts are readable
+by anon too.
+
+**Save as a community route.** After arriving, the walk can be saved through the existing `create_route` with the
+new `routes.origin = 'planned'` (default `'recorded'` for GPS recordings). The line is the planned path actually walked,
+including the parts before any re-plan; stairs, lifts and escalators become checkpoints. It starts unverified like
+every route, and the list labels it "Planned, then walked" so nobody mistakes it for a GPS recording. There's no
+privacy trim (it isn't a GPS trace), but it does start where you started; the form says so and the walker chooses.
+The id is made once per form, so a double tap can't save twice.
+
+**Live check:** three test users each answered 👎 on the sheltered A1 → MMW route. 15 of its 17 covered paths were
+overruled (the 2 indoor ones stayed), covered dropped from 43 % to 25 %, the planner chose a different route and the
+explanation said "Walkers corrected the map for 15 parts of this route". A saved planned route showed up for another
+user as `origin: planned, status: unverified`. All test data was then removed.
+
+**Known limits:** if someone deletes their account, their votes go but the counts aren't recalculated until that path
+gets another vote. A trigger can fix that when "delete my data" (Phase 7) lands. The MCP `apply_migration` call kept
+failing for the export migration ("Invalid or expired requestState"), so it was applied in one transaction with
+`execute_sql` and recorded in `supabase_migrations.schema_migrations` by hand (version 20261016205000).

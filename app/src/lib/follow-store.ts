@@ -4,6 +4,7 @@
  * doesn't survive an app restart.
  */
 import type { LatLng, RoutePosition } from '@scenic/shared';
+import { randomUUID } from 'expo-crypto';
 import { create } from 'zustand';
 
 import type { FollowRoute } from '@/lib/follow-route';
@@ -16,9 +17,18 @@ export type FollowBanner =
 export type FollowSession = {
   /** Changes for every new walk, so the engine starts fresh. */
   id: number;
+  /** Sent with the "was it as promised?" answer, so answering twice updates instead of adding. */
+  walkId: string;
+  startedAt: number;
+  originLabel: string;
   destination: LatLng;
   destinationLabel: string;
   route: FollowRoute;
+  /**
+   * What was walked of earlier routes before a re-plan replaced them (line and, roughly, edges),
+   * so feedback and "Save as a community route" cover the whole walk.
+   */
+  walkedBefore: { line: LatLng[]; edgeIds: number[] };
   /** Where you are (GPS or the demo walker); null until the first fix. */
   here: LatLng | null;
   position: RoutePosition | null;
@@ -45,7 +55,10 @@ export type FollowActions = {
 type FollowState = {
   session: FollowSession | null;
   actions: FollowActions | null;
-  start: (route: FollowRoute, destination: LatLng, destinationLabel: string) => void;
+  start: (
+    route: FollowRoute,
+    places: { originLabel: string; destination: LatLng; destinationLabel: string },
+  ) => void;
   stop: () => void;
   patch: (changes: Partial<FollowSession>) => void;
 };
@@ -53,13 +66,17 @@ type FollowState = {
 export const useFollow = create<FollowState>((set) => ({
   session: null,
   actions: null,
-  start: (route, destination, destinationLabel) =>
+  start: (route, { originLabel, destination, destinationLabel }) =>
     set({
       session: {
         id: Date.now(),
+        walkId: randomUUID(),
+        startedAt: Date.now(),
+        originLabel,
         destination,
         destinationLabel,
         route,
+        walkedBefore: { line: [], edgeIds: [] },
         here: null,
         position: null,
         secondsOff: 0,

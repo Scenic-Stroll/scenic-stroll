@@ -10,8 +10,10 @@
 import {
   ARRIVED_M,
   conditionChangeMessage,
+  edgesUpTo,
   formatHkTime,
   haversineMeters,
+  lineUpTo,
   locateOnRoute,
   missedClosing,
   pointAlong,
@@ -25,7 +27,7 @@ import {
 } from '@scenic/shared';
 import { useCallback, useEffect, useRef } from 'react';
 
-import { bestRouteFor, fromSmartOption, planFrom, type FollowRoute } from '@/lib/follow-route';
+import { bestRouteFor, planFrom, type FollowRoute } from '@/lib/follow-route';
 import { useFollow, useFollowDemo } from '@/lib/follow-store';
 import { clearMyPathReports, reportBlockedPath, subscribeToPathReports } from '@/lib/path-reports';
 
@@ -52,6 +54,25 @@ function replanText(reason: Reason, closing?: ClosingWarning): string {
 }
 
 const session = () => useFollow.getState().session;
+
+/**
+ * The session changes for a new route: what was walked of the old one is kept (for feedback and
+ * "Save as a community route"), the old route's position is dropped.
+ */
+function withNewRoute(next: FollowRoute) {
+  const s = session();
+  if (!s) return {};
+  const walkedLine = lineUpTo(s.route.coordinates, s.position?.alongM ?? 0);
+  return {
+    route: next,
+    walkedBefore: {
+      line: [...s.walkedBefore.line, ...walkedLine],
+      edgeIds: [...s.walkedBefore.edgeIds, ...edgesUpTo(s.route.edgeIds, s.position)],
+    },
+    position: null,
+    secondsOff: 0,
+  };
+}
 
 export function FollowEngine({ conditionMode }: { conditionMode: ConditionMode }) {
   const route = useFollow((s) => s.session?.route);
@@ -83,8 +104,7 @@ export function FollowEngine({ conditionMode }: { conditionMode: ConditionMode }
           preferComputed: reason === 'blocked' || reason === 'reported',
         });
         patch({
-          route: next,
-          secondsOff: 0,
+          ...withNewRoute(next),
           banner: {
             kind: 'notice',
             text: replanText(reason, closing),
@@ -181,11 +201,11 @@ export function FollowEngine({ conditionMode }: { conditionMode: ConditionMode }
         const leftS = now.position
           ? remainingSeconds(now.route.duration_s, now.position)
           : now.route.duration_s;
-        const viaIndoor = best?.explanation.facts.via_indoor;
+        const viaIndoor = best?.option?.explanation.facts.via_indoor;
         const message = conditionChangeMessage({
           from,
           to: conditionMode,
-          candidate: best
+          candidate: best?.profile
             ? {
                 profile: best.profile,
                 duration_s: best.duration_s,
@@ -193,13 +213,13 @@ export function FollowEngine({ conditionMode }: { conditionMode: ConditionMode }
               }
             : null,
           remainingS: leftS,
-          same: best !== null && sameEdges(best.edge_ids, now.route.edgeIds),
+          same: best !== null && sameEdges(best.edgeIds, now.route.edgeIds),
         });
         patch({
           banner: {
             kind: 'weather',
             text: message.text,
-            candidate: message.offerSwitch && best ? fromSmartOption(best) : null,
+            candidate: message.offerSwitch ? best : null,
           },
         });
       },
@@ -241,7 +261,7 @@ export function FollowEngine({ conditionMode }: { conditionMode: ConditionMode }
           const s = session();
           if (s?.banner?.kind !== 'weather' || !s.banner.candidate) return;
           offRoute.current = { since: null };
-          patch({ route: s.banner.candidate, banner: null, secondsOff: 0 });
+          patch({ ...withNewRoute(s.banner.candidate), banner: null });
         },
         stepOffRoute,
       },

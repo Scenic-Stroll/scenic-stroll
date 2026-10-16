@@ -8,11 +8,13 @@
  *   × (1 + rain  × uncovered)      uncovered = 1 when not covered and not indoor
  *   × (1 − ac    × air-conditioned) never below 0.3, so a mall is preferred but not "free"
  *   × (1 + slope × (slope% − 5) / 10) only above 5 %
- *   × (1 − community × confidence)  community-verified edges (none yet; from step 7)
+ *   × (1 − community × score)       walkers' feedback for what this route promises, −1…1
+ *                                   (edge-feedback.ts; 0 without feedback)
  * and for step-free: stairs and escalators are impossible, "unknown" access costs ×3.
  * No language model is involved anywhere here: same inputs, same route, every time.
  */
 import type { ConditionMode } from './conditions.ts';
+import { aspectForProfile } from './edge-feedback.ts';
 import type { RoutingEdge } from './graph-export.ts';
 import { shadeBucket, type ShadeMeta } from './shadows.ts';
 
@@ -151,7 +153,7 @@ export function edgeCost(
   factor *= 1 + w.rain * (sheltered ? 0 : 1);
   factor *= Math.max(0.3, 1 - w.ac * (e.air_conditioned ? 1 : 0));
   if (!HAS_OWN_SPEED.has(e.kind)) factor *= 1 + (w.slope * Math.max(0, e.slope_pct - 5)) / 10;
-  factor *= 1 - w.community * (e.data_source === 'community' ? e.confidence : 0);
+  factor *= 1 - w.community * (e.community?.[aspectForProfile(profile)] ?? 0);
   if (w.stepFree && e.step_free === 'unknown') factor *= 3;
   return edgeTimeS(e) * factor;
 }
