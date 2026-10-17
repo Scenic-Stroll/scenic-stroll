@@ -204,6 +204,14 @@ GRAPH_LOADER_KEY=<key> npm run graph:load   # uploads (~15 s), then switches the
   npm run sync-shared                       # copy into the Edge Functions, then redeploy plan-trip
   ```
 
+  Bus and minibus stops near CityU (multimodal step 3) come from the operators' open data. Rebuild
+  `demo-stops.ts` + `stop-routes.ts` when routes change (first run ~5 min, then cached in
+  `scripts/transit/data/stops-cache/`):
+
+  ```bash
+  npm run transit:stops && npm run sync-shared   # then redeploy eta and plan-trip
+  ```
+
   MTR fares are not in the repo: `plan-trip` loads them into the server-only `mtr_fares` table on first use.
   To refresh them after a fare change, run `delete from public.mtr_fares;` in the SQL editor.
 

@@ -11,6 +11,7 @@
  */
 import { haversineMeters } from '../geo.ts';
 import type { LatLng } from '../schemas.ts';
+import { mtrUsefulDests } from './mtr-lines.ts';
 import { MTR_LINES, MTR_STATIONS } from './mtr-data.ts';
 import type { TransitPlan, TransitPlanLeg } from './transit-plan.ts';
 
@@ -234,6 +235,11 @@ export function planMtrTrips(origin: LatLng, destination: LatLng, limit = 2): Tr
           geometry: r.stations.map((st) => ({ lat: st.lat, lng: st.lng })),
           instruction: `Take the ${r.line.en} towards ${towards(r.line, from, to)} · ${stops} stop${stops === 1 ? '' : 's'} · get off at ${to.en}`,
           realtime: false,
+          boarding: {
+            stop_id: `mtr:${from.code}`,
+            route: r.line.code,
+            dest_codes: mtrUsefulDests(r.line.code, from.code, to.code),
+          },
         });
       });
       legs.push(walkLeg(e.station, destination));

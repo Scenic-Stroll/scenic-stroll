@@ -8,6 +8,7 @@
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import {
   DEMO_CENTER,
+  DEMO_STOPS,
   FILTERS,
   floorsFromCheckpoints,
   haversineMeters,
@@ -62,6 +63,7 @@ import { PlacePicker } from './place-picker';
 import { PlaceSheet } from './place-sheet';
 import { PlanningSheet, STANDARD_OPTION_ID } from './planning-sheet';
 import { ShadeLayer, ShadeLegend } from './shade-layer';
+import { OPERATOR_LABEL } from './stop-arrivals';
 import { profileForMode, type RouteMode } from './route-mode-tabs';
 import { SmartRouteLine } from './smart-route-line';
 import type { TravelMode } from './travel-mode-tabs';
@@ -87,6 +89,8 @@ const DEMO_CAMERA: Camera = {
   zoom: 16.5, // Google Maps
 };
 
+/** Widest map span (degrees) at which transit stop pins are drawn. */
+const STOPS_MAX_SPAN = 0.025;
 const toMap = (p: LatLng): MapLatLng => ({ latitude: p.lat, longitude: p.lng });
 
 export function MapHome() {
@@ -115,10 +119,13 @@ export function MapHome() {
     communityRoutes: true,
     places: true,
     shade: false,
+    transitStops: false,
   });
   // The visible map area, for the "Shade now" layer (only fetched while that layer is on).
   const [mapBox, setMapBox] = useState<{ box: MapBox; span: number } | null>(null);
   const shadeZoomedOut = (mapBox?.span ?? 1) > SHADE_MAX_SPAN;
+  /** ~180 stop pins are only readable close up; hide them when zoomed out. */
+  const stopsZoomedOut = (mapBox?.span ?? 1) > STOPS_MAX_SPAN;
   const shadeLayer = useShadeLayer(layers.shade && !shadeZoomedOut, mapBox?.box ?? null);
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
   /** The place card being shown (landmark, search result or dropped pin). */
@@ -501,6 +508,33 @@ export function MapHome() {
               </Marker>
             ))
           : null}
+        {layers.transitStops && !stopsZoomedOut
+          ? DEMO_STOPS.map((stop) => (
+              <Marker
+                key={stop.id}
+                coordinate={toMap(stop)}
+                accessibilityLabel={`${OPERATOR_LABEL[stop.operator].en}: ${stop.name_en}`}
+                tracksViewChanges={false}
+                // Tapping a stop opens its card with live arrivals (stop-arrivals.tsx).
+                onPress={() =>
+                  openPlace({
+                    label: stop.name_en,
+                    point: { lat: stop.lat, lng: stop.lng },
+                    stopId: stop.id,
+                  })
+                }
+              >
+                <View
+                  style={[
+                    styles.stopDot,
+                    { backgroundColor: t.background, borderColor: t.textPrimary },
+                  ]}
+                >
+                  <Icon name={OPERATOR_LABEL[stop.operator].icon} size={12} color={t.textPrimary} />
+                </View>
+              </Marker>
+            ))
+          : null}
         {visibleCheckpoints.map((c) => (
           <Marker
             key={`cp-${c.id}`}
@@ -804,6 +838,14 @@ const styles = StyleSheet.create({
   },
   controls: { alignItems: 'flex-end', paddingHorizontal: space.lg, marginTop: space.sm },
   placeDot: { width: 14, height: 14, borderRadius: 7, borderWidth: 3 },
+  stopDot: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   friendMarker: { padding: 2, borderRadius: radius.round, borderWidth: 3 },
   checkpointDot: {
     width: 30,

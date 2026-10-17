@@ -674,3 +674,60 @@ cold; the app shows the walking option first from its own route call, so the scr
 
 **Deployment note:** as in D31, the deployed bundle uses trimmed copies of `schemas.ts`, `api.ts`, `presets.ts`,
 `conditions.ts` and `routing-profiles.ts` (only what runs). `sync-shared` now copies sub-folders (`transit/`).
+
+### D33 · Multimodal step 3: real-time arrivals and stop cards (2026-10-18)
+
+**Sources (all checked live on 2026-10-18; DATA.GOV.HK terms: free to reuse, with attribution — credited in
+Profile → About).** No keys needed; none publishes a hard rate limit, so we cache every answer for 30 s in
+`public.api_cache` (everyone looking at a stop shares one call) and log calls in `public.api_calls` with a
+20,000/day cap per operator so a bug can't hammer them.
+
+| Operator       | Endpoint                                                     | Notes                                                                                        |
+| -------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| MTR Next Train | `rt.data.gov.hk/v1/transport/mtr/getSchedule.php?line=&sta=` | one call per line at a station; times are local HK time with no zone; `dest` = terminus code |
+| KMB/LWB        | `data.etabus.gov.hk/v1/transport/kmb/stop-eta/{stop}`        | all routes at a stop in one call; "Scheduled Bus" remark = timetable, shown as _Scheduled_   |
+| Citybus        | `rt.data.gov.hk/v2/transport/citybus/eta/CTB/{stop}/{route}` | one call **per route** — no "all routes at a stop" call                                      |
+| Green minibus  | `data.etagmb.gov.hk/eta/stop/{stop_id}`                      | routes come back as internal ids, so we keep an id → number/destination table                |
+
+**Which stops.** `npm run transit:stops` builds the stops inside our walking graph's area: 69 KMB, 65 minibus,
+41 Citybus stops and 2 MTR stations (177). KMB has an all-stops list with positions; minibus and Citybus don't,
+so the script walks every Kowloon minibus route and every Citybus route (~5,000 small requests the first time,
+cached on disk). It writes two files: `demo-stops.ts` (names, positions, routes — for the app's map and stop
+card, 37 KB) and `stop-routes.ts` (only Citybus routes per stop and the minibus route table — for the Edge
+Functions, 5 KB). The split is about deployment: function bundles are pasted through the Supabase connector
+here, and the full list would have doubled them. MTR stations work anywhere in Hong Kong, because Next Train
+covers every heavy-rail station.
+
+**Brief's data model vs ours.** The brief suggests `transit_stops` and `transit_eta_cache` tables. Stops change
+a few times a year, so they live in generated, reviewable code like `mtr-data.ts` (rebuild with the script);
+ETAs use the existing `api_cache` (same 30 s TTL the brief asks for). No new table, so no new RLS surface.
+
+**Live departures in trips.** For each transit option, plan-trip looks up the **first** boarding stop
+(`TripLeg.boarding`: stop id, line, and for MTR the termini that actually stop at our station —
+`mtrUsefulDests`, so a Kwun Tong Line train ending at Whampoa is never offered for Tiu Keng Leng, and both
+Lo Wu and Lok Ma Chau trains count for Sha Tin). It takes the first departure at or after the moment you reach
+the stop + 60 s (`BOARDING_BUFFER_S`), so if you'd miss the next train it uses the one after, and shifts the
+rest of the trip (`withLiveDepartures`, 3 tests). Later changes of line keep the estimated wait: we don't model
+the walk between platforms well enough to promise a specific connection. Trips planned more than 20 min ahead
+keep scheduled/estimated waits (live lists don't reach that far). The card shows "Kwun Tong Line from Kowloon
+Tong at 08:23 · then 08:27, 08:31 (live)" and "Next departure is live · ride time estimated from distance".
+Google transit rides are matched to MTR stations by name (`mtrBoarding`), so they'll get live trains too once
+the key is set; Google _bus_ rides keep Google's scheduled times for now (matching a Google stop to an
+operator's stop id reliably needs more than names), but every nearby bus/minibus stop has live arrivals in its
+stop card.
+
+**Live check (04:28 HK, before the first trains):** CityU → Mong Kok boarded the southbound Kwun Tong Line at
+Kowloon Tong at 06:04 (Whampoa trains only); CityU → TST/HKU took the southbound East Rail at 05:45, correctly
+skipping the 05:29 Lok Ma Chau train; CUHK took that northbound 05:29. The honest result at that hour is a long
+wait, and the card says when the first train is. `eta` answers in 1–2 s (6 s cold for a station with two
+lines), 0.25 s from the cache. Bus stops returned no arrivals at that hour, as expected.
+
+**App.** Map → Layers → _Transit stops_ draws the 177 stops (only when zoomed in, so the map stays readable).
+Tapping one opens a stop card: name in English and Chinese, operator, routes, next arrivals per route and
+direction as minutes ("3 min · 11 min"), _Live_ or _Scheduled_, platform for MTR, "Updated 12 s ago", refreshed
+every 30 s, plus "Route here / Route from here". Step-free access is shown as _unconfirmed_: no operator feed
+says whether a stop is step-free, and we don't guess.
+
+**Deployment note:** the `eta` and `plan-trip` bundles were pasted comment-stripped (checked with `deno check`
+first). plan-trip's copy of `stop-routes.ts` has an empty minibus table because plan-trip only looks up MTR
+departures; the `eta` function has the full table.

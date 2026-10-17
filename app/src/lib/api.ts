@@ -11,6 +11,7 @@ import {
   PlanRouteResponseSchema,
   PlanTripResponseSchema,
   SmartRouteResponseSchema,
+  StopEtaResponseSchema,
   type Conditions,
   type FunctionHealth,
   type FunctionName,
@@ -21,6 +22,7 @@ import {
   type PlanTripResponse,
   type SmartRouteRequest,
   type SmartRouteResponse,
+  type StopEtaResponse,
 } from '@scenic/shared';
 import {
   FunctionsFetchError,
@@ -172,12 +174,21 @@ export function smartRoute(request: SmartRouteRequest): Promise<SmartRouteRespon
   );
 }
 
-/** Walk + car (later transit, taxi) in one comparable list — multimodal step 1. */
+/** Walk, car and public transport in one comparable list (multimodal steps 1–3). */
 export function planTrip(request: PlanTripRequest): Promise<PlanTripResponse> {
   return callFunction(
     FUNCTIONS.planTrip,
     { method: 'POST', body: request as Record<string, unknown> },
     PlanTripResponseSchema,
+  );
+}
+
+/** Live arrivals at one bus/minibus stop or MTR station (multimodal step 3, cached 30 s). */
+export function fetchStopEta(stopId: string): Promise<StopEtaResponse> {
+  return callFunction(
+    FUNCTIONS.eta,
+    { method: 'POST', body: { stop_id: stopId } },
+    StopEtaResponseSchema,
   );
 }
 

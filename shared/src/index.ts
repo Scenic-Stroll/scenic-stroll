@@ -30,3 +30,6 @@ export * from './shadows.ts';
 export * from './trip-schema.ts';
 export * from './emissions.ts';
 export * from './trip-plan.ts';
+export * from './transit/eta-schema.ts';
+export * from './transit/demo-stops.ts';
+export * from './transit/stops.ts';

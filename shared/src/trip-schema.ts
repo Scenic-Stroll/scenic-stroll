@@ -45,6 +45,20 @@ export const TripLegSchema = z.object({
   from_name: z.string().nullable().optional(),
   to_name: z.string().nullable().optional(),
   stops: z.number().int().nonnegative().nullable().optional(),
+  /**
+   * Transit: where to board, for live arrivals and the stop card. `dest_codes` (MTR) = termini of
+   * trains that go our way.
+   */
+  boarding: z
+    .object({
+      stop_id: z.string(),
+      route: z.string(),
+      dest_codes: z.array(z.string()).nullable().optional(),
+    })
+    .nullable()
+    .optional(),
+  /** Transit with live data: the next few departures you can still catch (ISO). */
+  live_departures: z.array(z.string()).optional(),
   depart_at: z.string(),
   arrive_at: z.string(),
   /** true = times from a live feed (traffic now, real-time ETA). */
@@ -97,6 +111,8 @@ export const TripOptionSchema = z.object({
   estimated: z.array(z.string()),
   /** Where it came from: 'walking-graph', 'google', 'ors'. */
   source: z.string(),
+  /** When live departure times were read (ISO), if this option uses any. */
+  eta_at: z.string().nullable().optional(),
 });
 export type TripOption = z.infer<typeof TripOptionSchema>;
 
@@ -117,6 +133,10 @@ export const PlanTripResponseSchema = z.object({
   /** Modes that gave nothing, and why (shown as a quiet note, never an error). */
   unavailable: z.array(z.object({ mode: z.enum(TRIP_MODES), reason: z.string() })),
   condition: ConditionModeSchema,
-  data_freshness: z.object({ traffic_at: z.string().nullable() }),
+  data_freshness: z.object({
+    traffic_at: z.string().nullable(),
+    /** When live transit departures were read; null = none used (times are estimates). */
+    eta_at: z.string().nullable().default(null),
+  }),
 });
 export type PlanTripResponse = z.infer<typeof PlanTripResponseSchema>;

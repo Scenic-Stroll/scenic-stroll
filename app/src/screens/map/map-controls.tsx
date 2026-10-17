@@ -17,6 +17,8 @@ export type MapLayers = {
   places: boolean;
   /** "Shade now": paths coloured by estimated shade at this half hour (smart routing step 8). */
   shade: boolean;
+  /** Bus, minibus and MTR stops near CityU; tap one for live arrivals (multimodal step 3). */
+  transitStops: boolean;
 };
 
 export function MapControls({
@@ -46,7 +48,7 @@ export function MapControls({
         icon="layers-outline"
         accessibilityLabel="Map layers"
         onPress={() => setMenuOpen(true)}
-        active={layers.threeD || layers.shade}
+        active={layers.threeD || layers.shade || layers.transitStops}
       />
       <LayersMenu
         visible={menuOpen}
@@ -116,6 +118,12 @@ function LayersMenu({
             title="Shade now"
             subtitle="Paths in sun or shade right now (estimated from buildings, trees and the sun)"
             right={toggle('shade', 'Shade now')}
+          />
+          <ListRow
+            icon="bus-stop"
+            title="Transit stops"
+            subtitle="Bus, minibus and MTR stops near CityU — tap one for live arrivals"
+            right={toggle('transitStops', 'Transit stops')}
           />
         </Pressable>
       </Pressable>

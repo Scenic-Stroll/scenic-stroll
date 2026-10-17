@@ -85,6 +85,11 @@ Deno.test('Google transit: walks merged, ride with wait, line colour and fare', 
     ride.instruction,
     'Take train EAL towards Admiralty · 4 stops · get off at Admiralty',
   );
+  // Matched to our MTR data, so plan-trip can fetch the live next train at Kowloon Tong.
+  assertEquals(ride.boarding?.stop_id, 'mtr:KOT');
+  assertEquals(ride.boarding?.route, 'EAL');
+  assertEquals(ride.boarding?.dest_codes?.includes('ADM'), true);
+  assertEquals(ride.boarding?.dest_codes?.includes('LOW'), false);
 });
 
 Deno.test('Google transit: a route without any ride is ignored', () => {

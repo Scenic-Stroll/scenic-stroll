@@ -9,6 +9,7 @@ import {
   PRESET_KIND_TYPE,
   PRESETS,
   TAXONOMY,
+  findStop,
   isTag,
   type CommunityRoute,
 } from '@scenic/shared';
@@ -20,6 +21,7 @@ import { PrimaryButton } from '@/components/ui/primary-button';
 import { useSavedPlaces } from '@/lib/saved-places-store';
 import { radius, space, TAP_TARGET, type, useAppTheme } from '@/theme';
 
+import { OPERATOR_LABEL, StopArrivals } from './stop-arrivals';
 import { placeId, type Place } from './types';
 
 /** Community routes that end within this distance count as "routes to this place". */
@@ -42,6 +44,7 @@ export function PlaceSheet({
 }) {
   const t = useAppTheme();
   const preset = place.presetId ? PRESETS.find((p) => p.id === place.presetId) : undefined;
+  const stop = place.stopId ? findStop(place.stopId) : null;
   const id = placeId(place);
   const saved = useSavedPlaces((s) => s.places.some((p) => p.id === id));
   const toggleSaved = useSavedPlaces((s) => s.toggle);
@@ -49,13 +52,17 @@ export function PlaceSheet({
   const typeLabel =
     place.kind === 'friend'
       ? 'Friend · live location'
-      : preset
-        ? `${PRESET_KIND_TYPE[preset.kind].en} · ${PRESET_KIND_TYPE[preset.kind].zh}`
-        : place.label === 'Dropped pin'
-          ? 'Dropped pin'
-          : 'Place';
+      : stop
+        ? `${OPERATOR_LABEL[stop.operator].en} · ${OPERATOR_LABEL[stop.operator].zh}`
+        : preset
+          ? `${PRESET_KIND_TYPE[preset.kind].en} · ${PRESET_KIND_TYPE[preset.kind].zh}`
+          : place.label === 'Dropped pin'
+            ? 'Dropped pin'
+            : 'Place';
   const exits =
-    preset?.kind === 'mtr_exit' ? [] : nearestPresets(place.point, { kind: 'mtr_exit', limit: 3 });
+    preset?.kind === 'mtr_exit' || stop
+      ? []
+      : nearestPresets(place.point, { kind: 'mtr_exit', limit: 3 });
   const arriving = communityRoutes.filter(
     (r) => haversineMeters(r.line.at(-1)!, place.point) <= ARRIVING_METERS,
   );
@@ -75,6 +82,9 @@ export function PlaceSheet({
             {place.label}
           </Text>
           {preset ? <Text style={[type.body, { color: t.textSecondary }]}>{preset.zh}</Text> : null}
+          {stop ? (
+            <Text style={[type.body, { color: t.textSecondary }]}>{stop.name_zh}</Text>
+          ) : null}
           <Text style={[type.small, { color: t.textSecondary }]}>{typeLabel}</Text>
           {place.note ? (
             <Text style={[type.small, { color: t.textSecondary }]}>{place.note}</Text>
@@ -105,6 +115,9 @@ export function PlaceSheet({
         />
         <Action icon="share-variant-outline" label="Share" onPress={() => void share()} />
       </View>
+
+      {/* Stop card: routes + live arrivals */}
+      {place.stopId ? <StopArrivals stopId={place.stopId} /> : null}
 
       {/* Nearest MTR exits */}
       {exits.length > 0 ? (

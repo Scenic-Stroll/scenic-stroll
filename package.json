@@ -18,7 +18,7 @@
     "deploy:functions": "npm run sync-shared && npx supabase functions deploy --use-api",
     "test:functions": "npm run sync-shared && npx -y deno test --config supabase/functions/plan-trip/deno.json \"supabase/functions/**/*.test.ts\"",
     "test:db": "node --test supabase/tests/database.test.mjs",
-    "typecheck:functions": "npm run sync-shared && npx -y deno check --config supabase/functions/plan-route/deno.json supabase/functions/plan-route/index.ts && npx -y deno check --config supabase/functions/geocode/deno.json supabase/functions/geocode/index.ts && npx -y deno check --config supabase/functions/conditions/deno.json supabase/functions/conditions/index.ts && npx -y deno check --config supabase/functions/smart-route/deno.json supabase/functions/smart-route/index.ts && npx -y deno check --config supabase/functions/plan-trip/deno.json supabase/functions/plan-trip/index.ts",
+    "typecheck:functions": "npm run sync-shared && npx -y deno check --config supabase/functions/plan-route/deno.json supabase/functions/plan-route/index.ts && npx -y deno check --config supabase/functions/geocode/deno.json supabase/functions/geocode/index.ts && npx -y deno check --config supabase/functions/conditions/deno.json supabase/functions/conditions/index.ts && npx -y deno check --config supabase/functions/smart-route/deno.json supabase/functions/smart-route/index.ts && npx -y deno check --config supabase/functions/plan-trip/deno.json supabase/functions/plan-trip/index.ts && npx -y deno check --config supabase/functions/eta/deno.json supabase/functions/eta/index.ts",
     "smoke:routing": "node scripts/smoke-routing.mjs",
     "graph:download": "node scripts/graph/download-3dpn.mts",
     "graph:build": "node scripts/graph/build-graph.mts",
@@ -30,7 +30,8 @@
     "graph:load-shade": "node scripts/graph/load-shade.mts",
     "eval:routing": "node eval/routing/run.mts",
     "demo:snapshot": "node scripts/demo/snapshot-smart-routes.mjs",
-    "transit:build": "node scripts/transit/build-mtr.mts"
+    "transit:build": "node scripts/transit/build-mtr.mts",
+    "transit:stops": "node scripts/transit/build-stops.mts"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",

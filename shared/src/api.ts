@@ -77,6 +77,7 @@ export const FUNCTIONS = {
   conditions: 'conditions',
   smartRoute: 'smart-route',
   planTrip: 'plan-trip',
+  eta: 'eta',
 } as const;
 export type FunctionName = (typeof FUNCTIONS)[keyof typeof FUNCTIONS];
 

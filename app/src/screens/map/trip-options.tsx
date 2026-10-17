@@ -44,12 +44,21 @@ function costText(o: TripOption): string {
 /** Plain words for what's estimated on a card, so nothing looks more certain than it is. */
 function estimateNotes(o: TripOption): string[] {
   const notes: string[] = [];
+  const liveWait = o.legs.some((l) => l.live_departures && l.live_departures.length > 0);
   if (o.estimated.includes('transit_times')) {
-    notes.push(
-      o.source === 'mtr-open-data'
-        ? 'Train times estimated from distance (MTR open data) — not live'
-        : 'Scheduled times — not live',
-    );
+    if (liveWait) {
+      notes.push(
+        o.source === 'mtr-open-data'
+          ? 'Next departure is live · ride time estimated from distance'
+          : 'Next departure is live · ride time from the timetable',
+      );
+    } else {
+      notes.push(
+        o.source === 'mtr-open-data'
+          ? 'Train times estimated from distance (MTR open data) — not live'
+          : 'Scheduled times — not live',
+      );
+    }
   }
   if (o.estimated.includes('walk_legs')) notes.push('Walks to and from stations are estimates');
   return notes;
@@ -151,6 +160,7 @@ function TripCard({
           Typical traffic — live traffic isn’t available right now
         </Text>
       ) : null}
+      <LiveDeparture option={o} />
       {estimateNotes(o).map((n) => (
         <Text key={n} style={[type.caption, { color: t.textSecondary }]}>
           {n}
@@ -168,6 +178,28 @@ function TripCard({
         </Text>
       ) : null}
     </Pressable>
+  );
+}
+
+/**
+ * "Kwun Tong Line from Kowloon Tong 08:23 · then 08:27 (live)" — the train or bus this trip
+ * counts on, and the next ones in case you miss it.
+ */
+function LiveDeparture({ option: o }: { option: TripOption }) {
+  const t = useAppTheme();
+  const leg = o.legs.find((l) => l.live_departures && l.live_departures.length > 0);
+  if (!leg) return null;
+  const [first, ...later] = leg.live_departures!;
+  return (
+    <View style={styles.liveLine}>
+      <View style={[styles.live, { backgroundColor: t.primary }]} />
+      <Text style={[type.caption, styles.flex1, { color: t.textPrimary }]}>
+        {leg.route_name ?? 'Next'}
+        {leg.from_name ? ` from ${leg.from_name}` : ''} at {formatHkTime(first!)}
+        {later.length > 0 ? ` · then ${later.map(formatHkTime).join(', ')}` : ''}
+        {leg.realtime ? ' (live)' : ' (scheduled)'}
+      </Text>
+    </View>
   );
 }
 
@@ -219,6 +251,9 @@ export function TripOptions({
         CO₂ is an estimate (car: average petrol car, one person; MTR and buses per passenger). Car
         times
         {plan.data_freshness.traffic_at ? ' use live traffic' : ' are typical, not live'}.
+        {plan.data_freshness.eta_at
+          ? ` Live departures checked at ${formatHkTime(plan.data_freshness.eta_at)}.`
+          : ''}
       </Text>
     </View>
   );
@@ -226,6 +261,7 @@ export function TripOptions({
 
 const styles = StyleSheet.create({
   list: { gap: space.md },
+  liveLine: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
   card: { borderRadius: radius.md, borderWidth: 2, padding: space.md, gap: space.sm },
   nudge: {
     flexDirection: 'row',

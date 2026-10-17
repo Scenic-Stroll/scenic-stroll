@@ -15,6 +15,7 @@ import { withSupabase } from '@supabase/server';
 
 import { budgetedCall, BudgetError, cacheKey } from '../_shared/api-budget.ts';
 import { googleDrive, orsDrive } from '../_shared/drive.ts';
+import { stopEta } from '../_shared/eta-fetch.ts';
 import { googleTransit } from '../_shared/transit-google.ts';
 import { errorResponse, json, readBody } from '../_shared/http.ts';
 import { getRoutingProvider } from '../_shared/routing/index.ts';
@@ -28,6 +29,7 @@ import {
   type SmartRouteResponse,
 } from '../_shared/scenic/smart-route-api.ts';
 import { MTR_FARES_CSV_URL, parseMtrFaresCsv } from '../_shared/scenic/transit/mtr-fares.ts';
+import { arrivalsForLeg, withLiveDepartures } from '../_shared/scenic/transit/live-departures.ts';
 import { planMtrTrips } from '../_shared/scenic/transit/mtr-planner.ts';
 import {
   transitTripFromPlan,
@@ -48,6 +50,8 @@ import {
 
 /** The whole request should answer within ~4 s (brief); each part gets this long. */
 const PART_TIMEOUT_MS = 4_000;
+/** Live arrival lists only reach ~20 min ahead; for later trips we keep scheduled/estimated waits. */
+const LIVE_ETA_WINDOW_MS = 20 * 60_000;
 /** Paid Google calls per day before we fall back to the free provider. Override with the secret. */
 const DEFAULT_GOOGLE_DAILY_CAP = 300;
 
@@ -244,7 +248,7 @@ export default {
       const trips = plans.slice(0, 3).map((p) => transitTripFromPlan(p, departAt));
       // Walking legs inside our walking graph -> our computed walks (the 2 best options only, to
       // keep the request quick). If that fails the estimated walk stays, labelled as such.
-      return await Promise.all(
+      const withWalks = await Promise.all(
         trips.map(async (t, i) => {
           if (i >= 2) return t;
           const walks = new Map<number, SmartRouteOption>();
@@ -268,6 +272,36 @@ export default {
           return allOurs
             ? { ...improved, estimated: improved.estimated.filter((e) => e !== 'walk_legs') }
             : improved;
+        }),
+      );
+      return await withLiveEtas(withWalks);
+    };
+
+    // ---- live departures (MTR Next Train, KMB, Citybus, GMB) at each option's first stop --------
+    // Only the first boarding: at a change of line we don't model the walk between platforms well
+    // enough to promise a particular train. One call per stop, shared by all options (and cached
+    // 30 s for everyone). If it fails the estimated wait stays, labelled as such.
+    const withLiveEtas = async (trips: TripOption[]): Promise<TripOption[]> => {
+      if (departAt.getTime() > Date.now() + LIVE_ETA_WINDOW_MS) return trips;
+      const calls = new Map<string, ReturnType<typeof stopEta>>();
+      const etaFor = (stopId: string) => {
+        if (!calls.has(stopId)) {
+          calls.set(stopId, stopEta(ctx.supabaseAdmin, stopId, AbortSignal.timeout(2_500)));
+        }
+        return calls.get(stopId)!;
+      };
+      return await Promise.all(
+        trips.map(async (t) => {
+          const i = t.legs.findIndex((l) => l.mode === 'transit');
+          const boarding = t.legs[i]?.boarding;
+          if (!boarding) return t;
+          const eta = await etaFor(boarding.stop_id);
+          if (!eta || eta.status !== 'live') return t;
+          return withLiveDepartures(
+            t,
+            new Map([[i, arrivalsForLeg(eta.arrivals, boarding)]]),
+            eta.fetched_at,
+          );
         }),
       );
     };
@@ -312,7 +346,10 @@ export default {
         options: rankTrips(options, condition),
         unavailable,
         condition,
-        data_freshness: { traffic_at: trafficAt },
+        data_freshness: {
+          traffic_at: trafficAt,
+          eta_at: options.map((o) => o.eta_at ?? null).find((at) => at !== null) ?? null,
+        },
       }),
     );
   }),

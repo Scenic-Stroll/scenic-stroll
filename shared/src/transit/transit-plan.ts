@@ -37,6 +37,8 @@ export type TransitPlanLeg =
       geometry: LatLng[];
       instruction: string;
       realtime: boolean;
+      /** Where to board, for live arrivals (see TripLeg.boarding). */
+      boarding?: { stop_id: string; route: string; dest_codes?: string[] | null } | null;
     };
 
 export type TransitPlan = {
@@ -83,6 +85,7 @@ export function transitTripFromPlan(plan: TransitPlan, departAt: Date): TripOpti
       from_name: l.from_name,
       to_name: l.to_name,
       stops: l.stops,
+      boarding: l.boarding ?? null,
       depart_at: iso(start),
       arrive_at: iso(clock),
       realtime: l.realtime,

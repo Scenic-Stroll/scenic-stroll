@@ -4,6 +4,7 @@
 // Docs: https://developers.google.com/maps/documentation/routes/transit-route (checked 2026-10-18)
 import { decodePolyline } from './scenic/geo.ts';
 import type { LatLng } from './scenic/schemas.ts';
+import { mtrBoarding } from './scenic/transit/mtr-lines.ts';
 import type { TransitPlan, TransitPlanLeg } from './scenic/transit/transit-plan.ts';
 
 const seconds = (d: unknown) => Number.parseFloat(String(d ?? '0').replace('s', '')) || 0;
@@ -65,7 +66,12 @@ export function parseGoogleTransit(json: any, departAt: Date): TransitPlan[] {
           distance_m: distance,
           geometry: geometry.length >= 2 ? geometry : [],
           instruction: `Take ${vehicle.toLowerCase()} ${name}${td.headsign ? ` towards ${td.headsign}` : ''} · ${stops} stop${stops === 1 ? '' : 's'} · get off at ${to}`,
-          realtime: false, // Google gives scheduled times; real-time ETAs come from operators (step 3)
+          realtime: false, // Google gives scheduled times; plan-trip adds operators' live ETAs
+          // MTR rides: matched to our station list so plan-trip can fetch the live next train.
+          // (Bus rides keep Google's scheduled times; stop cards show live bus arrivals.)
+          boarding: RAIL.has(type)
+            ? mtrBoarding(name, String(td?.stopDetails?.departureStop?.name ?? ''), to)
+            : null,
         });
         clock += (waitS + rideS) * 1000;
         continue;

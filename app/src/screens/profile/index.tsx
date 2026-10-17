@@ -374,6 +374,11 @@ export function ProfileScreen() {
             title="Public transport"
             subtitle="MTR lines, stations and fares © MTR Corporation · via DATA.GOV.HK · station positions © OpenStreetMap contributors (ODbL) · Google Maps Platform (when enabled)"
           />
+          <ListRow
+            icon="clock-fast"
+            title="Live arrivals"
+            subtitle="MTR Next Train, KMB/LWB, Citybus and green minibus (Transport Department) real-time data · via DATA.GOV.HK"
+          />
         </Section>
       </ScrollView>
 
