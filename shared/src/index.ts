@@ -33,3 +33,4 @@ export * from './trip-plan.ts';
 export * from './transit/eta-schema.ts';
 export * from './transit/demo-stops.ts';
 export * from './transit/stops.ts';
+export * from './taxi-fare.ts';

@@ -375,6 +375,11 @@ export function ProfileScreen() {
             subtitle="MTR lines, stations and fares © MTR Corporation · via DATA.GOV.HK · station positions © OpenStreetMap contributors (ODbL) · Google Maps Platform (when enabled)"
           />
           <ListRow
+            icon="taxi"
+            title="Taxi fares"
+            subtitle="Urban taxi meter tariff (from 14 July 2024) · Transport Department, HKSAR Government"
+          />
+          <ListRow
             icon="clock-fast"
             title="Live arrivals"
             subtitle="MTR Next Train, KMB/LWB, Citybus and green minibus (Transport Department) real-time data · via DATA.GOV.HK"

@@ -1,12 +1,15 @@
 // POST /functions/v1/plan-trip  { origin, destination, depart_at?, modes?, condition? }
 // → { options: TripOption[] (best for you first), unavailable, condition, data_freshness }
-// Multimodal steps 1–2: walk, car and public transport, in one comparable shape (trip-schema.ts).
+// Multimodal steps 1–4: walk, car, public transport and taxi, in one comparable shape (trip-schema.ts).
 //   * walk: our own computed routes (the smart-route function — shade, cover, step-free) inside the
 //     walking graph's area; the standard street walk elsewhere
 //   * car: Google Routes with live traffic when GOOGLE_ROUTES_API_KEY is set (cached 3 min, daily
 //     cap), else OpenRouteService with typical times
 //   * transit: Google Routes TRANSIT (with the key), else our own MTR planner from MTR open data;
-//     walking legs to/from stations inside our walking graph are swapped for our computed walks
+//     walking legs to/from stations inside our walking graph are swapped for our computed walks,
+//     and the first train gets the live MTR departure time (step 3)
+//   * taxi: the quickest driving route priced with the official taxi meter (taxi-fare.ts) — no
+//     extra API call
 // Each part has its own fallback and a time limit; a failed mode is listed in `unavailable`, never
 // an error. No language model anywhere in here.
 //
@@ -42,6 +45,7 @@ import {
   walkTripFromSmart,
   walkTripFromStandard,
 } from '../_shared/scenic/trip-plan.ts';
+import { taxiTripFromDrive } from '../_shared/scenic/taxi-fare.ts';
 import {
   PlanTripRequestSchema,
   PlanTripResponseSchema,
@@ -125,7 +129,12 @@ export default {
     };
 
     // ---- car -------------------------------------------------------------------------------
-    const car = async (): Promise<{ trips: TripOption[]; live: boolean }> => {
+    // Also gives the taxi option: same route, priced by the meter.
+    const car = async (): Promise<{
+      trips: TripOption[];
+      taxi: TripOption | null;
+      live: boolean;
+    }> => {
       const googleKey = env('GOOGLE_ROUTES_API_KEY');
       const admin = ctx.supabaseAdmin;
       if (googleKey) {
@@ -147,7 +156,11 @@ export default {
                 AbortSignal.timeout(PART_TIMEOUT_MS),
               ),
           );
-          return { trips: carTripsFromDrive(value, departAt, 'google'), live: true };
+          return {
+            trips: carTripsFromDrive(value, departAt, 'google'),
+            taxi: taxiTripFromDrive(value, departAt, 'google'),
+            live: true,
+          };
         } catch (err) {
           console.warn(
             err instanceof BudgetError ? err.message : 'plan-trip: Google drive failed',
@@ -167,7 +180,11 @@ export default {
         },
         () => orsDrive(orsKey, q.origin, q.destination, AbortSignal.timeout(PART_TIMEOUT_MS)),
       );
-      return { trips: carTripsFromDrive(value, departAt, 'ors'), live: false };
+      return {
+        trips: carTripsFromDrive(value, departAt, 'ors'),
+        taxi: taxiTripFromDrive(value, departAt, 'ors'),
+        live: false,
+      };
     };
 
     // ---- MTR fares (our planner) from public.mtr_fares, filled from MTR's CSV on first use ----
@@ -308,7 +325,7 @@ export default {
 
     const [walkResult, carResult, transitResult] = await Promise.allSettled([
       q.modes.includes('walk') ? walk() : Promise.resolve(null),
-      q.modes.includes('car') ? car() : Promise.resolve(null),
+      q.modes.includes('car') || q.modes.includes('taxi') ? car() : Promise.resolve(null),
       q.modes.includes('transit') ? transit() : Promise.resolve(null),
     ]);
 
@@ -322,10 +339,15 @@ export default {
     }
     let trafficAt: string | null = null;
     if (carResult.status === 'fulfilled' && carResult.value) {
-      options.push(...carResult.value.trips);
+      if (q.modes.includes('car')) options.push(...carResult.value.trips);
+      if (q.modes.includes('taxi') && carResult.value.taxi) options.push(carResult.value.taxi);
       if (carResult.value.live) trafficAt = new Date().toISOString();
     } else if (carResult.status === 'rejected') {
-      unavailable.push({ mode: 'car', reason: 'Driving routes unavailable right now' });
+      for (const mode of ['car', 'taxi'] as const) {
+        if (q.modes.includes(mode)) {
+          unavailable.push({ mode, reason: 'Driving routes unavailable right now' });
+        }
+      }
     }
 
     if (transitResult.status === 'fulfilled' && transitResult.value) {

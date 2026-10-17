@@ -731,3 +731,33 @@ says whether a stop is step-free, and we don't guess.
 **Deployment note:** the `eta` and `plan-trip` bundles were pasted comment-stripped (checked with `deno check`
 first). plan-trip's copy of `stop-routes.ts` has an empty minibus table because plan-trip only looks up MTR
 departures; the `eta` function has the full table.
+
+### D34 · Multimodal step 4: taxi option, fare estimate, sorting (2026-10-18)
+
+**Tariff (verified 2026-10-18).** Transport Department, "Taxi Fare of Hong Kong", urban (red) taxis, in force
+from 14 July 2024: HK$29 for the first 2 km; then HK$2.1 for every 200 m **or** every minute waiting, until the
+fare reaches HK$102.5; after that HK$1.4 per 200 m or minute. Extras (not in our estimate, said on the card):
+tunnel/bridge tolls (e.g. cross-harbour HK$25 + return toll), HK$6 per piece of luggage, HK$5 phone booking.
+Source in `shared/src/taxi-fare.ts`; credited in Profile → About. We only price urban taxis: the demo area is
+urban Kowloon (NT green and Lantau blue taxis have other tariffs).
+
+**Fare range, not a price.** `taxiMeterFare` simulates the meter jump by jump in 10-cent units (adding 2.1 in
+floating point 35 times can land just under the threshold and charge one jump at the wrong rate — a unit test
+pins 102.5 → 103.9). Low = distance only; high = distance + waiting minutes, taken from the live traffic delay
+when Google is on, else 15 % of the trip time (our allowance for lights and queues). Card: "HK$63–67 (meter)",
+"Fare from the official taxi meter — tunnel tolls and luggage extra". `cost_hkd` is the low end, so "Cheapest"
+and sorting stay simple numbers; `cost_range_hkd` carries the range.
+
+**Same route as the car, no extra API call.** The taxi uses the quickest driving route plus **3 min to get a
+taxi** (`TAXI_PICKUP_S`, our assumption, labelled "Includes ~3 min to get a taxi (estimate)") — otherwise a
+taxi would look exactly as quick as your own car. CO₂: the car's per-vehicle-km factor (HK taxis run on LPG; we
+don't have a sourced HK LPG-taxi factor, so we reuse the labelled car estimate rather than invent one). The
+green nudge already compares walking/transit with the quickest of car _or_ taxi.
+
+**Sorting.** Chips above the list: Best for you (server order) · Fastest · Cheapest · Greenest · Least walking,
+using the shared `sortTrips` (already unit-tested in step 1). Labels (Fastest, Cheapest, Greenest, Least walking,
+Most sheltered, Step-free, Avoids traffic) and the green nudge came in step 1 and now include taxis. A Taxi tab
+joins Walk · All · Transit · Car.
+
+**Live check (04:50 HK, ORS typical traffic):** CityU → Mong Kok taxi 11 min, HK$37–42; → TST 15 min, HK$63–67;
+→ HKU 24 min, HK$105–111 (+ cross-harbour toll, not included); → CUHK 35 min, HK$139–146.

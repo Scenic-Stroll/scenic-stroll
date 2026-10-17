@@ -1,5 +1,5 @@
 /**
- * One shape for every way to travel: walk, car and public transport (multimodal steps 1–2), taxi later.
+ * One shape for every way to travel: walk, car, public transport and taxi (multimodal steps 1–4).
  * The `plan-trip` Edge Function returns these; the app's comparison cards, mode tabs and map read
  * them. Walking stays the core: the other modes are here to compare with it and nudge towards it.
  */
@@ -12,8 +12,8 @@ import { LatLngSchema } from './schemas.ts';
 export const TRIP_MODES = ['walk', 'transit', 'car', 'taxi', 'mixed'] as const;
 export type TripMode = (typeof TRIP_MODES)[number];
 
-/** Modes plan-trip can be asked for (taxi comes in a later step). */
-export const PLANNABLE_MODES = ['walk', 'car', 'transit'] as const;
+/** Modes plan-trip can be asked for (taxi reuses the driving route, priced by the meter). */
+export const PLANNABLE_MODES = ['walk', 'car', 'transit', 'taxi'] as const;
 
 export const TRIP_LABELS = [
   'fastest',
@@ -81,6 +81,8 @@ export const TripOptionSchema = z.object({
   distance_m: z.number().nonnegative(),
   /** null = fare/cost unknown ("cost unavailable"); walking is 0. */
   cost_hkd: z.number().nonnegative().nullable(),
+  /** Taxi: low–high meter estimate (cost_hkd is the low end, used for "cheapest"). */
+  cost_range_hkd: z.tuple([z.number().nonnegative(), z.number().nonnegative()]).optional(),
   /** Estimated tailpipe CO₂ for the trip, grams (emissions.ts). */
   co2_g: z.number().nonnegative(),
   walking_s: z.number().nonnegative(),
@@ -121,7 +123,7 @@ export const PlanTripRequestSchema = z.object({
   destination: HkLatLngSchema,
   /** When you'll leave (ISO with offset). Default: now. */
   depart_at: z.iso.datetime({ offset: true }).optional(),
-  modes: z.array(z.enum(PLANNABLE_MODES)).min(1).default(['walk', 'car', 'transit']),
+  modes: z.array(z.enum(PLANNABLE_MODES)).min(1).default(['walk', 'car', 'transit', 'taxi']),
   /** The "Now" card's condition (or demo simulation), so walking exposure matches it. */
   condition: ConditionModeSchema.optional(),
 });

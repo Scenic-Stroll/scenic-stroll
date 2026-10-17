@@ -1,7 +1,7 @@
 /**
- * How to travel: Walk · All · Transit · Car, each with its best time ("🚶 13 · 🚇 9 · 🚗 6").
+ * How to travel: Walk · All · Transit · Car · Taxi, each with its best time ("🚶 13 · 🚇 9 · 🚗 6").
  * Walk is the default and comes first: the other modes are there to compare with walking, never
- * to replace it (a taxi tab comes in a later step).
+ * to replace it.
  */
 import { formatDuration, type TripOption } from '@scenic/shared';
 import { ScrollView, StyleSheet } from 'react-native';
@@ -15,6 +15,7 @@ export const TRAVEL_MODES = [
   { key: 'all', label: 'All', icon: 'compare-horizontal' },
   { key: 'transit', label: 'Transit', icon: 'train' },
   { key: 'car', label: 'Car', icon: 'car' },
+  { key: 'taxi', label: 'Taxi', icon: 'taxi' },
 ] as const satisfies readonly { key: string; label: string; icon: IconName }[];
 export type TravelMode = (typeof TRAVEL_MODES)[number]['key'];
 
@@ -26,7 +27,8 @@ function bestTimes(options: TripOption[]) {
     walk: best('walk'),
     transit: best('transit'),
     car: best('car'),
-    all: Math.min(best('walk'), best('transit'), best('car')),
+    taxi: best('taxi'),
+    all: Math.min(best('walk'), best('transit'), best('car'), best('taxi')),
   };
 }
 

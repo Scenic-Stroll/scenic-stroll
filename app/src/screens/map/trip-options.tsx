@@ -1,5 +1,6 @@
 /**
- * Comparison cards for the "All" and "Car" tabs (multimodal step 1). Each card: big time, arrival,
+ * Comparison cards for the All, Transit, Car and Taxi tabs (multimodal steps 1–4), with sort chips
+ * (Best for you · Fastest · Cheapest · Greenest · Least walking). Each card: big time, arrival,
  * cost, CO₂, walking minutes, a leg strip (🚶 13 / 🚗 6), labels (Fastest, Greenest…), the green
  * nudge when walking is nearly as quick, and for cars the traffic delay — or a clear "typical
  * traffic" note when there's no live data. Every number comes from plan-trip; nothing is guessed.
@@ -8,15 +9,27 @@ import {
   formatDistance,
   formatDuration,
   formatHkTime,
+  sortTrips,
+  TRIP_SORTS,
   type PlanTripResponse,
+  type TripSort,
   type TripLabel,
   type TripOption,
 } from '@scenic/shared';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Chip } from '@/components/ui/chip';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { radius, space, type, useAppTheme } from '@/theme';
+
+const SORT_LABELS: Record<TripSort, string> = {
+  best: 'Best for you',
+  fastest: 'Fastest',
+  cheapest: 'Cheapest',
+  greenest: 'Greenest',
+  least_walking: 'Least walking',
+};
 
 const LABELS: Record<TripLabel, { text: string; icon: IconName }> = {
   fastest: { text: 'Fastest', icon: 'flash' },
@@ -36,6 +49,10 @@ const LEG_ICONS: Record<TripOption['legs'][number]['mode'], IconName> = {
 };
 
 function costText(o: TripOption): string {
+  if (o.cost_range_hkd) {
+    const [low, high] = o.cost_range_hkd.map(Math.round);
+    return low === high ? `~HK$${low} (meter)` : `HK$${low}–${high} (meter)`;
+  }
   if (o.cost_hkd === null) return o.mode === 'transit' ? 'Fare unavailable' : 'Cost unavailable';
   if (o.cost_hkd === 0) return 'Free';
   return `HK$${o.cost_hkd.toFixed(1)}${o.mode === 'transit' ? ' (Octopus)' : ''}`;
@@ -61,6 +78,10 @@ function estimateNotes(o: TripOption): string[] {
     }
   }
   if (o.estimated.includes('walk_legs')) notes.push('Walks to and from stations are estimates');
+  if (o.estimated.includes('taxi_fare')) {
+    notes.push('Fare from the official taxi meter — tunnel tolls and luggage extra');
+  }
+  if (o.estimated.includes('taxi_pickup')) notes.push('Includes ~3 min to get a taxi (estimate)');
   return notes;
 }
 
@@ -172,7 +193,7 @@ function TripCard({
           {o.transfers > 0 ? ` · ${o.transfers} change${o.transfers > 1 ? 's' : ''}` : ''}
         </Text>
       ) : null}
-      {o.step_free !== 'yes' && o.mode !== 'car' ? (
+      {o.step_free !== 'yes' && o.mode !== 'car' && o.mode !== 'taxi' ? (
         <Text style={[type.caption, { color: t.textSecondary }]}>
           {o.step_free === 'no' ? 'Has stairs' : 'Step-free not confirmed'}
         </Text>
@@ -218,9 +239,12 @@ export function TripOptions({
   onSelect: (id: string) => void;
 }) {
   const t = useAppTheme();
-  const options = (plan?.options ?? []).filter(
+  const [sort, setSort] = useState<TripSort>('best');
+  const filtered = (plan?.options ?? []).filter(
     (o) => modeFilter === 'all' || o.mode === modeFilter,
   );
+  // The server already sends "best for you" first; other orders are re-sorted here.
+  const options = plan ? sortTrips(filtered, sort, plan.condition) : filtered;
   if (loading && options.length === 0) {
     return <Text style={[type.small, { color: t.textSecondary }]}>Comparing ways to travel…</Text>;
   }
@@ -234,6 +258,24 @@ export function TripOptions({
   const missing = plan.unavailable.filter((u) => modeFilter === 'all' || u.mode === modeFilter);
   return (
     <View style={styles.list}>
+      {options.length > 1 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.sorts}
+          accessibilityLabel="Sort options"
+        >
+          {TRIP_SORTS.map((s) => (
+            <Chip
+              key={s}
+              small
+              label={SORT_LABELS[s]}
+              selected={sort === s}
+              onPress={() => setSort(s)}
+            />
+          ))}
+        </ScrollView>
+      ) : null}
       {options.map((o) => (
         <TripCard
           key={o.id}
@@ -248,8 +290,8 @@ export function TripOptions({
         </Text>
       ))}
       <Text style={[type.caption, { color: t.textSecondary }]}>
-        CO₂ is an estimate (car: average petrol car, one person; MTR and buses per passenger). Car
-        times
+        CO₂ is an estimate (car and taxi: average car, per vehicle; MTR and buses per passenger).
+        Car times
         {plan.data_freshness.traffic_at ? ' use live traffic' : ' are typical, not live'}.
         {plan.data_freshness.eta_at
           ? ` Live departures checked at ${formatHkTime(plan.data_freshness.eta_at)}.`
@@ -261,6 +303,7 @@ export function TripOptions({
 
 const styles = StyleSheet.create({
   list: { gap: space.md },
+  sorts: { gap: space.xs },
   liveLine: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
   card: { borderRadius: radius.md, borderWidth: 2, padding: space.md, gap: space.sm },
   nudge: {
