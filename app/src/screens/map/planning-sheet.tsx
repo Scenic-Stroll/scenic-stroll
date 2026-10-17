@@ -155,7 +155,7 @@ export function PlanningSheet({
             <TripOptions
               plan={travel.plan}
               loading={travel.loading}
-              modeFilter={travel.mode === 'all' ? 'all' : 'car'}
+              modeFilter={travel.mode}
               selectedId={travel.selectedId}
               onSelect={travel.onSelect}
             />

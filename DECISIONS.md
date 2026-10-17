@@ -622,3 +622,55 @@ another line to choose it. Profile → About credits Google Maps Platform and op
 **Deployment note:** the `plan-trip` bundle was deployed with trimmed copies of `conditions.ts` and
 `routing-profiles.ts` containing only what it imports at run time (`ConditionModeSchema`, `PROFILE_FOR_CONDITION`,
 `PROFILE_LABELS`), to keep the bundle small. The repo has the full files; a CLI deploy would ship those.
+
+### D32 · Multimodal step 2: public transport — Google transit + our own MTR planner (2026-10-18)
+
+**Two sources, one shape.** `plan-trip` asks Google Routes `TRANSIT` first (`_shared/transit-google.ts`, field
+mask limited to steps, transit details and fare; cached 5 min, same daily cap as driving). Without a key, or if
+Google fails, it falls back to **our own MTR planner** (`shared/src/transit/`). Both produce a `TransitPlan`, which
+`transitTripFromPlan` turns into the same `TripOption` cards as walking and driving. The Google path is tested
+against a recorded response (2 Deno tests) but has **not run live**: `GOOGLE_ROUTES_API_KEY` is still not set
+(PLAN.md team need #8).
+
+**Why our own MTR planner instead of "transit unavailable".** Without a key there is no free transit router for
+Hong Kong we can call from an Edge Function (ORS and OSRM have no public transport; OpenTripPlanner needs a
+server we'd have to host). The MTR network is small and public, so a planner fits in ~200 lines:
+
+- **Data:** `mtr_lines_and_stations.csv` (MTR Corporation, via DATA.GOV.HK — free to reuse with attribution,
+  DATA.GOV.HK terms of use) gives the lines, branches and station order. It has no coordinates, so station
+  positions come from OpenStreetMap (station nodes/stop areas via Overpass; ODbL, credited in About). North Point
+  and Yau Tong were missing from the OSM match and were added by hand. `npm run transit:build` regenerates
+  `mtr-data.ts` (12 line branches, 100 stations, ~11 KB) and refuses neighbours more than 12 km apart (20 km for
+  the Airport Express and Tung Chung Line) to catch a bad match.
+- **Search:** Dijkstra over (station, line) states. Ride time = 40 s dwell + distance ÷ 18 m/s per hop; first wait
+  150 s; change of line 240 s; the two long walkways (Central ↔ Hong Kong, TST ↔ East TST) 360 s; 120 s to get in
+  or out of a station. Starts and ends: the 3 nearest stations within 1.5 km, walked at 1.3 m/s with a 1.25 detour
+  factor. A plan that isn't quicker than walking straight there is dropped (CityU → Festival Walk no longer
+  suggests the train). These are rough averages, not checked against MTR's timetables (e.g. CityU → Mong Kok
+  comes out at ~21 min door to door); they are **labelled estimates** until step 3 brings live times.
+- **Fares:** `mtr_lines_fares.csv` (same source, adult Octopus column). At ~123 KB it would bloat the function, so
+  it lives in `public.mtr_fares` (server-only: RLS on, no grants). `plan-trip` fills the table from MTR's CSV the
+  first time it finds it empty. If that fails the card says "Fare unavailable" rather than guessing.
+
+**Labels, never pretending.** Every transit card from our planner says "Train times estimated from distance (MTR
+open data) — not live"; Google's says "Scheduled times — not live" until step 3 adds real-time ETAs. Walks to and
+from stations are straight-line estimates ("Walks to and from stations are estimates") **unless** both ends are
+inside our walking graph: then `plan-trip` asks `smart-route` for each walking leg (2 best options only, to keep
+the request quick) and `withWalkLegs` swaps in the real route, times and steps. Sun and cover figures appear only
+when _every_ walking leg is ours; a half-known trip would otherwise look "most sheltered" on the strength of its
+first 300 m.
+
+**CO₂ per passenger-km** (estimates, labelled): rail 55 g — low end of the 55–71 g range from MTR's sustainability
+reports and Aston University's MTR study, since most demo trips are on busy urban lines; bus 130 g — UK DESNZ
+2024 "local bus (not London)", the closest published factor (Hong Kong publishes none per passenger-km).
+
+**App.** A Transit tab joins Walk · All · Car. Transit cards show the line names as chips in each line's colour,
+the fare ("HK$5.9 (Octopus)"), waiting time and changes. On the map, ride legs are drawn in the line colour with
+board/alight markers. Profile → About credits MTR / DATA.GOV.HK and OpenStreetMap.
+
+**Latency.** Warm requests take 2.4–3.7 s with all three modes; the first after a quiet spell takes 6.5–7 s (cold
+start of both `plan-trip` and `smart-route`, plus the walking-leg calls). That is over the brief's 4 s target when
+cold; the app shows the walking option first from its own route call, so the screen isn't empty meanwhile.
+
+**Deployment note:** as in D31, the deployed bundle uses trimmed copies of `schemas.ts`, `api.ts`, `presets.ts`,
+`conditions.ts` and `routing-profiles.ts` (only what runs). `sync-shared` now copies sub-folders (`transit/`).

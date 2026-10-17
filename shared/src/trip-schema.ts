@@ -1,5 +1,5 @@
 /**
- * One shape for every way to travel (multimodal step 1): walk, car — and later transit and taxi.
+ * One shape for every way to travel: walk, car and public transport (multimodal steps 1–2), taxi later.
  * The `plan-trip` Edge Function returns these; the app's comparison cards, mode tabs and map read
  * them. Walking stays the core: the other modes are here to compare with it and nudge towards it.
  */
@@ -12,8 +12,8 @@ import { LatLngSchema } from './schemas.ts';
 export const TRIP_MODES = ['walk', 'transit', 'car', 'taxi', 'mixed'] as const;
 export type TripMode = (typeof TRIP_MODES)[number];
 
-/** Modes plan-trip can be asked for (transit and taxi come in later steps). */
-export const PLANNABLE_MODES = ['walk', 'car'] as const;
+/** Modes plan-trip can be asked for (taxi comes in a later step). */
+export const PLANNABLE_MODES = ['walk', 'car', 'transit'] as const;
 
 export const TRIP_LABELS = [
   'fastest',
@@ -38,8 +38,13 @@ export const TripLegSchema = z.object({
   mode: z.enum(['walk', 'transit', 'car', 'taxi']),
   /** e.g. "MTR", "KMB" (transit, later). */
   operator: z.string().nullable(),
-  /** e.g. "Kwun Tong line", "2C" (transit, later). */
+  /** e.g. "Kwun Tong Line", "2C". */
   route_name: z.string().nullable(),
+  /** Transit: the line's colour ("#00A040"), its first/last stop and how many stops. */
+  color: z.string().nullable().optional(),
+  from_name: z.string().nullable().optional(),
+  to_name: z.string().nullable().optional(),
+  stops: z.number().int().nonnegative().nullable().optional(),
   depart_at: z.string(),
   arrive_at: z.string(),
   /** true = times from a live feed (traffic now, real-time ETA). */
@@ -100,7 +105,7 @@ export const PlanTripRequestSchema = z.object({
   destination: HkLatLngSchema,
   /** When you'll leave (ISO with offset). Default: now. */
   depart_at: z.iso.datetime({ offset: true }).optional(),
-  modes: z.array(z.enum(PLANNABLE_MODES)).min(1).default(['walk', 'car']),
+  modes: z.array(z.enum(PLANNABLE_MODES)).min(1).default(['walk', 'car', 'transit']),
   /** The "Now" card's condition (or demo simulation), so walking exposure matches it. */
   condition: ConditionModeSchema.optional(),
 });

@@ -36,8 +36,23 @@ const LEG_ICONS: Record<TripOption['legs'][number]['mode'], IconName> = {
 };
 
 function costText(o: TripOption): string {
-  if (o.cost_hkd === null) return 'Cost unavailable';
-  return o.cost_hkd === 0 ? 'Free' : `HK$${o.cost_hkd.toFixed(1)}`;
+  if (o.cost_hkd === null) return o.mode === 'transit' ? 'Fare unavailable' : 'Cost unavailable';
+  if (o.cost_hkd === 0) return 'Free';
+  return `HK$${o.cost_hkd.toFixed(1)}${o.mode === 'transit' ? ' (Octopus)' : ''}`;
+}
+
+/** Plain words for what's estimated on a card, so nothing looks more certain than it is. */
+function estimateNotes(o: TripOption): string[] {
+  const notes: string[] = [];
+  if (o.estimated.includes('transit_times')) {
+    notes.push(
+      o.source === 'mtr-open-data'
+        ? 'Train times estimated from distance (MTR open data) — not live'
+        : 'Scheduled times — not live',
+    );
+  }
+  if (o.estimated.includes('walk_legs')) notes.push('Walks to and from stations are estimates');
+  return notes;
 }
 
 function TripCard({
@@ -93,7 +108,23 @@ function TripCard({
           return (
             <View key={i} style={styles.leg}>
               {i > 0 ? <Icon name="chevron-right" size={14} color={t.textSecondary} /> : null}
-              <Icon name={LEG_ICONS[leg.mode]} size={18} color={t.textPrimary} />
+              <Icon
+                name={LEG_ICONS[leg.mode]}
+                size={18}
+                color={leg.mode === 'transit' && leg.color ? leg.color : t.textPrimary}
+              />
+              {leg.mode === 'transit' && leg.route_name ? (
+                <Text
+                  style={[
+                    type.caption,
+                    styles.lineName,
+                    { backgroundColor: leg.color ?? t.textSecondary, color: '#FFFFFF' },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {leg.route_name}
+                </Text>
+              ) : null}
               <Text style={[type.small, { color: t.textPrimary }]}>{min}</Text>
               {leg.realtime ? <View style={[styles.live, { backgroundColor: t.primary }]} /> : null}
             </View>
@@ -120,7 +151,18 @@ function TripCard({
           Typical traffic — live traffic isn’t available right now
         </Text>
       ) : null}
-      {o.step_free !== 'yes' && o.mode === 'walk' ? (
+      {estimateNotes(o).map((n) => (
+        <Text key={n} style={[type.caption, { color: t.textSecondary }]}>
+          {n}
+        </Text>
+      ))}
+      {o.mode === 'transit' && o.waiting_s > 0 ? (
+        <Text style={[type.caption, { color: t.textSecondary }]}>
+          Includes ~{formatDuration(o.waiting_s)} waiting
+          {o.transfers > 0 ? ` · ${o.transfers} change${o.transfers > 1 ? 's' : ''}` : ''}
+        </Text>
+      ) : null}
+      {o.step_free !== 'yes' && o.mode !== 'car' ? (
         <Text style={[type.caption, { color: t.textSecondary }]}>
           {o.step_free === 'no' ? 'Has stairs' : 'Step-free not confirmed'}
         </Text>
@@ -174,7 +216,8 @@ export function TripOptions({
         </Text>
       ))}
       <Text style={[type.caption, { color: t.textSecondary }]}>
-        CO₂ is an estimate (average petrol car, one person). Car times
+        CO₂ is an estimate (car: average petrol car, one person; MTR and buses per passenger). Car
+        times
         {plan.data_freshness.traffic_at ? ' use live traffic' : ' are typical, not live'}.
       </Text>
     </View>
@@ -197,5 +240,6 @@ const styles = StyleSheet.create({
   legs: { flexDirection: 'row', alignItems: 'center', gap: space.xs, flexWrap: 'wrap' },
   leg: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   live: { width: 6, height: 6, borderRadius: 3, marginLeft: 2 },
+  lineName: { paddingHorizontal: 4, borderRadius: 4, overflow: 'hidden', fontWeight: '700' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.xs },
 });

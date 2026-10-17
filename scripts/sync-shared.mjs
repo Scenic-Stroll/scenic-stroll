@@ -17,10 +17,15 @@ const HEADER =
 fs.rmSync(dest, { recursive: true, force: true });
 fs.mkdirSync(dest, { recursive: true });
 
-const files = fs.readdirSync(src).filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'));
+// Sub-folders too (e.g. shared/src/transit/), keeping the same layout so relative imports work.
+const files = fs
+  .readdirSync(src, { recursive: true })
+  .map((f) => String(f).split(path.sep).join('/'))
+  .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'));
 
 for (const file of files) {
   const code = fs.readFileSync(path.join(src, file), 'utf8');
+  fs.mkdirSync(path.dirname(path.join(dest, file)), { recursive: true });
   fs.writeFileSync(path.join(dest, file), HEADER + code);
 }
 

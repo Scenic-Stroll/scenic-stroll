@@ -6,11 +6,19 @@
  *    Reporting Conversion Factors 2024. Hong Kong has no equivalent public per-km factor; most
  *    private cars here are petrol. Counted for one person (the driver).
  *  - walking: 0 (we don't count food energy, as is usual).
- * Transit and taxi factors are added with those modes.
+ *  - rail (MTR, light rail, tram): 55 g CO₂e per passenger-km — the low end of the 55–71 g range
+ *    published for MTR's urban rail in 2008–2017 (Aston University study using MTR data); MTR
+ *    has cut its rail emissions per passenger-km since, so this is if anything high.
+ *  - bus / minibus / ferry: 130 g per passenger-km, "Local bus (not London)", DESNZ 2024. Hong
+ *    Kong buses carry more people than the UK average, so this overstates them — it works
+ *    against our own green nudge, never for it.
+ * Taxi factors are added with that mode.
  */
 export const CO2_G_PER_KM = {
   walk: 0,
   car: 164.5,
+  rail: 55,
+  bus: 130,
 } as const;
 
 export function co2Grams(mode: keyof typeof CO2_G_PER_KM, distanceM: number): number {

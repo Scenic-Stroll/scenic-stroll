@@ -1177,3 +1177,10 @@ describe('api_cache / api_calls (paid routing API cost control)', () => {
     }
   });
 });
+
+describe('mtr_fares (fallback transit planner)', () => {
+  it('is server-only', async () => {
+    await rejects(as(ALICE, 'select * from public.mtr_fares'), /permission denied/);
+    await rejects(as(null, 'select * from public.mtr_fares'), /permission denied/);
+  });
+});

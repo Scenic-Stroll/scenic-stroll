@@ -16,7 +16,7 @@
     "sync-shared": "node scripts/sync-shared.mjs",
     "check:functions": "node scripts/check-functions.mjs",
     "deploy:functions": "npm run sync-shared && npx supabase functions deploy --use-api",
-    "test:functions": "npm run sync-shared && npx -y deno test --config supabase/functions/plan-route/deno.json \"supabase/functions/**/*.test.ts\"",
+    "test:functions": "npm run sync-shared && npx -y deno test --config supabase/functions/plan-trip/deno.json \"supabase/functions/**/*.test.ts\"",
     "test:db": "node --test supabase/tests/database.test.mjs",
     "typecheck:functions": "npm run sync-shared && npx -y deno check --config supabase/functions/plan-route/deno.json supabase/functions/plan-route/index.ts && npx -y deno check --config supabase/functions/geocode/deno.json supabase/functions/geocode/index.ts && npx -y deno check --config supabase/functions/conditions/deno.json supabase/functions/conditions/index.ts && npx -y deno check --config supabase/functions/smart-route/deno.json supabase/functions/smart-route/index.ts && npx -y deno check --config supabase/functions/plan-trip/deno.json supabase/functions/plan-trip/index.ts",
     "smoke:routing": "node scripts/smoke-routing.mjs",
@@ -29,7 +29,8 @@
     "graph:shade": "node scripts/graph/compute-shade.mts",
     "graph:load-shade": "node scripts/graph/load-shade.mts",
     "eval:routing": "node eval/routing/run.mts",
-    "demo:snapshot": "node scripts/demo/snapshot-smart-routes.mjs"
+    "demo:snapshot": "node scripts/demo/snapshot-smart-routes.mjs",
+    "transit:build": "node scripts/transit/build-mtr.mts"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",

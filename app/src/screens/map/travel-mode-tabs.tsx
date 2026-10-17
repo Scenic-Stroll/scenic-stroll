@@ -1,7 +1,7 @@
 /**
- * How to travel: All · Walk · Car, each with its best time ("🚶 13 · 🚗 6") — multimodal step 1.
+ * How to travel: Walk · All · Transit · Car, each with its best time ("🚶 13 · 🚇 9 · 🚗 6").
  * Walk is the default and comes first: the other modes are there to compare with walking, never
- * to replace it (transit and taxi tabs come in later steps).
+ * to replace it (a taxi tab comes in a later step).
  */
 import { formatDuration, type TripOption } from '@scenic/shared';
 import { ScrollView, StyleSheet } from 'react-native';
@@ -13,6 +13,7 @@ import { space } from '@/theme';
 export const TRAVEL_MODES = [
   { key: 'walk', label: 'Walk', icon: 'walk' },
   { key: 'all', label: 'All', icon: 'compare-horizontal' },
+  { key: 'transit', label: 'Transit', icon: 'train' },
   { key: 'car', label: 'Car', icon: 'car' },
 ] as const satisfies readonly { key: string; label: string; icon: IconName }[];
 export type TravelMode = (typeof TRAVEL_MODES)[number]['key'];
@@ -21,7 +22,12 @@ export type TravelMode = (typeof TRAVEL_MODES)[number]['key'];
 function bestTimes(options: TripOption[]) {
   const best = (mode: TripOption['mode']) =>
     Math.min(...options.filter((o) => o.mode === mode).map((o) => o.total_s));
-  return { walk: best('walk'), car: best('car'), all: Math.min(best('walk'), best('car')) };
+  return {
+    walk: best('walk'),
+    transit: best('transit'),
+    car: best('car'),
+    all: Math.min(best('walk'), best('transit'), best('car')),
+  };
 }
 
 export function TravelModeTabs({

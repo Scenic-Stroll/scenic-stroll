@@ -101,7 +101,7 @@ Secrets are never committed and never go in the app — only into `supabase secr
 ## Multimodal (car with live traffic, MTR, bus, minibus, taxi — brief of 2026-10-18) — build order
 
 - [x] 1. Unified trip schema (`shared/src/trip-schema.ts`) + `plan-trip` (walk via our smart router / standard walk, car via Google Routes live traffic → ORS typical fallback; cache ±50 m / 5 min, daily cap, call log); labels, green nudge, best-for-you sort (`trip-plan.ts`, 11 tests); app: Walk · All · Car tabs with best times, comparison cards (time, arrival, cost, CO₂, walking, leg strip, labels, nudge, traffic delay / "typical traffic"), car route coloured by traffic. **Live traffic waits for the Google key (team need #8)** — until then cars show typical times, clearly labelled
-- [ ] 2. Transit via Google Routes TRANSIT; leg strip; walking legs replaced by our router inside the area
+- [x] 2. Transit via Google Routes TRANSIT (ready, waits for the key) → fallback: our own MTR planner from MTR open data (12 line branches, 100 stations, Dijkstra with changes, times estimated from distance, adult Octopus fares in `mtr_fares`); leg strip with line colours; walking legs to/from stations replaced by our smart router inside the area; "Transit" tab. Times are labelled **estimated, not live** until step 3
 - [ ] 3. Real-time ETAs (MTR Next Train, KMB, Citybus, GMB) near the demo area; stop cards
 - [ ] 4. Taxi + fare estimate; CO₂ + green-nudge labels; sort options
 - [ ] 5. Traffic + incidents layers

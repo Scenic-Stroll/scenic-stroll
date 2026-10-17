@@ -196,6 +196,17 @@ GRAPH_LOADER_KEY=<key> npm run graph:load   # uploads (~15 s), then switches the
   MMW, YEUNG, AC2, AC3, Student Residence) still show computed routes, labelled "saved for the demo".
   Profile → Diagnostics → **Test smart routing** checks the live function in one tap.
 
+- **MTR network data** (multimodal step 2): `shared/src/transit/mtr-data.ts` is generated and committed.
+  Rebuild it only when MTR opens a new station or line (online, uses MTR open data + OpenStreetMap):
+
+  ```bash
+  npm run transit:build                     # downloads to scripts/transit/data/ (git-ignored), writes mtr-data.ts
+  npm run sync-shared                       # copy into the Edge Functions, then redeploy plan-trip
+  ```
+
+  MTR fares are not in the repo: `plan-trip` loads them into the server-only `mtr_fares` table on first use.
+  To refresh them after a fare change, run `delete from public.mtr_fares;` in the SQL editor.
+
 ## 10. Before you push code
 
 ```bash

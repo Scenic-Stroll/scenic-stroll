@@ -369,6 +369,11 @@ export function ProfileScreen() {
             title="Driving routes"
             subtitle="Google Maps Platform (live traffic, when enabled) · openrouteservice.org, © OpenStreetMap contributors"
           />
+          <ListRow
+            icon="train"
+            title="Public transport"
+            subtitle="MTR lines, stations and fares © MTR Corporation · via DATA.GOV.HK · station positions © OpenStreetMap contributors (ODbL) · Google Maps Platform (when enabled)"
+          />
         </Section>
       </ScrollView>
 

@@ -38,3 +38,4 @@ supabase/functions/_shared/scenic/
 
 # Walking graph downloads (re-create with npm run graph:download)
 scripts/graph/data/
+scripts/transit/data/
