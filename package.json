@@ -18,7 +18,7 @@
     "deploy:functions": "npm run sync-shared && npx supabase functions deploy --use-api",
     "test:functions": "npm run sync-shared && npx -y deno test --config supabase/functions/plan-route/deno.json \"supabase/functions/**/*.test.ts\"",
     "test:db": "node --test supabase/tests/database.test.mjs",
-    "typecheck:functions": "npm run sync-shared && npx -y deno check --config supabase/functions/plan-route/deno.json supabase/functions/plan-route/index.ts && npx -y deno check --config supabase/functions/geocode/deno.json supabase/functions/geocode/index.ts && npx -y deno check --config supabase/functions/conditions/deno.json supabase/functions/conditions/index.ts && npx -y deno check --config supabase/functions/smart-route/deno.json supabase/functions/smart-route/index.ts",
+    "typecheck:functions": "npm run sync-shared && npx -y deno check --config supabase/functions/plan-route/deno.json supabase/functions/plan-route/index.ts && npx -y deno check --config supabase/functions/geocode/deno.json supabase/functions/geocode/index.ts && npx -y deno check --config supabase/functions/conditions/deno.json supabase/functions/conditions/index.ts && npx -y deno check --config supabase/functions/smart-route/deno.json supabase/functions/smart-route/index.ts && npx -y deno check --config supabase/functions/plan-trip/deno.json supabase/functions/plan-trip/index.ts",
     "smoke:routing": "node scripts/smoke-routing.mjs",
     "graph:download": "node scripts/graph/download-3dpn.mts",
     "graph:build": "node scripts/graph/build-graph.mts",

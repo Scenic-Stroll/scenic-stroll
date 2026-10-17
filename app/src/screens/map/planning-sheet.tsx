@@ -9,6 +9,7 @@ import {
   type ConditionMode,
   type Conditions,
   type PlanRouteResponse,
+  type PlanTripResponse,
   type SmartRouteResponse,
 } from '@scenic/shared';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -24,6 +25,8 @@ import { ConditionsCard } from './conditions-card';
 import { DeparturePicker } from './departure-picker';
 import { RouteModeTabs, type RouteMode } from './route-mode-tabs';
 import { SmartRouteOptions } from './smart-route-options';
+import { TravelModeTabs, type TravelMode } from './travel-mode-tabs';
+import { TripOptions } from './trip-options';
 import type { Place } from './types';
 
 /** What the "Now" card needs (comes from useConditions()). */
@@ -59,6 +62,7 @@ export function PlanningSheet({
   smart,
   smartLoading,
   onStart,
+  travel,
 }: {
   origin: Place | null;
   destination: Place | null;
@@ -84,6 +88,15 @@ export function PlanningSheet({
   smartLoading: boolean;
   /** Start walking the selected option (follow mode). */
   onStart: () => void;
+  /** How to travel (multimodal): Walk shows everything below; All / Car show trip cards. */
+  travel: {
+    mode: TravelMode;
+    onModeChange: (mode: TravelMode) => void;
+    plan: PlanTripResponse | null | undefined;
+    loading: boolean;
+    selectedId: string | null;
+    onSelect: (id: string) => void;
+  };
 }) {
   const t = useAppTheme();
   const ready = origin !== null && destination !== null;
@@ -127,82 +140,114 @@ export function PlanningSheet({
         </View>
       </View>
 
-      <RouteModeTabs value={mode} onChange={onModeChange} />
-      <DeparturePicker value={departure} onChange={onDepartureChange} />
-
-      {!ready ? (
-        <Text style={[type.small, { color: t.textSecondary }]}>
-          Choose a start and a destination to see route options.
-        </Text>
-      ) : null}
-
-      {ready && smart?.status === 'outside_area' ? (
-        <Note text="Computed routes cover Kowloon Tong, Festival Walk and CityU. Outside that, only the standard street route is shown." />
-      ) : null}
-      {ready && smart?.savedFor ? (
-        <Note
-          text={`Offline — showing routes saved for the demo (shade and opening hours for ${smart.savedFor}). Live routes come back when you're online.`}
-        />
-      ) : null}
-      {ready && smart && smart.blocked_paths > 0 ? (
-        <Note
-          text={`Avoiding ${smart.blocked_paths === 1 ? 'a path' : `${smart.blocked_paths} paths`} walkers reported blocked in the last 3 hours.`}
-        />
-      ) : null}
-      {ready && stepFreeMissing ? (
-        <Note text="No step-free way was found in the map data for this trip. The routes below include stairs or escalators." />
-      ) : null}
-
-      {ready && (isLoading || smartLoading) ? (
-        <View style={styles.loadingRow}>
-          <ActivityIndicator />
-          <Text style={[type.small, { color: t.textSecondary }]}>Finding routes…</Text>
-        </View>
-      ) : null}
-      {ready && error ? (
-        <ErrorCard title="Couldn’t get a route" message={error.message} onRetry={onRetry} />
-      ) : null}
-
-      {ready && selectedOptionId ? (
-        <PrimaryButton
-          label="Start walking"
-          icon="navigation-variant"
-          onPress={onStart}
-          accessibilityHint="Step-by-step directions; re-plans if you leave the route or the weather changes"
-        />
-      ) : null}
-
       {ready ? (
-        <SmartRouteOptions
-          options={smartOptions}
-          selectedId={selectedOptionId}
-          onSelect={onSelectOption}
+        <TravelModeTabs
+          value={travel.mode}
+          onChange={travel.onModeChange}
+          options={travel.plan?.options ?? []}
         />
       ) : null}
 
-      {ready && standardRoute ? (
-        <RouteOptionCard
-          option={{
-            id: STANDARD_OPTION_ID,
-            title: 'Standard walking route (street map)',
-            durationS: standardRoute.duration_s,
-            distanceM: standardRoute.distance_m,
-            segments: buildSegments([]), // no checkpoints → outdoor only
-            tags: [],
-            color: t.routeStandard,
-            verified: null,
-            notes: mode === 'step_free' ? ['Step-free not confirmed'] : undefined,
-          }}
-          selected={selectedOptionId === STANDARD_OPTION_ID}
-          onPress={() => onSelectOption(STANDARD_OPTION_ID)}
-        />
-      ) : null}
-
-      {ready && standardRoute && selectedOptionId === STANDARD_OPTION_ID ? (
-        <DirectionsList steps={standardRoute.steps ?? []} provider={standardRoute.provider} />
-      ) : null}
+      {travel.mode !== 'walk' ? (
+        <>
+          <DeparturePicker value={departure} onChange={onDepartureChange} />
+          {ready ? (
+            <TripOptions
+              plan={travel.plan}
+              loading={travel.loading}
+              modeFilter={travel.mode === 'all' ? 'all' : 'car'}
+              selectedId={travel.selectedId}
+              onSelect={travel.onSelect}
+            />
+          ) : null}
+        </>
+      ) : (
+        walkPlanning()
+      )}
     </View>
   );
+
+  // The walking part (everything since smart routing step 1): preferences, notes, route options.
+  function walkPlanning() {
+    return (
+      <>
+        <RouteModeTabs value={mode} onChange={onModeChange} />
+        <DeparturePicker value={departure} onChange={onDepartureChange} />
+
+        {!ready ? (
+          <Text style={[type.small, { color: t.textSecondary }]}>
+            Choose a start and a destination to see route options.
+          </Text>
+        ) : null}
+
+        {ready && smart?.status === 'outside_area' ? (
+          <Note text="Computed routes cover Kowloon Tong, Festival Walk and CityU. Outside that, only the standard street route is shown." />
+        ) : null}
+        {ready && smart?.savedFor ? (
+          <Note
+            text={`Offline — showing routes saved for the demo (shade and opening hours for ${smart.savedFor}). Live routes come back when you're online.`}
+          />
+        ) : null}
+        {ready && smart && smart.blocked_paths > 0 ? (
+          <Note
+            text={`Avoiding ${smart.blocked_paths === 1 ? 'a path' : `${smart.blocked_paths} paths`} walkers reported blocked in the last 3 hours.`}
+          />
+        ) : null}
+        {ready && stepFreeMissing ? (
+          <Note text="No step-free way was found in the map data for this trip. The routes below include stairs or escalators." />
+        ) : null}
+
+        {ready && (isLoading || smartLoading) ? (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator />
+            <Text style={[type.small, { color: t.textSecondary }]}>Finding routes…</Text>
+          </View>
+        ) : null}
+        {ready && error ? (
+          <ErrorCard title="Couldn’t get a route" message={error.message} onRetry={onRetry} />
+        ) : null}
+
+        {ready && selectedOptionId ? (
+          <PrimaryButton
+            label="Start walking"
+            icon="navigation-variant"
+            onPress={onStart}
+            accessibilityHint="Step-by-step directions; re-plans if you leave the route or the weather changes"
+          />
+        ) : null}
+
+        {ready ? (
+          <SmartRouteOptions
+            options={smartOptions}
+            selectedId={selectedOptionId}
+            onSelect={onSelectOption}
+          />
+        ) : null}
+
+        {ready && standardRoute ? (
+          <RouteOptionCard
+            option={{
+              id: STANDARD_OPTION_ID,
+              title: 'Standard walking route (street map)',
+              durationS: standardRoute.duration_s,
+              distanceM: standardRoute.distance_m,
+              segments: buildSegments([]), // no checkpoints → outdoor only
+              tags: [],
+              color: t.routeStandard,
+              verified: null,
+              notes: mode === 'step_free' ? ['Step-free not confirmed'] : undefined,
+            }}
+            selected={selectedOptionId === STANDARD_OPTION_ID}
+            onPress={() => onSelectOption(STANDARD_OPTION_ID)}
+          />
+        ) : null}
+
+        {ready && standardRoute && selectedOptionId === STANDARD_OPTION_ID ? (
+          <DirectionsList steps={standardRoute.steps ?? []} provider={standardRoute.provider} />
+        ) : null}
+      </>
+    );
+  }
 }
 
 function Note({ text }: { text: string }) {

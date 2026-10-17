@@ -1164,3 +1164,16 @@ describe('shade_layer ("Shade now" map layer)', () => {
     assert.deepEqual(empty.lines, []);
   });
 });
+
+describe('api_cache / api_calls (paid routing API cost control)', () => {
+  it('are invisible to app users, signed in or not', async () => {
+    for (const user of [ALICE, null]) {
+      await rejects(as(user, 'select * from public.api_cache'), /permission denied/);
+      await rejects(as(user, 'select * from public.api_calls'), /permission denied/);
+      await rejects(
+        as(user, `insert into public.api_calls (api, ok) values ('google_routes_drive', true)`),
+        /permission denied/,
+      );
+    }
+  });
+});

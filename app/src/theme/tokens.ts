@@ -32,6 +32,9 @@ const light = {
   routeOpen: '#9AA0A6', // outdoors, no sun to speak of (night) or shade unknown
   routeStairs: '#D93025',
   shadePartial: '#C99A00', // "Shade now" layer: partly shaded (between sun orange and shade green)
+  trafficFree: '#1E8E3E', // car route: traffic flowing
+  trafficSlow: '#E37400', // slow
+  trafficJam: '#C5221F', // jam
   /** The line you are recording (distinct from community green). 5.8:1 on white. */
   trace: '#1565C0',
   warning: '#B35C00', // 4.7:1 on white (the brighter #E07B00 was 2.9:1)
@@ -68,6 +71,9 @@ const dark: Palette = {
   routeOpen: '#8E949B',
   routeStairs: '#FF6B5E',
   shadePartial: '#E8C547',
+  trafficFree: '#5BB974',
+  trafficSlow: '#FCAD32',
+  trafficJam: '#F28B82',
   trace: '#5B9BFF',
   warning: '#FFA43A',
   danger: '#FF6B5E',

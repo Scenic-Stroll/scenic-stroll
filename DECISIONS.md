@@ -562,3 +562,63 @@ attribution adds "Shade estimates: building heights © Lands Department · trees
 
 **Not done in smart routing** (see PLAN.md → Definition of done): merging computed routes with community routes
 needs `find-routes` (Phase 4), and the smart-routing screens are English only (the bilingual pass is Phase 7).
+
+### D31 · Multimodal step 1: walk vs car in one comparison (2026-10-18)
+
+**Scope change.** The interim report said "pedestrians only". The multimodal brief adds car, taxi and public transport
+— **as a comparison and nudge layer, not a new core.** Walking stays the default tab and comes first, every option
+shows the same facts (time, cost or "unavailable", CO₂ estimate, walking minutes, sun/rain exposure, step-free), and
+a walk or transit option within 5 minutes of driving is marked _recommended_ with the time and CO₂ comparison
+("Only 3 min slower than driving · saves ~329 g CO₂"). Driving is never the default.
+
+**One shape for every mode** (`shared/src/trip-schema.ts`, zod): a TripOption has legs (walk / car / later transit
+and taxi) with geometry, instructions, traffic segments and a realtime flag, plus labels (fastest, cheapest,
+greenest, least walking, most sheltered, step-free, avoids traffic). `trip-plan.ts` turns each mode's result into
+options and ranks them. The default "best for you" sort is time, plus 0.2 s per gram of CO₂ (1 km by car ≈ 33 s),
+2 min per transfer, and in rain or heat half a second per exposed walking second (unknown counts as half exposed,
+like the walking router). The user can also sort by Fastest / Cheapest / Greenest / Least walking.
+
+**`plan-trip` Edge Function.** Walk and car run in parallel, each with a 4 s limit and its own fallback. A mode
+that fails is listed in `unavailable`, never as an error, and the app keeps the walking tab whatever happens.
+
+- _Walk_ asks our `smart-route` function, passing the user's own token, so walking logic lives in one place: shade,
+  cover, step-free, blocked paths and walkers' feedback all carry over. Outside the walking graph it uses the
+  standard street walk.
+- _Car_: **Google Routes API** `computeRoutes`, `travelMode=DRIVE`, `routingPreference=TRAFFIC_AWARE`,
+  `computeAlternativeRoutes=true`, `extraComputations=[TRAFFIC_ON_POLYLINE]`, with a minimal field mask. It returns
+  the time with traffic (`duration`), the typical time (`staticDuration`) and NORMAL / SLOW / TRAFFIC_JAM per
+  stretch (checked against Google's docs 2026-10-18). We use `TRAFFIC_AWARE` rather than `_OPTIMAL` because Google
+  documents alternatives with it and it answers faster; traffic-aware requests are billed at a higher rate. Google
+  refuses departure times in the past, so "now" is sent without one.
+- _Fallback_: OpenRouteService `driving-car` with up to 2 alternatives. It has no live traffic, so every card says
+  "Typical traffic — live traffic isn't available right now", and `estimated` includes `traffic`.
+- _Avoids traffic_: when two live car routes differ by ≥ 2 min, the quicker one is labelled ("Avoids traffic: saves
+  6 min vs the route via …").
+- **Live check:** it works; the first call took 6.4 s (cold start), later calls ~1.8 s and 0.5 s from the cache.
+  **`GOOGLE_ROUTES_API_KEY` is not set** on the project yet (the health check says `ors-typical-traffic`), so live
+  traffic switches on as soon as the team adds a key with billing (PLAN.md team need #8).
+
+**Cost control** (brief §7). `public.api_cache` keys requests by mode, start/end rounded to ±50 m and a 5-minute
+time bucket: Google answers are reused for 3 min, ORS for 10. `public.api_calls` logs every paid call, and Google
+stops at a daily cap (secret `GOOGLE_DAILY_CAP`, default 300; resets at Hong Kong midnight) before falling back to
+ORS. ORS is capped at 1,500 a day (its free tier is 2,000). Both tables are server-only (RLS on, no grants, like the
+weather cache). Field masks keep each Google call in the cheapest tier that has what we need.
+
+**Data model (brief §2), only what this step uses.** `transit_stops`, `transit_eta_cache`, `traffic_cache` and
+`trip_plans` come with the steps that need them. Emission factors live in code (`shared/src/emissions.ts`, with
+sources) rather than a table: they change maybe once a year, and code review is where a number like that should be
+checked.
+
+**CO₂** (estimates, labelled): car 164.5 g CO₂e per vehicle-km, "Petrol car (average)", UK DESNZ/BEIS GHG
+Conversion Factors 2024 (Hong Kong publishes no per-km factor; most private cars here are petrol), counted for one
+person. Walking 0. Car cost shows "Cost unavailable": fuel, parking and tolls vary too much to guess.
+
+**App.** The planning sheet has Walk · All · Car tabs, each with its best time. Walk keeps everything from smart
+routing. All and Car show comparison cards: big time, arrival, distance, cost, CO₂, walking minutes, a leg strip
+with a dot for live data, labels, the green nudge, and the traffic delay or the "typical traffic" note. On the map
+the chosen car route is coloured by traffic (green / orange / red), or dashed grey when traffic isn't live. Tap
+another line to choose it. Profile → About credits Google Maps Platform and openrouteservice/OSM for driving.
+
+**Deployment note:** the `plan-trip` bundle was deployed with trimmed copies of `conditions.ts` and
+`routing-profiles.ts` containing only what it imports at run time (`ConditionModeSchema`, `PROFILE_FOR_CONDITION`,
+`PROFILE_LABELS`), to keep the bundle small. The repo has the full files; a CLI deploy would ship those.

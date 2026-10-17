@@ -41,6 +41,7 @@ import { useConditions, useConditionsUi } from '@/lib/conditions';
 import { fromSmartOption, fromStandardRoute } from '@/lib/follow-route';
 import { useFollow } from '@/lib/follow-store';
 import { useSmartRoutes } from '@/lib/smart-routes';
+import { useTripPlan } from '@/lib/trips';
 import { friendAsPlace, stopSharing, useFriendLocations, useSharing } from '@/lib/location-sharing';
 import { useCheckpointsNear } from '@/lib/checkpoints-near';
 import { useMapFocus } from '@/lib/map-focus-store';
@@ -63,6 +64,8 @@ import { PlanningSheet, STANDARD_OPTION_ID } from './planning-sheet';
 import { ShadeLayer, ShadeLegend } from './shade-layer';
 import { profileForMode, type RouteMode } from './route-mode-tabs';
 import { SmartRouteLine } from './smart-route-line';
+import type { TravelMode } from './travel-mode-tabs';
+import { TripLine } from './trip-line';
 import type { Place } from './types';
 
 const PITCH_3D = 55;
@@ -189,6 +192,24 @@ export function MapHome() {
     enabled: planning,
   });
   const smartOptions = smart.data?.status === 'ok' ? smart.data.options : [];
+
+  // Other ways to travel (multimodal): walk vs car, compared. Walk stays the default tab.
+  const [travelMode, setTravelMode] = useState<TravelMode>('walk');
+  const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
+  const trips = useTripPlan({
+    origin: origin?.point ?? null,
+    destination: destination?.point ?? null,
+    condition: now.mode,
+    departure,
+    enabled: planning,
+  });
+  const tripOptions = (trips.data?.options ?? []).filter(
+    (o) => travelMode === 'all' || o.mode === travelMode,
+  );
+  const shownTripId =
+    (tripOptions.some((o) => o.id === selectedTripId) ? selectedTripId : null) ??
+    tripOptions[0]?.id ??
+    null;
   // The option shown on the map and in the directions: the one tapped, else the first computed
   // route, else the standard route. Derived (not stored) so a new search picks a fresh default.
   const shownOptionId =
@@ -324,6 +345,7 @@ export function MapHome() {
     setOrigin(null);
     setDestination(null);
     setMode('best_now');
+    setTravelMode('walk');
     setDeparture(null);
     setSelectedOptionId(null);
     sheetRef.current?.snapToIndex(SHEET_PEEK);
@@ -432,7 +454,17 @@ export function MapHome() {
           <ShadeLayer lines={shadeLayer.data.lines} />
         ) : null}
         {following ? <FollowLayer /> : null}
-        {planning && !following && standardRoute.data ? (
+        {planning && !following && travelMode !== 'walk'
+          ? tripOptions.map((o) => (
+              <TripLine
+                key={`trip-${o.id}`}
+                option={o}
+                selected={o.id === shownTripId}
+                onPress={() => setSelectedTripId(o.id)}
+              />
+            ))
+          : null}
+        {planning && !following && travelMode === 'walk' && standardRoute.data ? (
           <Polyline
             coordinates={standardRoute.data.coordinates.map(toMap)}
             strokeColor={t.routeStandard}
@@ -440,7 +472,7 @@ export function MapHome() {
             zIndex={1}
           />
         ) : null}
-        {planning && !following
+        {planning && !following && travelMode === 'walk'
           ? smartOptions.map((o) => (
               <SmartRouteLine
                 key={`smart-${o.id}`}
@@ -685,6 +717,21 @@ export function MapHome() {
               smart={smart.data}
               smartLoading={smart.isFetching}
               onStart={startFollowing}
+              travel={{
+                mode: travelMode,
+                onModeChange: (m) => {
+                  setTravelMode(m);
+                  setSelectedTripId(null);
+                },
+                plan: trips.data,
+                loading: trips.isFetching,
+                selectedId: shownTripId,
+                onSelect: (id) => {
+                  setSelectedTripId(id);
+                  const trip = trips.data?.options.find((o) => o.id === id);
+                  if (trip) fit(trip.legs.flatMap((l) => l.geometry));
+                },
+              }}
             />
           ) : selectedPlace ? (
             <PlaceSheet

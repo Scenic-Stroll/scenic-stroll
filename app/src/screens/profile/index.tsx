@@ -364,6 +364,11 @@ export function ProfileScreen() {
             title="Shade estimates"
             subtitle="Building heights © Lands Department, HKSAR Government · trees © OpenStreetMap contributors (ODbL)"
           />
+          <ListRow
+            icon="car"
+            title="Driving routes"
+            subtitle="Google Maps Platform (live traffic, when enabled) · openrouteservice.org, © OpenStreetMap contributors"
+          />
         </Section>
       </ScrollView>
 

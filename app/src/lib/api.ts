@@ -9,6 +9,7 @@ import {
   FunctionHealthSchema,
   GeocodeResponseSchema,
   PlanRouteResponseSchema,
+  PlanTripResponseSchema,
   SmartRouteResponseSchema,
   type Conditions,
   type FunctionHealth,
@@ -16,6 +17,8 @@ import {
   type GeocodeResult,
   type LatLng,
   type PlanRouteResponse,
+  type PlanTripRequest,
+  type PlanTripResponse,
   type SmartRouteRequest,
   type SmartRouteResponse,
 } from '@scenic/shared';
@@ -166,6 +169,15 @@ export function smartRoute(request: SmartRouteRequest): Promise<SmartRouteRespon
     FUNCTIONS.smartRoute,
     { method: 'POST', body: request as Record<string, unknown> },
     SmartRouteResponseSchema,
+  );
+}
+
+/** Walk + car (later transit, taxi) in one comparable list — multimodal step 1. */
+export function planTrip(request: PlanTripRequest): Promise<PlanTripResponse> {
+  return callFunction(
+    FUNCTIONS.planTrip,
+    { method: 'POST', body: request as Record<string, unknown> },
+    PlanTripResponseSchema,
   );
 }
 

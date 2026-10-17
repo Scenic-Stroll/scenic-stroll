@@ -27,3 +27,6 @@ export * from './smart-route.ts';
 export * from './follow.ts';
 export * from './edge-feedback.ts';
 export * from './shadows.ts';
+export * from './trip-schema.ts';
+export * from './emissions.ts';
+export * from './trip-plan.ts';

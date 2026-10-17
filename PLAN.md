@@ -10,15 +10,16 @@ Legend: `[ ]` todo · `[x]` done · `[~]` blocked on team input (see "Needed fro
 
 ## Needed from the team
 
-| #   | What                                                                               | Where to get it                                                              | Blocks               |
-| --- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | -------------------- |
-| 1   | Supabase project **URL** + **publishable key** (`sb_publishable_…`)                | supabase.com → New project (region: Singapore) → Project Settings → API Keys | Phase 0 sign-in test |
-| 2   | Supabase **project ref** + **database password** (for `supabase link` / `db push`) | Same project; password chosen at creation                                    | Applying migrations  |
-| 3   | Enable **Anonymous sign-ins**                                                      | Dashboard → Authentication → Sign In / Providers                             | Phase 0              |
-| 4   | **Gemini API key** (free tier)                                                     | aistudio.google.com → Get API key                                            | Phase 3              |
-| 5   | **OpenRouteService key** (free) — and optionally a Google Routes API key           | openrouteservice.org/dev → Sign up → Tokens                                  | Phase 1              |
-| 6   | Optional: DeepSeek / OpenRouter key for the second LLM provider                    | platform.deepseek.com / openrouter.ai                                        | Phase 3 eval         |
-| 7   | Everyone: update **Expo Go** to the latest version (SDK 57)                        | App Store / Play Store                                                       | All phones           |
+| #   | What                                                                                         | Where to get it                                                                                    | Blocks                                  |
+| --- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| 1   | Supabase project **URL** + **publishable key** (`sb_publishable_…`)                          | supabase.com → New project (region: Singapore) → Project Settings → API Keys                       | Phase 0 sign-in test                    |
+| 2   | Supabase **project ref** + **database password** (for `supabase link` / `db push`)           | Same project; password chosen at creation                                                          | Applying migrations                     |
+| 3   | Enable **Anonymous sign-ins**                                                                | Dashboard → Authentication → Sign In / Providers                                                   | Phase 0                                 |
+| 4   | **Gemini API key** (free tier)                                                               | aistudio.google.com → Get API key                                                                  | Phase 3                                 |
+| 5   | **OpenRouteService key** (free) — and optionally a Google Routes API key                     | openrouteservice.org/dev → Sign up → Tokens                                                        | Phase 1                                 |
+| 6   | Optional: DeepSeek / OpenRouter key for the second LLM provider                              | platform.deepseek.com / openrouter.ai                                                              | Phase 3 eval                            |
+| 7   | Everyone: update **Expo Go** to the latest version (SDK 57)                                  | App Store / Play Store                                                                             | All phones                              |
+| 8   | **Google Routes API key** with billing (Routes API enabled) → secret `GOOGLE_ROUTES_API_KEY` | console.cloud.google.com → APIs → Routes API; cap with secret `GOOGLE_DAILY_CAP` (default 300/day) | Live traffic + transit (multimodal 1–2) |
 
 Secrets are never committed and never go in the app — only into `supabase secrets set …` (server) or local `.env` files that are git-ignored.
 
@@ -96,6 +97,16 @@ Secrets are never committed and never go in the app — only into `supabase secr
   - [x] Eval table saved for the pitch deck
   - [x] Data sources and licences in DECISIONS.md (D23–D26); attribution in Profile → About (OSM, HKO, Lands Dept network + building heights)
   - [ ] All strings in English **and** Traditional Chinese — smart-routing UI is English only for now (Phase 7 bilingual pass)
+
+## Multimodal (car with live traffic, MTR, bus, minibus, taxi — brief of 2026-10-18) — build order
+
+- [x] 1. Unified trip schema (`shared/src/trip-schema.ts`) + `plan-trip` (walk via our smart router / standard walk, car via Google Routes live traffic → ORS typical fallback; cache ±50 m / 5 min, daily cap, call log); labels, green nudge, best-for-you sort (`trip-plan.ts`, 11 tests); app: Walk · All · Car tabs with best times, comparison cards (time, arrival, cost, CO₂, walking, leg strip, labels, nudge, traffic delay / "typical traffic"), car route coloured by traffic. **Live traffic waits for the Google key (team need #8)** — until then cars show typical times, clearly labelled
+- [ ] 2. Transit via Google Routes TRANSIT; leg strip; walking legs replaced by our router inside the area
+- [ ] 3. Real-time ETAs (MTR Next Train, KMB, Citybus, GMB) near the demo area; stop cards
+- [ ] 4. Taxi + fare estimate; CO₂ + green-nudge labels; sort options
+- [ ] 5. Traffic + incidents layers
+- [ ] 6. Live trip updates (ETA refresh, traffic reroute)
+- [ ] 7. Friends/meetups multimodal ETAs; demo seeds ("simulate rush hour"); eval table; polish
 
 ## Phase 3 — AI tagging (target Oct 12–13)
 

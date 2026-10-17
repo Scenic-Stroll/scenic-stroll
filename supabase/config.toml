@@ -428,3 +428,6 @@ verify_jwt = false
 
 [functions.smart-route]
 verify_jwt = false
+
+[functions.plan-trip]
+verify_jwt = false
