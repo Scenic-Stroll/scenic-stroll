@@ -105,7 +105,7 @@ Secrets are never committed and never go in the app — only into `supabase secr
 - [x] 3. Real-time ETAs: `eta` function (MTR Next Train, KMB/LWB, Citybus, GMB; cached 30 s); 177 stops near CityU (`npm run transit:stops`); Transit stops layer + stop cards (live/scheduled, refreshed 30 s); plan-trip uses the live next train at the first boarding station (catchable one, rest of trip shifted); "Next departure is live" on cards
 - [x] 4. Taxi option (quickest driving route + 3 min pickup) priced with the official urban meter tariff (from 14 Jul 2024) as a low–high range, tolls/luggage noted; Taxi tab; sort chips (Best · Fastest · Cheapest · Greenest · Least walking); labels + green nudge include taxis (5 tests)
 - [x] 5. Traffic layer (map's own live traffic, `showsTraffic`) + Incidents layer (TD special traffic news, parsed in shared, 3 tests; pins when positioned + banner/list in English & Chinese, refreshed 2 min); attribution. TD speed-segment fallback not built (D35)
-- [ ] 6. Live trip updates (ETA refresh, traffic reroute)
+- [x] 6. Live trip updates: selected transit card re-checks its stop every 30 s → "Leave in 4 min for the 08:30 KTL" / "You'd miss the 08:23…" + one buzz when it's time; car/taxi re-planned every 2 min → "faster route, saves N min · Switch" (≥ 3 min, only after a refresh); 6 tests. Full multimodal follow mode not built (D36)
 - [ ] 7. Friends/meetups multimodal ETAs; demo seeds ("simulate rush hour"); eval table; polish
 
 ## Phase 3 — AI tagging (target Oct 12–13)

@@ -789,3 +789,28 @@ planning depends on it, so a failure only changes the banner text.
 **Not done here:** linking incidents to car routes ("Avoid: accident on Tat Chee Avenue") — without positions
 we'd be matching road names in free text, which we won't present as fact. Live traffic in _car times_ comes
 from Google Routes once the key is set (D31).
+
+### D36 · Multimodal step 6: live trip updates (2026-10-18)
+
+**Transit: "when do I leave?"** On the selected transit card, `LiveTransit` re-asks the `eta` function for the
+boarding stop every 30 s (server cache is 30 s too) and runs `catchPlan` (`shared/src/live-trip.ts`, tests):
+leave-by time = departure − walk to the stop − the same 60 s boarding buffer plan-trip uses. It says one of:
+"Leave in 4 min for the 08:30 KTL", "Leave now for the 08:26 KTL", "You'd miss the 08:23 — leave in 5 min for
+the 08:31 KTL", or "No KTL departures you can reach are listed right now", with "live/scheduled · updated 12 s
+ago". The card turns amber and the phone buzzes **once** when it's time to leave (React Native's built-in
+`Vibration`, no new package; push notifications would need `expo-notifications` and a background task, which
+is out of scope for the demo). Hidden for trips planned > 20 min ahead (live lists don't reach that far). If
+the operator is down: "Live departures unavailable — times below are the plan's estimate".
+
+**Car / taxi: faster route banner.** While a car or taxi option is shown, the app re-plans every 2 min
+(`useTripPlan` `refreshMs`; server caches Google 3 min / ORS 10 min). `fasterAlternative` offers a same-mode
+route that now saves ≥ 3 min ("Traffic changed: via Lung Cheung Road now saves 4 min · Switch"). It only
+appears after a refresh _since you picked_, so choosing a slower route on purpose isn't nagged. Honest caveat:
+without the Google key, driving times are ORS typical times that don't change between refreshes, so the banner
+will only ever fire once live traffic is on (D31).
+
+**Walking legs** keep the existing follow-mode re-routing (rain, off-route, blocked paths — D27/D28).
+
+**Not done:** a full turn-by-turn follow mode for transit/car trips (board/alight prompts, re-timing as you
+walk). Step 6 refreshes the _plan_ while you look at it; following a multimodal trip step by step would be a
+larger piece of work than the time left allows.

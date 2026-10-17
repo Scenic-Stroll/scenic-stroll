@@ -16,14 +16,20 @@ export function useTripPlan(args: {
   /** null = leave now. */
   departure: Date | null;
   enabled: boolean;
+  /**
+   * Re-plan this often (ms) while following a car/taxi option, to catch a faster route as
+   * traffic changes (multimodal step 6). false = only when asked.
+   */
+  refreshMs?: number | false;
 }) {
-  const { origin, destination, condition, departure, enabled } = args;
+  const { origin, destination, condition, departure, enabled, refreshMs = false } = args;
   const departAt = departure?.toISOString();
   return useQuery({
     queryKey: ['plan-trip', origin, destination, condition, departAt],
     enabled: enabled && isSupabaseConfigured && origin !== null && destination !== null,
     // Traffic changes; the server caches 3 min, so asking again after 2 min is plenty.
     staleTime: 2 * 60_000,
+    refetchInterval: refreshMs,
     retry: false,
     queryFn: async (): Promise<PlanTripResponse | null> => {
       try {

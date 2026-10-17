@@ -93,6 +93,8 @@ export function PlanningSheet({
     mode: TravelMode;
     onModeChange: (mode: TravelMode) => void;
     plan: PlanTripResponse | null | undefined;
+    /** When the plan was last fetched (ms), for "faster route" after a refresh. */
+    updatedAt: number;
     loading: boolean;
     selectedId: string | null;
     onSelect: (id: string) => void;
@@ -154,6 +156,7 @@ export function PlanningSheet({
           {ready ? (
             <TripOptions
               plan={travel.plan}
+              updatedAt={travel.updatedAt}
               loading={travel.loading}
               modeFilter={travel.mode}
               selectedId={travel.selectedId}

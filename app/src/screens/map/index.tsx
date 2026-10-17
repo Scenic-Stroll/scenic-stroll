@@ -91,6 +91,8 @@ const DEMO_CAMERA: Camera = {
   zoom: 16.5, // Google Maps
 };
 
+/** How often to re-check traffic while a car/taxi option is shown (brief §4: every 2 min). */
+const DRIVING_REFRESH_MS = 2 * 60_000;
 /** Widest map span (degrees) at which transit stop pins are drawn. */
 const STOPS_MAX_SPAN = 0.025;
 const toMap = (p: LatLng): MapLatLng => ({ latitude: p.lat, longitude: p.lng });
@@ -208,12 +210,17 @@ export function MapHome() {
   // Other ways to travel (multimodal): walk vs car, compared. Walk stays the default tab.
   const [travelMode, setTravelMode] = useState<TravelMode>('walk');
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
+  // Looking at a car or taxi option? Re-check traffic every 2 min (brief §4) so a faster route
+  // can be offered. Car/taxi option ids start with "car-"/"taxi-" (shared/src/trip-plan.ts).
+  const watchingDriving =
+    travelMode === 'car' || travelMode === 'taxi' || /^(car|taxi)-/.test(selectedTripId ?? '');
   const trips = useTripPlan({
     origin: origin?.point ?? null,
     destination: destination?.point ?? null,
     condition: now.mode,
     departure,
     enabled: planning,
+    refreshMs: watchingDriving ? DRIVING_REFRESH_MS : false,
   });
   const tripOptions = (trips.data?.options ?? []).filter(
     (o) => travelMode === 'all' || o.mode === travelMode,
@@ -793,6 +800,7 @@ export function MapHome() {
                   setSelectedTripId(null);
                 },
                 plan: trips.data,
+                updatedAt: trips.dataUpdatedAt,
                 loading: trips.isFetching,
                 selectedId: shownTripId,
                 onSelect: (id) => {

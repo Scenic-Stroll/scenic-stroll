@@ -8,6 +8,7 @@
 import {
   formatDistance,
   formatDuration,
+  fasterAlternative,
   formatHkTime,
   sortTrips,
   TRIP_SORTS,
@@ -22,6 +23,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Chip } from '@/components/ui/chip';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { radius, space, type, useAppTheme } from '@/theme';
+
+import { LiveTransit, RerouteBanner } from './live-trip';
 
 const SORT_LABELS: Record<TripSort, string> = {
   best: 'Best for you',
@@ -181,7 +184,7 @@ function TripCard({
           Typical traffic — live traffic isn’t available right now
         </Text>
       ) : null}
-      <LiveDeparture option={o} />
+      {selected && o.mode === 'transit' ? <LiveTransit option={o} /> : <LiveDeparture option={o} />}
       {estimateNotes(o).map((n) => (
         <Text key={n} style={[type.caption, { color: t.textSecondary }]}>
           {n}
@@ -226,12 +229,15 @@ function LiveDeparture({ option: o }: { option: TripOption }) {
 
 export function TripOptions({
   plan,
+  updatedAt,
   loading,
   modeFilter,
   selectedId,
   onSelect,
 }: {
   plan: PlanTripResponse | null | undefined;
+  /** When `plan` was fetched (ms): a "faster route" is only offered after a later refresh. */
+  updatedAt: number;
   loading: boolean;
   /** 'all' = every option (best for you first); otherwise one mode. */
   modeFilter: 'all' | TripOption['mode'];
@@ -245,6 +251,16 @@ export function TripOptions({
   );
   // The server already sends "best for you" first; other orders are re-sorted here.
   const options = plan ? sortTrips(filtered, sort, plan.condition) : filtered;
+  // When the shown option was picked. A faster car route is suggested only once the plan has
+  // been refreshed since (traffic changed), not straight after you chose a slower one on purpose.
+  const [pickedAt, setPickedAt] = useState(updatedAt);
+  const pick = (id: string) => {
+    setPickedAt(updatedAt);
+    onSelect(id);
+  };
+  const shown = options.find((o) => o.id === selectedId) ?? options[0];
+  const faster =
+    plan && shown && updatedAt > pickedAt ? fasterAlternative(shown, plan.options) : null;
   if (loading && options.length === 0) {
     return <Text style={[type.small, { color: t.textSecondary }]}>Comparing ways to travel…</Text>;
   }
@@ -258,6 +274,13 @@ export function TripOptions({
   const missing = plan.unavailable.filter((u) => modeFilter === 'all' || u.mode === modeFilter);
   return (
     <View style={styles.list}>
+      {faster && shown ? (
+        <RerouteBanner
+          alternative={faster}
+          saving_s={shown.total_s - faster.total_s}
+          onSwitch={() => pick(faster.id)}
+        />
+      ) : null}
       {options.length > 1 ? (
         <ScrollView
           horizontal
@@ -277,12 +300,7 @@ export function TripOptions({
         </ScrollView>
       ) : null}
       {options.map((o) => (
-        <TripCard
-          key={o.id}
-          option={o}
-          selected={o.id === selectedId}
-          onPress={() => onSelect(o.id)}
-        />
+        <TripCard key={o.id} option={o} selected={o.id === selectedId} onPress={() => pick(o.id)} />
       ))}
       {missing.map((u) => (
         <Text key={u.mode} style={[type.small, { color: t.textSecondary }]}>

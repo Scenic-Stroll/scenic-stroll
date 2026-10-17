@@ -35,3 +35,5 @@ export * from './transit/demo-stops.ts';
 export * from './transit/stops.ts';
 export * from './taxi-fare.ts';
 export * from './traffic-news.ts';
+export * from './live-trip.ts';
+export * from './transit/live-departures.ts';
