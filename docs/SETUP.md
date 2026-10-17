@@ -184,6 +184,18 @@ GRAPH_LOADER_KEY=<key> npm run graph:load   # uploads (~15 s), then switches the
   route**. Answers from a simulated walk are recorded but never counted, so demos can't change real routing. A route
   saved during a demo really appears on the map; delete it under My routes afterwards.
 
+- **The day before a demo** (smart routing step 8), online:
+
+  ```bash
+  npm run graph:shade -- 2026-10-24        # shade for the demo day, then graph:key + graph:load-shade (above)
+  npm run eval:routing                      # checks + Markdown table → eval/results/routing-<day>.md
+  npm run demo:snapshot -- 2026-10-24       # saves the demo trips' routes into the app (commit the JSON)
+  ```
+
+  If the network or server fails during the pitch, the demo trips (presets: Exit A1, Exit C1, Festival Walk ↔
+  MMW, YEUNG, AC2, AC3, Student Residence) still show computed routes, labelled "saved for the demo".
+  Profile → Diagnostics → **Test smart routing** checks the live function in one tap.
+
 ## 10. Before you push code
 
 ```bash

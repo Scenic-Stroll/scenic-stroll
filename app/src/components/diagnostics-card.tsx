@@ -15,6 +15,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { FollowDemoControls } from '@/components/follow-demo-controls';
+import { SmartRoutingTest } from '@/components/smart-routing-test';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Chip } from '@/components/ui/chip';
@@ -132,6 +133,7 @@ export function DiagnosticsCard() {
         ))}
       </View>
       <FollowDemoControls />
+      <SmartRoutingTest />
 
       <Pressable
         accessibilityRole="button"

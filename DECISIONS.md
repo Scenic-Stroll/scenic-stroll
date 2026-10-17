@@ -524,3 +524,41 @@ user as `origin: planned, status: unverified`. All test data was then removed.
 gets another vote. A trigger can fix that when "delete my data" (Phase 7) lands. The MCP `apply_migration` call kept
 failing for the export migration ("Invalid or expired requestState"), so it was applied in one transaction with
 `execute_sql` and recorded in `supabase_migrations.schema_migrations` by hand (version 20261016205000).
+
+### D30 · Smart routing step 8: shade layer, evaluation, demo safety (2026-10-18)
+
+**"Shade now" layer** (Layers menu). Every outdoor path is coloured by estimated shade at the current half hour:
+sun < 35 %, part shade 35–70 %, shade ≥ 70 %, plus covered walkways. Indoor paths and lifts are left out (no sky).
+`shade_layer()` merges neighbouring paths of the same class into long lines on the server (`ST_LineMerge`). Why:
+react-native-maps draws one native line per path, and the whole area has ~9,000 paths. Merged and without < 10 m
+scraps it is 1,937 lines for the whole area and ~600 (20 KB) for a screen, with 93 % of the length kept (measured
+live). The app only asks while zoomed in, for a box snapped to a 500 m grid (small pans reuse what it has), and caps
+drawing at 1,500 lines. After dark it shows 13:00 and says so ("No sun now — showing 13:00 for reference").
+
+**Evaluation** (`npm run eval:routing`, brief §9) → `eval/results/routing-2026-10-24.md`. It covers 5 demo trips at
+10:00 / 13:00 / 17:00, in heat and in rain, on the local copy of the live graph build. 66 checks all pass: the
+coolest route is at least as shaded as the fastest, the sheltered route at least as covered, step-free routes have
+no stairs or escalators, the "much longer" flag matches the 1.4× cap, and each plan takes < 2 s (slowest 28 ms
+locally). The headline counts only trips where the weather route actually differs. In the other 7 the fastest route
+already _is_ the best one (often through Festival Walk), and averaging those zeros in would hide the trade-off.
+**Heat: a different route in 8 of 15 trips, there a median +1 min for 48 % less time in the sun (best case 81 %).
+Rain: 9 of 15, median under a minute for 29 % less uncovered walking.**
+
+**Demo safety** (brief §10). `npm run demo:snapshot -- <day>` saves the live answers for the demo trips (both
+directions, normal / rain / heat, the "Best now" tab, 13:00 on the pitch day) into `app/src/demo/smart-route-snapshot.json`
+(30 answers, 530 KB, bundled). `useSmartRoutes` uses one **only when the live call fails** and the trip starts and
+ends within 40 m of the demo places. The planning sheet then says "Offline — showing routes saved for the demo
+(…13:00 on 2026-10-24)", so a saved answer is never shown as live. Saved answers pass the same zod check as live
+ones, so an outdated file can't show a broken route. It isn't Prettier-formatted (one line, on purpose), and the
+"Simulate weather" switch from step 1 still works offline.
+
+**Shade recomputed for the pitch day.** Live shade is now for 2026-10-24 (was 16 Oct; the sun's path moves
+~0.4° a day). The eval and the snapshot were rerun on it, with almost the same results.
+
+**Diagnostics** gained "Test smart routing" (Exit A1 → MMW: options, seconds, map build, shade day). The profile's
+attribution adds "Shade estimates: building heights © Lands Department · trees © OpenStreetMap contributors".
+
+**Measured live latency** (from the dev machine, 8 calls): first 2.1 s, then a median of 1.4 s (0.6–1.5 s).
+
+**Not done in smart routing** (see PLAN.md → Definition of done): merging computed routes with community routes
+needs `find-routes` (Phase 4), and the smart-routing screens are English only (the bilingual pass is Phase 7).

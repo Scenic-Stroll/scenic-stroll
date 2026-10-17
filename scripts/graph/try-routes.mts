@@ -1,57 +1,16 @@
 // Tries smart routing on the local graph (scripts/graph/data/graph.json) for the demo trips, so
 // you can see the effect of a weight change in routing-profiles.ts without deploying anything.
 // Run: npm run graph:try          (after npm run graph:build; uses shade.json from graph:shade if there)
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
 import type { ConditionMode } from '../../shared/src/conditions.ts';
 import { formatDuration } from '../../shared/src/format.ts';
-import type { GraphEdge, GraphNode } from '../../shared/src/graph-build.ts';
 import { PRESETS } from '../../shared/src/presets.ts';
-import { prepareGraph } from '../../shared/src/router.ts';
 import type { RoutingProfile } from '../../shared/src/routing-profiles.ts';
 import { planSmartRoutes } from '../../shared/src/smart-route.ts';
 
-const here = path.dirname(fileURLToPath(import.meta.url));
-const raw = JSON.parse(fs.readFileSync(path.join(here, 'data', 'graph.json'), 'utf8')) as {
-  source: string;
-  sourceVersion: string;
-  nodes: GraphNode[];
-  edges: GraphEdge[];
-};
+import { loadLocalGraph } from './local-graph.mts';
 
-// Shade, if computed (npm run graph:shade).
-const shadePath = path.join(here, 'data', 'shade.json');
-const shadeFile = fs.existsSync(shadePath)
-  ? (JSON.parse(fs.readFileSync(shadePath, 'utf8')) as {
-      date: string;
-      firstMin: number;
-      bucketMin: number;
-      edges: [number, number[], number][];
-    })
-  : null;
-const shadeById = new Map(shadeFile?.edges.map(([id, pct]) => [id, pct]) ?? []);
-const day = shadeFile?.date ?? '2026-10-16';
-
-// Same as what the server loads: the main connected piece, with the build script's ids (they have
-// gaps where scraps were left out; prepareGraph renumbers them, exactly as on the server).
-const nodes = raw.nodes.filter((n) => n.component === 0);
-const graph = prepareGraph({
-  buildId: 0,
-  source: raw.source,
-  version: raw.sourceVersion,
-  shadeMeta: shadeFile
-    ? { date: shadeFile.date, firstMin: shadeFile.firstMin, bucketMin: shadeFile.bucketMin }
-    : null,
-  nodes: nodes.map((n) => ({ id: n.id, lng: n.lng, lat: n.lat, z: n.z, kind: n.kind })),
-  edges: raw.edges.map((e) => ({
-    ...e,
-    data_source: raw.source,
-    shade: shadeById.get(e.id) ?? null,
-    line: e.coords.map(([lng, lat]) => ({ lng, lat })),
-  })),
-});
+const { graph, shadeDate } = loadLocalGraph();
+const day = shadeDate ?? '2026-10-16';
 
 const point = (id: string) => PRESETS.find((p) => p.id === id)!.point;
 const TRIPS: [string, string][] = [

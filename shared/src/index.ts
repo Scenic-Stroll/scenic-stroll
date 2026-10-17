@@ -26,3 +26,4 @@ export * from './smart-route-api.ts';
 export * from './smart-route.ts';
 export * from './follow.ts';
 export * from './edge-feedback.ts';
+export * from './shadows.ts';

@@ -44,6 +44,7 @@ import { useSmartRoutes } from '@/lib/smart-routes';
 import { friendAsPlace, stopSharing, useFriendLocations, useSharing } from '@/lib/location-sharing';
 import { useCheckpointsNear } from '@/lib/checkpoints-near';
 import { useMapFocus } from '@/lib/map-focus-store';
+import { SHADE_MAX_SPAN, useShadeLayer, type MapBox } from '@/lib/shade-layer';
 import { CHECKPOINT_INFO, describeCheckpoint } from '@/constants/checkpoints';
 import { ShareLocationSheet } from '@/screens/friends/share-location-sheet';
 import { useMyProfile } from '@/lib/profile';
@@ -59,6 +60,7 @@ import { NearbySheet } from './nearby-sheet';
 import { PlacePicker } from './place-picker';
 import { PlaceSheet } from './place-sheet';
 import { PlanningSheet, STANDARD_OPTION_ID } from './planning-sheet';
+import { ShadeLayer, ShadeLegend } from './shade-layer';
 import { profileForMode, type RouteMode } from './route-mode-tabs';
 import { SmartRouteLine } from './smart-route-line';
 import type { Place } from './types';
@@ -109,7 +111,12 @@ export function MapHome() {
     threeD: false,
     communityRoutes: true,
     places: true,
+    shade: false,
   });
+  // The visible map area, for the "Shade now" layer (only fetched while that layer is on).
+  const [mapBox, setMapBox] = useState<{ box: MapBox; span: number } | null>(null);
+  const shadeZoomedOut = (mapBox?.span ?? 1) > SHADE_MAX_SPAN;
+  const shadeLayer = useShadeLayer(layers.shade && !shadeZoomedOut, mapBox?.box ?? null);
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
   /** The place card being shown (landmark, search result or dropped pin). */
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
@@ -380,6 +387,15 @@ export function MapHome() {
         toolbarEnabled={false}
         // Zoomed in close to a building? Show its floors.
         onRegionChangeComplete={(region) => {
+          setMapBox({
+            span: region.latitudeDelta,
+            box: {
+              minLng: region.longitude - region.longitudeDelta / 2,
+              maxLng: region.longitude + region.longitudeDelta / 2,
+              minLat: region.latitude - region.latitudeDelta / 2,
+              maxLat: region.latitude + region.latitudeDelta / 2,
+            },
+          });
           const zoomedIn = region.latitudeDelta < BUILDING_ZOOM_DELTA;
           const center = { lat: region.latitude, lng: region.longitude };
           const building = zoomedIn
@@ -412,6 +428,9 @@ export function MapHome() {
               />
             ))
           : null}
+        {layers.shade && !shadeZoomedOut && shadeLayer.data ? (
+          <ShadeLayer lines={shadeLayer.data.lines} />
+        ) : null}
         {following ? <FollowLayer /> : null}
         {planning && !following && standardRoute.data ? (
           <Polyline
@@ -551,6 +570,17 @@ export function MapHome() {
             </View>
           ))}
         </ScrollView>
+        {layers.shade ? (
+          <View style={styles.bannerRow} pointerEvents="box-none">
+            <ShadeLegend
+              bucket={shadeLayer.bucket}
+              reference={shadeLayer.reference}
+              zoomedOut={shadeZoomedOut}
+              loading={shadeLayer.isPending && !shadeZoomedOut}
+              failed={shadeLayer.isError}
+            />
+          </View>
+        ) : null}
         {sharingOn ? (
           <View style={styles.bannerRow} pointerEvents="box-none">
             <Pressable

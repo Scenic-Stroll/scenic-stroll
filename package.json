@@ -27,7 +27,9 @@
     "graph:try": "node scripts/graph/try-routes.mts",
     "graph:download-shade": "node scripts/graph/download-shade-data.mts",
     "graph:shade": "node scripts/graph/compute-shade.mts",
-    "graph:load-shade": "node scripts/graph/load-shade.mts"
+    "graph:load-shade": "node scripts/graph/load-shade.mts",
+    "eval:routing": "node eval/routing/run.mts",
+    "demo:snapshot": "node scripts/demo/snapshot-smart-routes.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",

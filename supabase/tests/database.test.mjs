@@ -1139,3 +1139,28 @@ describe('community routes saved from a planned route', () => {
     );
   });
 });
+
+describe('shade_layer ("Shade now" map layer)', () => {
+  const BOX = [114.16, 22.33, 114.19, 22.345];
+  const layer = (bucket) =>
+    as(null, 'select public.shade_layer($1, $2, $3, $4, $5) as l', [bucket, ...BOX]).then(
+      (r) => r.rows[0].l,
+    );
+
+  it('classes paths by shade at that half hour, for signed-out users too', async () => {
+    // The shade test above set one edge to 0, 4, 8 … 96 % across the 25 buckets.
+    const early = await layer(0); // 0 % shaded
+    const late = await layer(24); // 96 % shaded
+    assert.equal(early.date, '2026-10-16');
+    assert.ok(early.lines.some(([cls]) => cls === 'sun'));
+    assert.ok(late.lines.some(([cls]) => cls === 'shade'));
+    assert.equal(typeof late.lines[0][1], 'string', 'encoded polyline');
+  });
+
+  it('draws nothing for a bucket outside the day, or an empty box', async () => {
+    assert.deepEqual((await layer(99)).lines, []);
+    const empty = (await as(null, 'select public.shade_layer(0, 120, 30, 120.01, 30.01) as l'))
+      .rows[0].l;
+    assert.deepEqual(empty.lines, []);
+  });
+});

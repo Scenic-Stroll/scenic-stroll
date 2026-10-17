@@ -80,7 +80,7 @@ export function PlanningSheet({
   now: NowInfo;
   onConditionOverride: (mode: ConditionMode | null) => void;
   /** Computed routes; null/undefined = not available (the standard route is still shown). */
-  smart: SmartRouteResponse | null | undefined;
+  smart: (SmartRouteResponse & { savedFor?: string }) | null | undefined;
   smartLoading: boolean;
   /** Start walking the selected option (follow mode). */
   onStart: () => void;
@@ -138,6 +138,11 @@ export function PlanningSheet({
 
       {ready && smart?.status === 'outside_area' ? (
         <Note text="Computed routes cover Kowloon Tong, Festival Walk and CityU. Outside that, only the standard street route is shown." />
+      ) : null}
+      {ready && smart?.savedFor ? (
+        <Note
+          text={`Offline — showing routes saved for the demo (shade and opening hours for ${smart.savedFor}). Live routes come back when you're online.`}
+        />
       ) : null}
       {ready && smart && smart.blocked_paths > 0 ? (
         <Note

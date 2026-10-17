@@ -1,12 +1,14 @@
 /**
  * Smart routes for the planning sheet: our own computed routes from the `smart-route` function.
  * Never shows an error: if the function fails (offline, outside the area, not deployed), this
- * returns null and the planning sheet simply shows the standard route, as before.
+ * returns the routes saved for the demo trips if it's one of those (demo-snapshot.ts), else null and
+ * the planning sheet simply shows the standard route, as before.
  */
 import type { ConditionMode, LatLng, RoutingProfile, SmartRouteResponse } from '@scenic/shared';
 import { useQuery } from '@tanstack/react-query';
 
 import { smartRoute } from '@/lib/api';
+import { savedDemoRoutes, type SavedRoutes } from '@/lib/demo-snapshot';
 import { isSupabaseConfigured } from '@/lib/supabase';
 
 export function useSmartRoutes(args: {
@@ -26,7 +28,7 @@ export function useSmartRoutes(args: {
     enabled: enabled && isSupabaseConfigured && origin !== null && destination !== null,
     staleTime: 5 * 60_000,
     retry: false, // the standard route is already there; don't keep the user waiting
-    queryFn: async (): Promise<SmartRouteResponse | null> => {
+    queryFn: async (): Promise<SmartRouteResponse | SavedRoutes | null> => {
       try {
         // Sending the card's condition keeps the routes consistent with what the card says.
         return await smartRoute({
@@ -37,8 +39,17 @@ export function useSmartRoutes(args: {
           departure_time: departureTime,
         });
       } catch (err) {
-        console.warn('[smart-route] falling back to the standard route', err);
-        return null;
+        const saved = savedDemoRoutes({
+          origin: origin!,
+          destination: destination!,
+          profile,
+          condition,
+        });
+        console.warn(
+          `[smart-route] ${saved ? 'using the routes saved for the demo' : 'falling back to the standard route'}`,
+          err,
+        );
+        return saved;
       }
     },
   });

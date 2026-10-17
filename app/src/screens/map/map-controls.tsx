@@ -15,6 +15,8 @@ export type MapLayers = {
   communityRoutes: boolean;
   /** Landmark pins (MTR exits, Festival Walk, CityU buildings). */
   places: boolean;
+  /** "Shade now": paths coloured by estimated shade at this half hour (smart routing step 8). */
+  shade: boolean;
 };
 
 export function MapControls({
@@ -44,7 +46,7 @@ export function MapControls({
         icon="layers-outline"
         accessibilityLabel="Map layers"
         onPress={() => setMenuOpen(true)}
-        active={layers.threeD}
+        active={layers.threeD || layers.shade}
       />
       <LayersMenu
         visible={menuOpen}
@@ -108,6 +110,12 @@ function LayersMenu({
             title="Places"
             subtitle="MTR exits, Festival Walk, CityU buildings"
             right={toggle('places', 'Places')}
+          />
+          <ListRow
+            icon="weather-sunny-off"
+            title="Shade now"
+            subtitle="Paths in sun or shade right now (estimated from buildings, trees and the sun)"
+            right={toggle('shade', 'Shade now')}
           />
         </Pressable>
       </Pressable>

@@ -84,7 +84,18 @@ Secrets are never committed and never go in the app — only into `supabase secr
 - [x] 5. Mode tabs (Best now default + Fastest · Shaded · Sheltered · Cool · Step-free), departure time picker (now / +15 / +30 / +1 h / at…, sent as `departure_time`), one penalty-based alternative (×1.5 on used edges, ≤ 80 % overlap, ≤ 1.4× fastest, max 4 options); 3 new tests
 - [x] 6. Re-routing while walking: follow mode ("Start walking": current/next instruction, time left, arrival, off-route countdown; GPS fixes worse than 50 m ignored) re-plans from where you are after > 40 m off for 20 s; weather change → "It's started raining — a sheltered route via … adds 2 min. Switch?"; `path_reports` (anonymous, 3 h, snapped to the nearest edge, rate-limited, Realtime) — smart-route routes around reported paths and followers whose route ahead is hit re-plan; links closing < 20 min after you'd reach them are flagged on the card + explanation, with an alternative around them, and follow mode re-plans if you won't make it; demo "Simulate walk" + "Clear my reports" in Diagnostics; 28 unit + 7 DB tests
 - [x] 7. Feedback: after a computed walk one question matching the route's promise ("Was this route sheltered as promised?" 👍 / Partly / 👎) → one vote per person per relevant path (`private.edge_votes`, counts in `public.edge_feedback`, sent with the graph export as field 23); score nudges cost ±20 % for that promise, 3+ people disagreeing overrules the map (cover → not covered, shade → unknown, step-free → unconfirmed; never upgraded); demo walks not counted. "Save as a community route": the walked line (incl. parts before re-plans) via `create_route` with `origin = 'planned'`, labelled "Planned, then walked"; 13 unit + 10 DB tests
-- [ ] 8. Shade heatmap layer, eval report, demo seed, polish
+- [x] 8. "Shade now" map layer (Layers menu; `shade_layer()` merges paths by shade class on the server, ~600 lines per screen, 13:00 for reference after dark); `npm run eval:routing` → `eval/results/routing-2026-10-24.md` (5 trips × 10:00/13:00/17:00 × heat/rain, 66/66 checks; **+1 min for 48 % less sun** where the coolest route differs, best case 81 %); demo safety: `npm run demo:snapshot` bundles 30 saved demo routes, used only when the live call fails and labelled as saved; Diagnostics "Test smart routing"; shade recomputed for the pitch day (24 Oct); shade attribution
+- Definition of done (brief §11), checked 2026-10-18:
+  - [x] Any two points in the area → a fastest and a condition-aware route, with zero community routes
+  - [x] "Now" card shows live HKO data, or says it's cached / unavailable
+  - [x] Changing mode or simulated weather changes the recommended route and exposure bar (different route in 8–9 of 15 eval trips; in the rest the fastest already is the best)
+  - [x] Step-free routes never contain stairs/escalators; unknown parts say "unconfirmed" (eval checks)
+  - [x] Closed indoor links never used outside opening hours (router + tests; closing-soon warnings)
+  - [ ] Community-verified routes appear and are badged ✓ — but merging matching computed and community routes needs `find-routes` (Phase 4), not built yet
+  - [x] `smart-route` < 2 s for demo pairs (live median 1.4 s warm, 2.1 s first call); failures fall back silently (standard route, or the saved demo routes)
+  - [x] Eval table saved for the pitch deck
+  - [x] Data sources and licences in DECISIONS.md (D23–D26); attribution in Profile → About (OSM, HKO, Lands Dept network + building heights)
+  - [ ] All strings in English **and** Traditional Chinese — smart-routing UI is English only for now (Phase 7 bilingual pass)
 
 ## Phase 3 — AI tagging (target Oct 12–13)
 

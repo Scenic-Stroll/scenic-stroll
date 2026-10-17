@@ -359,6 +359,11 @@ export function ProfileScreen() {
             title="Walking network"
             subtitle="3D Pedestrian Network © Lands Department, HKSAR Government · via CSDI / DATA.GOV.HK"
           />
+          <ListRow
+            icon="weather-sunny-off"
+            title="Shade estimates"
+            subtitle="Building heights © Lands Department, HKSAR Government · trees © OpenStreetMap contributors (ODbL)"
+          />
         </Section>
       </ScrollView>
 
