@@ -47,6 +47,7 @@ import { friendAsPlace, stopSharing, useFriendLocations, useSharing } from '@/li
 import { useCheckpointsNear } from '@/lib/checkpoints-near';
 import { useMapFocus } from '@/lib/map-focus-store';
 import { SHADE_MAX_SPAN, useShadeLayer, type MapBox } from '@/lib/shade-layer';
+import { useTrafficNews } from '@/lib/traffic-news';
 import { CHECKPOINT_INFO, describeCheckpoint } from '@/constants/checkpoints';
 import { ShareLocationSheet } from '@/screens/friends/share-location-sheet';
 import { useMyProfile } from '@/lib/profile';
@@ -64,6 +65,7 @@ import { PlaceSheet } from './place-sheet';
 import { PlanningSheet, STANDARD_OPTION_ID } from './planning-sheet';
 import { ShadeLayer, ShadeLegend } from './shade-layer';
 import { OPERATOR_LABEL } from './stop-arrivals';
+import { IncidentsBanner } from './incidents';
 import { profileForMode, type RouteMode } from './route-mode-tabs';
 import { SmartRouteLine } from './smart-route-line';
 import type { TravelMode } from './travel-mode-tabs';
@@ -120,7 +122,10 @@ export function MapHome() {
     places: true,
     shade: false,
     transitStops: false,
+    traffic: false,
+    incidents: false,
   });
+  const trafficNews = useTrafficNews(layers.incidents);
   // The visible map area, for the "Shade now" layer (only fetched while that layer is on).
   const [mapBox, setMapBox] = useState<{ box: MapBox; span: number } | null>(null);
   const shadeZoomedOut = (mapBox?.span ?? 1) > SHADE_MAX_SPAN;
@@ -409,6 +414,8 @@ export function MapHome() {
         mapType={Platform.OS === 'ios' ? 'mutedStandard' : 'standard'}
         userInterfaceStyle={scheme}
         showsBuildings={layers.threeD}
+        // Live road traffic drawn by the map itself (Google Maps on Android, Apple Maps on iOS).
+        showsTraffic={layers.traffic}
         pitchEnabled
         showsUserLocation={hasLocationPermission}
         showsMyLocationButton={false}
@@ -535,6 +542,25 @@ export function MapHome() {
               </Marker>
             ))
           : null}
+        {layers.incidents
+          ? (trafficNews.data ?? [])
+              .filter((i) => i.point)
+              .map((i) => (
+                <Marker
+                  key={`incident-${i.id}`}
+                  coordinate={toMap(i.point!)}
+                  // A native callout is enough here: heading + where; the banner opens the full list.
+                  title={i.heading_en}
+                  description={i.location_en}
+                  accessibilityLabel={`Road incident: ${i.heading_en}, ${i.location_en}`}
+                  tracksViewChanges={false}
+                >
+                  <View style={[styles.incidentDot, { backgroundColor: t.warning }]}>
+                    <Icon name="alert" size={12} color={t.onPrimary} />
+                  </View>
+                </Marker>
+              ))
+          : null}
         {visibleCheckpoints.map((c) => (
           <Marker
             key={`cp-${c.id}`}
@@ -636,6 +662,15 @@ export function MapHome() {
             </View>
           ))}
         </ScrollView>
+        {layers.incidents ? (
+          <View style={styles.bannerRow} pointerEvents="box-none">
+            <IncidentsBanner
+              incidents={trafficNews.data}
+              loading={trafficNews.isPending}
+              failed={trafficNews.isError}
+            />
+          </View>
+        ) : null}
         {layers.shade ? (
           <View style={styles.bannerRow} pointerEvents="box-none">
             <ShadeLegend
@@ -838,6 +873,13 @@ const styles = StyleSheet.create({
   },
   controls: { alignItems: 'flex-end', paddingHorizontal: space.lg, marginTop: space.sm },
   placeDot: { width: 14, height: 14, borderRadius: 7, borderWidth: 3 },
+  incidentDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   stopDot: {
     width: 20,
     height: 20,

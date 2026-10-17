@@ -34,3 +34,4 @@ export * from './transit/eta-schema.ts';
 export * from './transit/demo-stops.ts';
 export * from './transit/stops.ts';
 export * from './taxi-fare.ts';
+export * from './traffic-news.ts';

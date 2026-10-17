@@ -104,7 +104,7 @@ Secrets are never committed and never go in the app — only into `supabase secr
 - [x] 2. Transit via Google Routes TRANSIT (ready, waits for the key) → fallback: our own MTR planner from MTR open data (12 line branches, 100 stations, Dijkstra with changes, times estimated from distance, adult Octopus fares in `mtr_fares`); leg strip with line colours; walking legs to/from stations replaced by our smart router inside the area; "Transit" tab. Times are labelled **estimated, not live** until step 3
 - [x] 3. Real-time ETAs: `eta` function (MTR Next Train, KMB/LWB, Citybus, GMB; cached 30 s); 177 stops near CityU (`npm run transit:stops`); Transit stops layer + stop cards (live/scheduled, refreshed 30 s); plan-trip uses the live next train at the first boarding station (catchable one, rest of trip shifted); "Next departure is live" on cards
 - [x] 4. Taxi option (quickest driving route + 3 min pickup) priced with the official urban meter tariff (from 14 Jul 2024) as a low–high range, tolls/luggage noted; Taxi tab; sort chips (Best · Fastest · Cheapest · Greenest · Least walking); labels + green nudge include taxis (5 tests)
-- [ ] 5. Traffic + incidents layers
+- [x] 5. Traffic layer (map's own live traffic, `showsTraffic`) + Incidents layer (TD special traffic news, parsed in shared, 3 tests; pins when positioned + banner/list in English & Chinese, refreshed 2 min); attribution. TD speed-segment fallback not built (D35)
 - [ ] 6. Live trip updates (ETA refresh, traffic reroute)
 - [ ] 7. Friends/meetups multimodal ETAs; demo seeds ("simulate rush hour"); eval table; polish
 

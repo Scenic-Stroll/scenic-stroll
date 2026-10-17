@@ -19,6 +19,10 @@ export type MapLayers = {
   shade: boolean;
   /** Bus, minibus and MTR stops near CityU; tap one for live arrivals (multimodal step 3). */
   transitStops: boolean;
+  /** Live traffic colours on the roads, drawn by the map itself (Google Maps / Apple Maps). */
+  traffic: boolean;
+  /** Road incidents and closures from Transport Department traffic news. */
+  incidents: boolean;
 };
 
 export function MapControls({
@@ -48,7 +52,9 @@ export function MapControls({
         icon="layers-outline"
         accessibilityLabel="Map layers"
         onPress={() => setMenuOpen(true)}
-        active={layers.threeD || layers.shade || layers.transitStops}
+        active={
+          layers.threeD || layers.shade || layers.transitStops || layers.traffic || layers.incidents
+        }
       />
       <LayersMenu
         visible={menuOpen}
@@ -124,6 +130,18 @@ function LayersMenu({
             title="Transit stops"
             subtitle="Bus, minibus and MTR stops near CityU — tap one for live arrivals"
             right={toggle('transitStops', 'Transit stops')}
+          />
+          <ListRow
+            icon="car-clock"
+            title="Traffic"
+            subtitle="Live road traffic from the map (green flowing · orange slow · red jammed)"
+            right={toggle('traffic', 'Traffic')}
+          />
+          <ListRow
+            icon="alert-outline"
+            title="Incidents"
+            subtitle="Accidents and closures from Transport Department traffic news"
+            right={toggle('incidents', 'Incidents')}
           />
         </Pressable>
       </Pressable>

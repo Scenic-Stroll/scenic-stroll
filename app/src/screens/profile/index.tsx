@@ -380,6 +380,11 @@ export function ProfileScreen() {
             subtitle="Urban taxi meter tariff (from 14 July 2024) · Transport Department, HKSAR Government"
           />
           <ListRow
+            icon="alert-outline"
+            title="Traffic and incidents"
+            subtitle="Road traffic layer by Google Maps / Apple Maps · incidents from Transport Department special traffic news · via DATA.GOV.HK"
+          />
+          <ListRow
             icon="clock-fast"
             title="Live arrivals"
             subtitle="MTR Next Train, KMB/LWB, Citybus and green minibus (Transport Department) real-time data · via DATA.GOV.HK"

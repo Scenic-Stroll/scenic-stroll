@@ -761,3 +761,31 @@ joins Walk · All · Transit · Car.
 
 **Live check (04:50 HK, ORS typical traffic):** CityU → Mong Kok taxi 11 min, HK$37–42; → TST 15 min, HK$63–67;
 → HKU 24 min, HK$105–111 (+ cross-harbour toll, not included); → CUHK 35 min, HK$139–146.
+
+### D35 · Multimodal step 5: traffic and incidents layers (2026-10-18)
+
+**Traffic layer = the map's own traffic.** Layers → _Traffic_ turns on `showsTraffic` in react-native-maps:
+Google Maps draws it on Android, Apple Maps on iOS (both in Expo Go, no key or billing on our side). This is the
+brief's primary option. The brief's fallback — Transport Department road-speed data drawn as our own coloured
+segments — is **not built**: TD's speed feed only gives link ids, and matching them to road geometry is a
+separate dataset and a day of work; the native layer already covers all of Hong Kong. If a judge's phone shows
+no colours, the cause is the base map (e.g. no traffic data at that zoom), not our code.
+
+**Incidents = Transport Department "Special Traffic News".** `https://www.td.gov.hk/en/special_news/trafficnews.xml`
+(checked live 2026-10-18; the `resource.data.gov.hk` mirror refused connections that day). A small flat XML
+file, English + Chinese, no key, DATA.GOV.HK terms (credited in Profile → About). `parseTrafficNews`
+(`shared/src/traffic-news.ts`, 3 tests) reads it with a few regular expressions — React Native has no XML
+parser and the file is one flat list. We hide messages whose status is `CLOSED` (they linger in the feed).
+Positions are often blank (the live check had one incident, closed, with no position), so incidents with a
+position get a pin and _all_ active ones are in a list behind a banner under the search bar ("2 road
+incidents · see list" / "No road incidents reported right now" / "Traffic news unavailable right now").
+
+**Fetched by the app, not an Edge Function.** The brief suggests a cached `traffic(bbox)` proxy. For this feed
+a proxy adds nothing: it's a public static file with no key to hide, served by TD's web server, and the app
+only fetches it while the layer is on, at most every 2 minutes (React Query), with an 8 s timeout. (It also
+meant this step needed no deploy — the Supabase connector was disconnected this session.) Nothing in trip
+planning depends on it, so a failure only changes the banner text.
+
+**Not done here:** linking incidents to car routes ("Avoid: accident on Tat Chee Avenue") — without positions
+we'd be matching road names in free text, which we won't present as fact. Live traffic in _car times_ comes
+from Google Routes once the key is set (D31).
