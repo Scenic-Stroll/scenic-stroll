@@ -863,3 +863,12 @@ are deployed: a stuck provider now gives a 504 in ~8 s. With Google answering we
 (`app/src/demo/trip-snapshot.json`) and wrote `eval/results/multimodal-2026-10-18.md`. Their long-distance
 walking rows are empty because standard walking still comes from ORS. Map routes (`plan-route`) stay on ORS until someone
 runs `npx supabase secrets set ROUTING_PROVIDER=google` — a team decision, since Google bills per call.
+
+## D39 — Demo video built with Remotion in `video/` (2026-10-18)
+
+The 30 s pitch video is code (Remotion 4, React) in its own `video/` folder, not an npm workspace, so the
+app's install, lint and tests don't change. All timings, captions (en + zh-HK) and highlight positions are
+in `video/src/video.config.ts`; missing footage renders as a labelled placeholder, so the video can be
+rendered at any point. Footage and music stay out of git (size, licences). The storyboard was adjusted to the
+real app: "Simulate weather: Heat" instead of a Demo mode, the friend scene uses "Getting there" + "Route to
+friend" (no meetup card exists), and the comparison caption uses the eval's Exit A1 → MMW numbers.

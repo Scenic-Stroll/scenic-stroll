@@ -1,0 +1,21 @@
+{
+  "name": "scenic-stroll-video",
+  "private": true,
+  "description": "30-second demo video for Scenic Stroll, built with Remotion. Not part of the app.",
+  "scripts": {
+    "assets": "node scripts/find-assets.mjs",
+    "preview": "npm run assets && remotion studio",
+    "render": "npm run assets && remotion render Vertical out/scenic-stroll-30s-vertical.mp4 && remotion render Landscape out/scenic-stroll-30s-landscape.mp4",
+    "typecheck": "npm run assets && tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.536",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "remotion": "^4.0.536"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "typescript": "^7.0.2"
+  }
+}
