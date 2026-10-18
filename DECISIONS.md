@@ -853,3 +853,13 @@ need ORS back — run `npm run demo:trips` and `npm run eval:multimodal` once dr
 
 **Polish.** `docs/DEMO.md`: a 3–4 minute demo script (walking core → comparison → nudge → live city →
 community, plus what happens offline). SETUP's "day before a demo" lists `demo:trips` and `eval:multimodal`.
+
+## D38 — Google Routes for driving during the ORS outage (2026-10-18)
+
+The public OpenRouteService API stopped answering (walking and driving, from our server and from a laptop,
+with a fresh key), so we set `GOOGLE_ROUTES_API_KEY`. `plan-trip` prefers Google for car/taxi whenever the key
+exists, so driving now has **live traffic** (and the faster-route banner can fire). The server timeouts (D37)
+are deployed: a stuck provider now gives a 504 in ~8 s. With Google answering we saved the demo trips
+(`app/src/demo/trip-snapshot.json`) and wrote `eval/results/multimodal-2026-10-18.md`. Their long-distance
+walking rows are empty because standard walking still comes from ORS. Map routes (`plan-route`) stay on ORS until someone
+runs `npx supabase secrets set ROUTING_PROVIDER=google` — a team decision, since Google bills per call.
