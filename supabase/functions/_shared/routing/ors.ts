@@ -1,7 +1,7 @@
 // OpenRouteService — free tier, `foot-walking` profile. Docs: https://openrouteservice.org/dev/#/api-docs
 import { DEMO_CENTER } from '../scenic/presets.ts';
 import type { LatLng } from '../scenic/schemas.ts';
-import { ProviderError, type RoutingProvider } from './types.ts';
+import { PROVIDER_TIMEOUT_MS, ProviderError, type RoutingProvider } from './types.ts';
 
 const BASE = 'https://api.openrouteservice.org';
 
@@ -12,6 +12,7 @@ export function createOrsProvider(apiKey: string): RoutingProvider {
     async walk(origin, destination) {
       const res = await fetch(`${BASE}/v2/directions/foot-walking/geojson`, {
         method: 'POST',
+        signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
         headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
         // ORS wants [longitude, latitude] order.
         body: JSON.stringify({
@@ -61,7 +62,9 @@ export function createOrsProvider(apiKey: string): RoutingProvider {
         'focus.point.lat': String(DEMO_CENTER.lat),
         'focus.point.lon': String(DEMO_CENTER.lng),
       });
-      const res = await fetch(`${BASE}/geocode/search?${params}`);
+      const res = await fetch(`${BASE}/geocode/search?${params}`, {
+        signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+      });
       if (!res.ok) throw new ProviderError(`OpenRouteService geocode error ${res.status}`);
       const json = await res.json();
       const features: unknown[] = Array.isArray(json?.features) ? json.features : [];

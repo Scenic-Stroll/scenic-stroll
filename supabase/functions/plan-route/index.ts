@@ -28,6 +28,10 @@ export default {
     } catch (err) {
       console.error('plan-route failed:', err);
       if (err instanceof ProviderError) return errorResponse(err.message, 502);
+      // Provider didn't answer within PROVIDER_TIMEOUT_MS (routing/types.ts).
+      if (err instanceof DOMException && err.name === 'TimeoutError') {
+        return errorResponse('The routing service is slow to answer — try again in a minute', 504);
+      }
       return errorResponse('Could not plan a route', 500);
     }
   }),

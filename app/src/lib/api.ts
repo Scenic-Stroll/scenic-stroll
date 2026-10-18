@@ -120,6 +120,9 @@ async function toFunctionError(name: FunctionName, error: unknown): Promise<Func
   );
 }
 
+/** Longest we wait for any Edge Function answer. */
+const FUNCTION_TIMEOUT_MS = 20_000;
+
 /** Calls an Edge Function and validates its JSON response. */
 async function callFunction<T extends z.ZodType>(
   name: FunctionName,
@@ -133,7 +136,12 @@ async function callFunction<T extends z.ZodType>(
       name,
     );
   }
-  const { data, error } = await supabase.functions.invoke(name, options);
+  // Never wait forever: if a server-side provider hangs, give up so the app can fall back
+  // (saved demo trips, walking-only) instead of spinning. Cold starts take up to ~8 s.
+  const { data, error } = await supabase.functions.invoke(name, {
+    ...options,
+    timeout: FUNCTION_TIMEOUT_MS,
+  });
   if (error) throw await toFunctionError(name, error);
 
   const parsed = schema.safeParse(data);

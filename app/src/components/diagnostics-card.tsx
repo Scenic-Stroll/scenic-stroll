@@ -1,13 +1,15 @@
 /**
  * Profile → Diagnostics: which Supabase project the app talks to, whether we're signed in,
  * and a "Test backend" button that pings every Edge Function and shows OK / the problem.
- * Also the live-weather status and the demo "Simulate weather" / "Simulate walk" switches.
+ * Also the live-weather status and the demo "Simulate weather" / "Simulate rush hour" /
+ * "Simulate walk" switches.
  */
 import {
   agoLabel,
   CONDITION_MODE_INFO,
   CONDITION_MODES,
   FUNCTIONS,
+  RUSH_HOUR_FACTOR,
   type Conditions,
   type FunctionName,
 } from '@scenic/shared';
@@ -15,6 +17,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { FollowDemoControls } from '@/components/follow-demo-controls';
+import { useRushHour } from '@/lib/rush-hour-store';
 import { SmartRoutingTest } from '@/components/smart-routing-test';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -60,6 +63,8 @@ export function DiagnosticsCard() {
   const now = useConditions();
   const simulated = useConditionsUi((s) => s.simulated);
   const setSimulated = useConditionsUi((s) => s.setSimulated);
+  const rushHour = useRushHour((s) => s.on);
+  const setRushHour = useRushHour((s) => s.setOn);
   const graph = useActiveGraph();
 
   const signedIn =
@@ -131,6 +136,20 @@ export function DiagnosticsCard() {
             onPress={() => setSimulated(m)}
           />
         ))}
+      </View>
+      {/* Demo only: jam every car/taxi so the walking/MTR nudge shows at a quiet hour. */}
+      <ThemedText type="small" themeColor="textSecondary">
+        Simulate rush hour (demo)
+      </ThemedText>
+      <View style={styles.chips}>
+        <Chip small label="Off" selected={!rushHour} onPress={() => setRushHour(false)} />
+        <Chip
+          small
+          icon="car-clock"
+          label={`Heavy traffic (driving ×${RUSH_HOUR_FACTOR})`}
+          selected={rushHour}
+          onPress={() => setRushHour(true)}
+        />
       </View>
       <FollowDemoControls />
       <SmartRoutingTest />

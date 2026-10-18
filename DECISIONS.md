@@ -814,3 +814,42 @@ will only ever fire once live traffic is on (D31).
 **Not done:** a full turn-by-turn follow mode for transit/car trips (board/alight prompts, re-timing as you
 walk). Step 6 refreshes the _plan_ while you look at it; following a multimodal trip step by step would be a
 larger piece of work than the time left allows.
+
+### D37 · Multimodal step 7: friends, demo safety, evaluation, polish (2026-10-18)
+
+**Friends.** A friend's profile (while they share location) shows "Getting there: best is MTR, 12 min" and
+the best time per mode, from the same `plan-trip` call as the map; "Route to friend" opens the full
+comparison. Your position is only read if location is already allowed — no permission prompt for this.
+**Meetups are not built**: the app has no meetup feature yet, so "each participant's best ETA" has nowhere
+to live; the per-friend line is the part of brief §6 that fits what exists.
+
+**Simulate rush hour (demo switch).** Profile → Diagnostics. `withRushHour` (`shared/src/rush-hour.ts`, 3
+tests) makes every car/taxi option take ×2.5 its time, colours the route as a jam, re-prices the taxi meter
+for the minutes stuck (half to all of the extra time), and re-ranks — at Exit A1 → CityU walking becomes
+Fastest with "As quick as driving · saves ~386 g CO₂". Applied in the app on top of the real answer (React
+Query `select`), never sent to the server; labelled on every card ("Traffic simulated for the demo") and in a
+banner; resets when the app restarts. ×2.5 is our choice for "heavy jam", not a measured figure. Found on the
+way: `rankTrips` kept an old nudge when re-ranking — it now starts each option clean.
+
+**Saved demo trips.** `npm run demo:trips` saves live plan-trip answers for the 5 brief pairs into
+`app/src/demo/trip-snapshot.json` (live departures stripped, coordinates rounded to ~1 m). The app uses one
+only when the live call fails or returns nothing, within 300 m of the saved ends, with times moved to start
+now and a banner "Saved for the demo (time) — the live service didn't answer".
+
+**Evaluation.** `npm run eval:multimodal` asks plan-trip for the 5 brief pairs (Exit A1 → CityU; CityU →
+Mong Kok, TST, HKU, CUHK) leaving now and at 08:30 / 18:00 on the next weekday, plus the 18:00 answer under
+simulated rush hour, and writes `eval/results/multimodal-<day>.md`: best time, cost, CO₂ and walking per
+mode, and one pitch line per pair.
+
+**Incident during this step — OpenRouteService directions stopped answering our server** (from ~05:30 HK on
+2026-10-18; ORS geocoding still worked, and ORS answered this laptop instantly). Effects: no driving/taxi
+options and no standard walk outside our graph, and — the real bug — `plan-route` and `plan-trip` hung ~2 min
+because our provider calls had no timeout. Fixes: every routing-provider request now gives up after 8 s
+(`PROVIDER_TIMEOUT_MS`), `plan-route`/`geocode` answer 504 "slow to answer — try again", and the app gives
+every function call 20 s (`FUNCTION_TIMEOUT_MS`) before falling back (saved trips, walking-only). **The
+server-side timeouts need a redeploy** of plan-route, geocode and plan-trip (the Supabase connector was
+disconnected in this session); the app-side timeout and fallbacks work now. The demo snapshot and the eval
+need ORS back — run `npm run demo:trips` and `npm run eval:multimodal` once driving works again.
+
+**Polish.** `docs/DEMO.md`: a 3–4 minute demo script (walking core → comparison → nudge → live city →
+community, plus what happens offline). SETUP's "day before a demo" lists `demo:trips` and `eval:multimodal`.

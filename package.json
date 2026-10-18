@@ -29,7 +29,9 @@
     "graph:shade": "node scripts/graph/compute-shade.mts",
     "graph:load-shade": "node scripts/graph/load-shade.mts",
     "eval:routing": "node eval/routing/run.mts",
+    "eval:multimodal": "node eval/multimodal/run.mts",
     "demo:snapshot": "node scripts/demo/snapshot-smart-routes.mjs",
+    "demo:trips": "node scripts/demo/snapshot-trips.mjs",
     "transit:build": "node scripts/transit/build-mtr.mts",
     "transit:stops": "node scripts/transit/build-stops.mts"
   },

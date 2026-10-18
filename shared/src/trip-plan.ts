@@ -209,7 +209,13 @@ export function rankTrips(
   condition: ConditionMode,
   nudgeMarginS = NUDGE_MARGIN_S,
 ): TripOption[] {
-  const out = options.map((o) => ({ ...o, labels: [] as TripLabel[] }));
+  // Start clean: options may be re-ranked after a change (e.g. the demo's simulated rush hour).
+  const out = options.map((o) => ({
+    ...o,
+    labels: [] as TripLabel[],
+    recommended: false,
+    nudge: null as string | null,
+  }));
   const label = (o: TripOption | undefined, l: TripLabel) => o && o.labels.push(l);
 
   const byTimeThen = (k: (o: TripOption) => number) => (o: TripOption) => k(o) * 1e6 + o.total_s;

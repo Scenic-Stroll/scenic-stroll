@@ -17,6 +17,8 @@ import { friendAsPlace, useFriendLocations } from '@/lib/location-sharing';
 import { useMapFocus } from '@/lib/map-focus-store';
 import { radius, space, type, useAppTheme } from '@/theme';
 
+import { FriendTravelTimes } from './friend-travel-times';
+
 export function FriendProfileScreen({ friendId }: { friendId: string }) {
   const t = useAppTheme();
   const profile = useFriendProfile(friendId);
@@ -106,12 +108,13 @@ export function FriendProfileScreen({ friendId }: { friendId: string }) {
             <ListRow
               icon="directions"
               title="Route to friend"
-              subtitle="Walking route to where they are now"
+              subtitle="Compare walking, MTR, car and taxi to where they are now"
               onPress={() => {
                 focusPlace(friendAsPlace(location), true);
                 router.navigate('/');
               }}
             />
+            <FriendTravelTimes friendPoint={friendAsPlace(location).point} />
           </>
         ) : (
           <ListRow

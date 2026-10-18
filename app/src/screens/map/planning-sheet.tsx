@@ -9,7 +9,6 @@ import {
   type ConditionMode,
   type Conditions,
   type PlanRouteResponse,
-  type PlanTripResponse,
   type SmartRouteResponse,
 } from '@scenic/shared';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -19,6 +18,7 @@ import { RouteOptionCard } from '@/components/route/route-option-card';
 import { ErrorCard } from '@/components/ui/error-card';
 import { Icon } from '@/components/ui/icon';
 import { PrimaryButton } from '@/components/ui/primary-button';
+import type { TripPlan } from '@/lib/demo-trips';
 import { radius, space, TAP_TARGET, type, useAppTheme } from '@/theme';
 
 import { ConditionsCard } from './conditions-card';
@@ -92,7 +92,7 @@ export function PlanningSheet({
   travel: {
     mode: TravelMode;
     onModeChange: (mode: TravelMode) => void;
-    plan: PlanTripResponse | null | undefined;
+    plan: TripPlan | null | undefined;
     /** When the plan was last fetched (ms), for "faster route" after a refresh. */
     updatedAt: number;
     loading: boolean;

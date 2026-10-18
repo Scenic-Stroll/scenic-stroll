@@ -2,7 +2,7 @@
 // Docs: https://developers.google.com/maps/documentation/routes/compute_route_directions
 import { decodePolyline } from '../scenic/geo.ts';
 import { DEMO_CENTER } from '../scenic/presets.ts';
-import { ProviderError, type RoutingProvider } from './types.ts';
+import { PROVIDER_TIMEOUT_MS, ProviderError, type RoutingProvider } from './types.ts';
 
 export function createGoogleProvider(apiKey: string): RoutingProvider {
   return {
@@ -11,6 +11,7 @@ export function createGoogleProvider(apiKey: string): RoutingProvider {
     async walk(origin, destination) {
       const res = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
         method: 'POST',
+        signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
         headers: {
           'Content-Type': 'application/json',
           'X-Goog-Api-Key': apiKey,
@@ -69,6 +70,7 @@ export function createGoogleProvider(apiKey: string): RoutingProvider {
     async geocode(text) {
       const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
         method: 'POST',
+        signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
         headers: {
           'Content-Type': 'application/json',
           'X-Goog-Api-Key': apiKey,

@@ -10,9 +10,9 @@ import {
   formatDuration,
   fasterAlternative,
   formatHkTime,
+  RUSH_HOUR_FACTOR,
   sortTrips,
   TRIP_SORTS,
-  type PlanTripResponse,
   type TripSort,
   type TripLabel,
   type TripOption,
@@ -23,6 +23,9 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Chip } from '@/components/ui/chip';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { radius, space, type, useAppTheme } from '@/theme';
+
+import type { TripPlan } from '@/lib/demo-trips';
+import { useRushHour } from '@/lib/rush-hour-store';
 
 import { LiveTransit, RerouteBanner } from './live-trip';
 
@@ -83,6 +86,9 @@ function estimateNotes(o: TripOption): string[] {
   if (o.estimated.includes('walk_legs')) notes.push('Walks to and from stations are estimates');
   if (o.estimated.includes('taxi_fare')) {
     notes.push('Fare from the official taxi meter — tunnel tolls and luggage extra');
+  }
+  if (o.estimated.includes('simulated_traffic')) {
+    notes.push('Traffic simulated for the demo (not live)');
   }
   if (o.estimated.includes('taxi_pickup')) notes.push('Includes ~3 min to get a taxi (estimate)');
   return notes;
@@ -235,7 +241,7 @@ export function TripOptions({
   selectedId,
   onSelect,
 }: {
-  plan: PlanTripResponse | null | undefined;
+  plan: TripPlan | null | undefined;
   /** When `plan` was fetched (ms): a "faster route" is only offered after a later refresh. */
   updatedAt: number;
   loading: boolean;
@@ -246,6 +252,7 @@ export function TripOptions({
 }) {
   const t = useAppTheme();
   const [sort, setSort] = useState<TripSort>('best');
+  const rushHour = useRushHour((s) => s.on);
   const filtered = (plan?.options ?? []).filter(
     (o) => modeFilter === 'all' || o.mode === modeFilter,
   );
@@ -274,6 +281,18 @@ export function TripOptions({
   const missing = plan.unavailable.filter((u) => modeFilter === 'all' || u.mode === modeFilter);
   return (
     <View style={styles.list}>
+      {plan.savedFor ? (
+        <Text style={[type.small, styles.simulated, { color: t.warning }]}>
+          Saved for the demo ({plan.savedFor}) — the live service didn’t answer. Times are as
+          measured then, moved to start now.
+        </Text>
+      ) : null}
+      {rushHour ? (
+        <Text style={[type.small, styles.simulated, { color: t.warning }]}>
+          Rush hour simulated (demo): driving takes ×{RUSH_HOUR_FACTOR} as long. Turn off in Profile
+          → Diagnostics.
+        </Text>
+      ) : null}
       {faster && shown ? (
         <RerouteBanner
           alternative={faster}
@@ -322,6 +341,7 @@ export function TripOptions({
 const styles = StyleSheet.create({
   list: { gap: space.md },
   sorts: { gap: space.xs },
+  simulated: { fontWeight: '600' },
   liveLine: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
   card: { borderRadius: radius.md, borderWidth: 2, padding: space.md, gap: space.sm },
   nudge: {

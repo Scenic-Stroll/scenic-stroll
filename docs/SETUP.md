@@ -190,6 +190,8 @@ GRAPH_LOADER_KEY=<key> npm run graph:load   # uploads (~15 s), then switches the
   npm run graph:shade -- 2026-10-24        # shade for the demo day, then graph:key + graph:load-shade (above)
   npm run eval:routing                      # checks + Markdown table → eval/results/routing-<day>.md
   npm run demo:snapshot -- 2026-10-24       # saves the demo trips' routes into the app (commit the JSON)
+  npm run demo:trips                        # saves walk/MTR/car/taxi answers for the demo trips (commit the JSON)
+  npm run eval:multimodal                   # Markdown table per trip → eval/results/multimodal-<day>.md
   ```
 
   If the network or server fails during the pitch, the demo trips (presets: Exit A1, Exit C1, Festival Walk ↔
