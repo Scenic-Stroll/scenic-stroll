@@ -1,6 +1,0 @@
-node_modules/
-out/
-# Footage, music and voiceover are large and some are licensed: share them outside git.
-assets/*
-!assets/.gitkeep
-src/assets-present.json

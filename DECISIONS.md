@@ -872,3 +872,7 @@ in `video/src/video.config.ts`; missing footage renders as a labelled placeholde
 rendered at any point. Footage and music stay out of git (size, licences). The storyboard was adjusted to the
 real app: "Simulate weather: Heat" instead of a Demo mode, the friend scene uses "Getting there" + "Route to
 friend" (no meetup card exists), and the comparison caption uses the eval's Exit A1 → MMW numbers.
+
+## D40 — Demo video dropped (2026-10-23)
+
+The team decided not to make the 30 s video, so the Remotion project from D39 (`video/`) was deleted.

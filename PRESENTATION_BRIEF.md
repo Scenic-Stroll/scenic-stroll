@@ -124,7 +124,6 @@ Status: **Working** = works in the app today · **Partly working** = works with 
 | Server functions | 6 Supabase Edge Functions (Deno): `plan-route`, `geocode`, `conditions`, `smart-route`, `plan-trip`, `eta`                                                                     |
 | Data pipelines   | Node scripts that build the walking graph, shade and transit stop lists from open data and load them into Postgres                                                             |
 | Testing          | Vitest (app + shared), Deno tests (functions), Postgres security tests, eval scripts                                                                                           |
-| Demo video       | Remotion (`video/`)                                                                                                                                                            |
 
 **How it fits together:** the app never talks to a paid API directly and holds no secret keys. It calls
 our Edge Functions, which check the user's sign-in, call the outside services with server-side keys,
@@ -358,9 +357,4 @@ OK. Use light theme and Do Not Disturb.
 - Layers → **Incidents**.
 - A friend's profile with "Getting there" times: needs a teammate sharing their location.
 
-**Pitch cautions:**
-
-- The demo-video storyboard has two problem scenes:
-  - "AI turns words into tags" (R3) shows a feature that isn't built;
-  - the "Verified" badge (R4) can't appear yet.
-- Don't show or claim either as working. Swap R3 for screen 8 above, and R4 for the Step-free tab or follow mode.
+**Pitch caution:** AI tagging and the Verified badge aren't built. Don't show or claim either as working.
