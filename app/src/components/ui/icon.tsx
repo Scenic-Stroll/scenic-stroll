@@ -4,6 +4,7 @@ import type { ColorValue } from 'react-native';
 
 /** Any MaterialCommunityIcons name (open icon set bundled in Expo Go). */
 export type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
+type IconColor = ComponentProps<typeof MaterialCommunityIcons>['color'];
 
 export function Icon({
   name,
@@ -14,5 +15,7 @@ export function Icon({
   size?: number;
   color: ColorValue;
 }) {
-  return <MaterialCommunityIcons name={name} size={size} color={color} />;
+  // Same colour at runtime; since React Native 0.88 the icon set's colour type is narrower than
+  // ColorValue (which our theme and the tab bar use), so we convert it here, in one place.
+  return <MaterialCommunityIcons name={name} size={size} color={color as IconColor} />;
 }

@@ -27,7 +27,9 @@ export function QrScanner({
       visible={visible}
       animationType="slide"
       onRequestClose={onClose}
-      onShow={() => (handled.current = false)}
+      onShow={() => {
+        handled.current = false;
+      }}
     >
       <SafeAreaView style={[styles.fill, { backgroundColor: '#000' }]}>
         {!permission ? null : !permission.granted ? (
