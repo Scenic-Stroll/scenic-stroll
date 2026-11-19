@@ -12,7 +12,6 @@ import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -39,6 +38,7 @@ import { ShareLocationSheet } from '@/screens/friends/share-location-sheet';
 import { useSettings, type ThemePreference } from '@/lib/settings-store';
 import { useAuth } from '@/providers/auth-provider';
 import { radius, space, TAP_TARGET, type, useAppTheme } from '@/theme';
+import { showAlert } from '@/lib/alert';
 
 import { BadgeTile } from './badge-tile';
 import { EditProfileSheet } from './edit-profile-sheet';
@@ -93,14 +93,14 @@ export function ProfileScreen() {
     try {
       await downloadMyData(userId);
     } catch (e) {
-      Alert.alert('Couldn’t export your data', e instanceof Error ? e.message : String(e));
+      showAlert('Couldn’t export your data', e instanceof Error ? e.message : String(e));
     } finally {
       setExporting(false);
     }
   };
 
   const confirmDelete = () => {
-    Alert.alert(
+    showAlert(
       'Delete all my data?',
       'This permanently deletes your uploaded routes and descriptions from the server, and every recording, GPS point and saved place on this phone. It can’t be undone.',
       [
@@ -112,9 +112,9 @@ export function ProfileScreen() {
             setDeleting(true);
             try {
               await deleteMyData(userId);
-              Alert.alert('Deleted', 'Your routes, descriptions and phone data have been deleted.');
+              showAlert('Deleted', 'Your routes, descriptions and phone data have been deleted.');
             } catch (e) {
-              Alert.alert(
+              showAlert(
                 'Nothing was deleted on your phone',
                 `${e instanceof Error ? e.message : String(e)} Check your connection and try again.`,
               );

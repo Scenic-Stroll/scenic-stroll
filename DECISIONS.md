@@ -876,3 +876,17 @@ friend" (no meetup card exists), and the comparison caption uses the eval's Exit
 ## D40 — Demo video dropped (2026-10-23)
 
 The team decided not to make the 30 s video, so the Remotion project from D39 (`video/`) was deleted.
+
+## D41 — Public web app: hosting, map library, backend plan (2026-11-19)
+
+Audit in `docs/WEB_LAUNCH_AUDIT.md`. Decisions agreed with the team:
+
+- **One codebase, Expo web target** (react-native-web), built as a single-page app (`web.output: "single"`): the
+  app needs sign-in and location, so pre-rendering pages on a server buys nothing and broke the build.
+- **SDK 58 first:** merged into `main` before any web work.
+- **Hosting: EAS Hosting**, not Vercel: Vercel's free Hobby plan is for non-commercial use only and the project has a
+  business model. Netlify / Cloudflare Pages remain fallbacks.
+- **Map on web: MapLibre GL JS with OpenFreeMap tiles** — free, no key, no usage limits, OpenStreetMap data. Google's JS
+  map would need a public, billed key. Consequence: no Traffic layer on web (hidden there).
+- **Backend: Supabase Pro** (the free plan pauses after 7 days without activity, which silently breaks a public link).
+  Upgrading is a billing step the team does in the Supabase dashboard.

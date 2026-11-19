@@ -14,7 +14,6 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -41,6 +40,7 @@ import {
 import { useFriendLocations, useSharing } from '@/lib/location-sharing';
 import { useMapFocus } from '@/lib/map-focus-store';
 import { radius, space, TAP_TARGET, type, useAppTheme } from '@/theme';
+import { showAlert } from '@/lib/alert';
 
 import { AddFriendSheet } from './add-friend-sheet';
 import { ShareLocationSheet } from './share-location-sheet';
@@ -167,7 +167,7 @@ export function FriendsScreen() {
                         label="Unblock"
                         onPress={() =>
                           void removeFriend(b.other_id).catch((e) =>
-                            Alert.alert('Couldn’t unblock', String(e?.message ?? e)),
+                            showAlert('Couldn’t unblock', String(e?.message ?? e)),
                           )
                         }
                       />
@@ -257,7 +257,7 @@ function FriendRowView({
 
 function Requests({ incoming, outgoing }: { incoming: FriendRow[]; outgoing: FriendRow[] }) {
   const act = (fn: () => Promise<void>, failTitle: string) =>
-    void fn().catch((e) => Alert.alert(failTitle, e instanceof Error ? e.message : String(e)));
+    void fn().catch((e) => showAlert(failTitle, e instanceof Error ? e.message : String(e)));
 
   if (incoming.length === 0 && outgoing.length === 0) {
     return (

@@ -1,17 +1,15 @@
 /**
  * Privacy (Hong Kong PDPO): "Download my data" and "Delete my data".
  */
-import { File, Paths } from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-
 import * as localDb from '@/lib/local-db';
 import { queryClient, refreshLocalData } from '@/lib/query-client';
+import { saveExport } from '@/lib/save-export';
 import { useSavedPlaces } from '@/lib/saved-places-store';
 import { supabase } from '@/lib/supabase';
 
 /**
  * Writes everything we hold about you on this phone (recordings, raw GPS samples, checkpoints,
- * saved places) plus your server profile into one JSON file and opens the share sheet.
+ * saved places) plus your server profile into one JSON file and shares it (phones) or downloads it (web).
  */
 export async function downloadMyData(userId: string | null): Promise<void> {
   let profile: unknown = null;
@@ -30,18 +28,7 @@ export async function downloadMyData(userId: string | null): Promise<void> {
     ...(await localDb.exportLocalData()),
   };
 
-  const file = new File(Paths.cache, 'scenic-stroll-my-data.json');
-  file.create({ overwrite: true });
-  file.write(JSON.stringify(payload, null, 2));
-
-  if (!(await Sharing.isAvailableAsync())) {
-    throw new Error('Sharing isn’t available on this device.');
-  }
-  await Sharing.shareAsync(file.uri, {
-    mimeType: 'application/json',
-    dialogTitle: 'Your Scenic Stroll data',
-    UTI: 'public.json',
-  });
+  await saveExport('scenic-stroll-my-data.json', JSON.stringify(payload, null, 2));
 }
 
 /**

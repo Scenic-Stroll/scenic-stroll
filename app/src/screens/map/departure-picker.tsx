@@ -3,10 +3,10 @@
  * Quick choices (in 15 / 30 / 60 min) plus a clock for any time. A time earlier than now means
  * tomorrow (e.g. picking 08:00 at night).
  */
-import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { ClockPicker } from './clock-picker';
 import { Chip } from '@/components/ui/chip';
 import { space, type, useAppTheme } from '@/theme';
 
@@ -43,10 +43,7 @@ export function DeparturePicker({
     onChange(minutesFromNow(minutes));
   };
 
-  const onClock = (event: DateTimePickerEvent, picked?: Date) => {
-    // Android shows a dialog that closes itself; iOS shows an inline clock we close with "Done".
-    if (Platform.OS === 'android') setClockOpen(false);
-    if (event.type !== 'set' || !picked) return;
+  const onClock = (picked: Date) => {
     setQuick(null);
     onChange(nextOccurrence(picked));
   };
@@ -95,23 +92,11 @@ export function DeparturePicker({
       ) : null}
 
       {clockOpen ? (
-        <View>
-          <DateTimePicker
-            value={value ?? new Date()}
-            mode="time"
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            onChange={onClock}
-          />
-          {Platform.OS === 'ios' ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setClockOpen(false)}
-              style={styles.done}
-            >
-              <Text style={[type.body, { color: t.primary, fontWeight: '600' }]}>Done</Text>
-            </Pressable>
-          ) : null}
-        </View>
+        <ClockPicker
+          value={value ?? new Date()}
+          onPick={onClock}
+          onClose={() => setClockOpen(false)}
+        />
       ) : null}
     </View>
   );
@@ -120,10 +105,4 @@ export function DeparturePicker({
 const styles = StyleSheet.create({
   wrap: { gap: space.xs },
   row: { gap: space.sm, paddingVertical: 2 },
-  done: {
-    alignSelf: 'flex-end',
-    minHeight: 44,
-    justifyContent: 'center',
-    paddingHorizontal: space.md,
-  },
 });

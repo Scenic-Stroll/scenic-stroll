@@ -21,7 +21,6 @@ import { router } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -48,6 +47,7 @@ import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/theme';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { processUploadQueue } from '@/lib/upload-queue';
+import { showAlert } from '@/lib/alert';
 
 /** Start/end labels snap to a landmark this close (build prompt: 60 m). */
 const SNAP_METERS = 60;
@@ -196,7 +196,7 @@ function ReviewForm({ rec }: { rec: localDb.RecordingDetail }) {
   };
 
   const remove = () => {
-    Alert.alert(
+    showAlert(
       'Delete this route?',
       uploaded
         ? 'It will be removed from the server and from your phone.'
@@ -243,7 +243,7 @@ function ReviewForm({ rec }: { rec: localDb.RecordingDetail }) {
   };
 
   const removeCheckpoint = (checkpointId: number) => {
-    Alert.alert('Remove this checkpoint?', undefined, [
+    showAlert('Remove this checkpoint?', undefined, [
       { text: 'Keep', style: 'cancel' },
       {
         text: 'Remove',

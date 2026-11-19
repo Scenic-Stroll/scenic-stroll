@@ -5,7 +5,7 @@
 import { levelFor } from '@scenic/shared';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/ui/avatar';
 import { ErrorCard } from '@/components/ui/error-card';
@@ -16,6 +16,7 @@ import { blockUser, removeFriend, useFriendProfile } from '@/lib/friends';
 import { friendAsPlace, useFriendLocations } from '@/lib/location-sharing';
 import { useMapFocus } from '@/lib/map-focus-store';
 import { radius, space, type, useAppTheme } from '@/theme';
+import { showAlert } from '@/lib/alert';
 
 import { FriendTravelTimes } from './friend-travel-times';
 
@@ -27,7 +28,7 @@ export function FriendProfileScreen({ friendId }: { friendId: string }) {
   const [busy, setBusy] = useState(false);
 
   const confirm = (title: string, body: string, action: () => Promise<void>, verb: string) =>
-    Alert.alert(title, body, [
+    showAlert(title, body, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: verb,
@@ -38,10 +39,7 @@ export function FriendProfileScreen({ friendId }: { friendId: string }) {
             await action();
             router.back();
           } catch (e) {
-            Alert.alert(
-              `Couldn’t ${verb.toLowerCase()}`,
-              e instanceof Error ? e.message : String(e),
-            );
+            showAlert(`Couldn’t ${verb.toLowerCase()}`, e instanceof Error ? e.message : String(e));
           } finally {
             setBusy(false);
           }

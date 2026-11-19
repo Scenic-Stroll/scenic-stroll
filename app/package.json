@@ -12,6 +12,7 @@
     "@scenic/shared": "*",
     "@supabase/supabase-js": "2.117.3",
     "@tanstack/react-query": "^5.104.1",
+    "@types/react-dom": "~19.3.0",
     "eslint-config-expo": "~57.0.2",
     "expo": "~58.0.19",
     "expo-camera": "~58.0.12",
@@ -33,6 +34,8 @@
     "expo-symbols": "~58.0.4",
     "expo-system-ui": "~58.0.6",
     "expo-web-browser": "~58.0.6",
+    "idb-keyval": "^6.3.0",
+    "maplibre-gl": "^6.19.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-native": "0.88.0",
@@ -59,9 +62,10 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web",
+    "web": "node scripts/copy-map-worker.mjs && expo start --web",
     "lint": "expo lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:web": "node scripts/copy-map-worker.mjs && expo export --platform web"
   },
   "private": true
 }
