@@ -8,6 +8,7 @@
 #   secret   EXPO_TOKEN                          an Expo access token (expo.dev → Account settings → Access tokens)
 #   variable EXPO_PUBLIC_SUPABASE_URL            public: it ends up in the web page anyway
 #   variable EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY public (the "anon"/publishable key, never the service role key)
+#   variable EXPO_PUBLIC_SENTRY_DSN, EXPO_PUBLIC_UMAMI_WEBSITE_ID   optional: error reports, visit counts
 # Never add a secret key as an EXPO_PUBLIC_ variable: everything in the web build is readable by anyone.
 name: Web
 
@@ -31,6 +32,9 @@ jobs:
     env:
       EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
       EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+      # Optional; each feature stays off while its variable is empty (DECISIONS D47).
+      EXPO_PUBLIC_SENTRY_DSN: ${{ vars.EXPO_PUBLIC_SENTRY_DSN }}
+      EXPO_PUBLIC_UMAMI_WEBSITE_ID: ${{ vars.EXPO_PUBLIC_UMAMI_WEBSITE_ID }}
     steps:
       - uses: actions/checkout@v4
 

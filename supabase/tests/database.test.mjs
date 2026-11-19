@@ -1325,3 +1325,47 @@ describe('public launch safety (moderation, reports, rate limits — D44)', () =
     assert.equal(await hit(), 1); // 4th request this minute: over the first bucket's limit of 3
   });
 });
+
+describe('feedback form (web step 7, D47)', () => {
+  const send = (user, message, kind = 'idea') =>
+    as(user, 'insert into public.feedback (kind, message, platform) values ($1, $2, $3)', [
+      kind,
+      message,
+      'web',
+    ]);
+
+  it('signed-in users can send feedback, but nobody can read it back', async () => {
+    await send(ALICE, 'Please add Mong Kok');
+    await rejects(as(ALICE, 'select * from public.feedback'), /permission denied/);
+    await rejects(as(BOB, 'select message from public.feedback'), /permission denied/);
+    await rejects(as(null, 'select message from public.feedback'), /permission denied/);
+  });
+
+  it('signed-out visitors cannot send feedback', async () => {
+    await rejects(send(null, 'spam'), /permission denied/);
+  });
+
+  it('you cannot send feedback in someone else’s name', async () => {
+    await rejects(
+      as(ALICE, 'insert into public.feedback (user_id, kind, message) values ($1, $2, $3)', [
+        BOB,
+        'bug',
+        'pretending to be Bob',
+      ]),
+      /permission denied/,
+    );
+  });
+
+  it('rejects empty, too long or unknown kinds of feedback', async () => {
+    await rejects(send(BOB, '   '), /check constraint/);
+    await rejects(send(BOB, 'x'.repeat(1001)), /check constraint/);
+    await rejects(send(BOB, 'hello', 'praise'), /check constraint/);
+  });
+
+  it('allows 10 messages per hour per person, then refuses', async () => {
+    for (let i = 0; i < 10; i++) await send(BOB, `message ${i}`, 'wrong_route');
+    await rejects(send(BOB, 'one too many'), /row-level security/);
+    // Others are not affected.
+    await send(ALICE, 'still fine');
+  });
+});

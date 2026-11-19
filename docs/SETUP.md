@@ -238,6 +238,13 @@ select r.id, r.title, count(*) as reports from public.routes r
 join public.route_reports rr on rr.route_id = r.id where r.status = 'flagged' group by r.id, r.title;
 ```
 
+Feedback from the "Send feedback" form (DECISIONS D47) — nobody can read it in the app:
+
+```sql
+select created_at, kind, platform, app_version, message
+from public.feedback order by created_at desc limit 50;
+```
+
 Paid API usage today: `select api, ok, count(*) from public.api_calls where created_at > current_date group by 1, 2;`
 Function logs (dashboard → Edge Functions → Logs) show `COST ALARM` at 80 % of a daily cap.
 

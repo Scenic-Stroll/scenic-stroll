@@ -5,14 +5,20 @@ import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { OfflineBanner } from '@/components/offline-banner';
+import { Welcome } from '@/components/welcome';
 import { useBackgroundSync } from '@/hooks/use-background-sync';
 import { queryClient } from '@/lib/query-client';
 import { registerServiceWorker } from '@/lib/service-worker';
+import { startAnalytics } from '@/lib/analytics';
+import { startMonitoring } from '@/lib/monitoring';
 import { AuthProvider } from '@/providers/auth-provider';
 import { palettes, useColorSchemeName } from '@/theme';
 
-// Web only: installable app + offline copy (does nothing on phones).
+// Web only (each does nothing on phones): installable app + offline copy, error reports, visit
+// counts. The last two stay off until their EXPO_PUBLIC_ settings exist (docs/DEPLOY.md).
 registerServiceWorker();
+startMonitoring();
+startAnalytics();
 
 export default function RootLayout() {
   // Follows Profile → Theme (system / light / dark).
@@ -50,11 +56,32 @@ export default function RootLayout() {
                 options={{ headerShown: true, title: 'Saved places', headerBackTitle: 'Profile' }}
               />
               <Stack.Screen
+                name="feedback"
+                options={{ headerShown: true, title: 'Send feedback', headerBackTitle: 'Back' }}
+              />
+              <Stack.Screen
+                name="privacy"
+                options={{ headerShown: true, title: 'Privacy policy', headerBackTitle: 'Back' }}
+              />
+              <Stack.Screen
+                name="terms"
+                options={{ headerShown: true, title: 'Terms of use', headerBackTitle: 'Back' }}
+              />
+              <Stack.Screen
+                name="attribution"
+                options={{
+                  headerShown: true,
+                  title: 'Data sources & credits',
+                  headerBackTitle: 'Back',
+                }}
+              />
+              <Stack.Screen
                 name="recording/[id]"
                 options={{ presentation: 'modal', headerShown: true, title: 'Review route' }}
               />
             </Stack>
             <OfflineBanner />
+            <Welcome />
           </ThemeProvider>
         </AuthProvider>
       </QueryClientProvider>

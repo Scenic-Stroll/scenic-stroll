@@ -1,4 +1,5 @@
-"""Draws the Scenic Stroll web icons (install icon, Apple home-screen icon, favicon).
+"""Draws the Scenic Stroll web icons (install icon, Apple home-screen icon, favicon) and the
+share image that WhatsApp/Instagram/X show for a link (public/og-image.png, 1200x630).
 
 Placeholder art until the team has a designed logo: a winding white path ending in a map pin on
 our green. The template's icon in assets/images/icon.png is Expo's logo, so we don't reuse it
@@ -10,7 +11,7 @@ our green. The template's icon in assets/images/icon.png is Expo's logo, so we d
 import math
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 GREEN = (0x1B, 0xA1, 0x36)  # theme colour from the launch brief
 DARK_GREEN = (0x0B, 0x2A, 0x18)
@@ -62,6 +63,31 @@ def draw_icon() -> Image.Image:
     return img
 
 
+def font(size: int, bold: bool = False) -> ImageFont.ImageFont:
+    """Segoe UI on Windows, DejaVu on Linux/macOS, else Pillow's built-in font."""
+    names = ["segoeuib.ttf", "DejaVuSans-Bold.ttf"] if bold else ["segoeui.ttf", "DejaVuSans.ttf"]
+    for name in names:
+        for folder in ["C:/Windows/Fonts", "/usr/share/fonts/truetype/dejavu", "/Library/Fonts"]:
+            try:
+                return ImageFont.truetype(f"{folder}/{name}", size)
+            except OSError:
+                pass
+    return ImageFont.load_default(size)
+
+
+def draw_share_image(icon: Image.Image) -> Image.Image:
+    """1200x630: icon on the left, name and what it does on the right, on the dark green."""
+    img = Image.new("RGB", (1200, 630), DARK_GREEN)
+    d = ImageDraw.Draw(img)
+    img.paste(icon.resize((300, 300), Image.LANCZOS), (110, 165))
+    d.text((470, 175), "Scenic Stroll", font=font(84, bold=True), fill=WHITE)
+    lines = ["Shaded, sheltered and step-free", "walking routes in Hong Kong"]
+    for i, line in enumerate(lines):
+        d.text((474, 300 + i * 56), line, font=font(44), fill=(0xC4, 0xD4, 0xC8))
+    d.text((474, 440), "Beta · CityU · Kowloon Tong · Festival Walk", font=font(32), fill=GREEN)
+    return img
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     big = draw_icon()
@@ -73,6 +99,7 @@ def main() -> None:
     ]:
         big.resize((px, px), Image.LANCZOS).save(OUT / name, optimize=True)
     big.resize((48, 48), Image.LANCZOS).save(APP / "assets" / "images" / "favicon.png", optimize=True)
+    draw_share_image(big).save(APP / "public" / "og-image.png", optimize=True)
     print(f"wrote icons to {OUT} and assets/images/favicon.png")
 
 

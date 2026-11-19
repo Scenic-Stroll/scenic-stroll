@@ -7,6 +7,7 @@
  */
 import { buildRouteUpload } from '@scenic/shared';
 
+import { track } from '@/lib/analytics';
 import * as localDb from '@/lib/local-db';
 import { refreshLocalData } from '@/lib/query-client';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
@@ -44,6 +45,7 @@ async function uploadAll() {
         continue;
       }
       await localDb.markUploaded(id);
+      track('route-recorded'); // web visit counts only (analytics.web.ts)
     } catch (err) {
       // Network failure: stop this pass, everything stays queued for next time.
       await localDb.setLastError(id, 'No connection — will upload automatically when online.');

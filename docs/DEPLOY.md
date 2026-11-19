@@ -30,6 +30,12 @@ GitHub → the repo → Settings → Secrets and variables → Actions:
   - `EXPO_PUBLIC_SUPABASE_URL` — same value as in `app/.env`
   - `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — same value as in `app/.env`
 
+- **Optional variables** (each feature is off while its variable is missing):
+  - `EXPO_PUBLIC_SENTRY_DSN` — error reports from the website. sentry.io (free plan) → create a project
+    "scenic-stroll-web" (platform: Browser JavaScript) → Settings → Client Keys (DSN).
+  - `EXPO_PUBLIC_UMAMI_WEBSITE_ID` — visit counts. cloud.umami.is (free Hobby plan) → Add website
+    `scenic-stroll.expo.app` → the Website ID.
+
 Or with the GitHub CLI: `gh secret set EXPO_TOKEN`, `gh variable set EXPO_PUBLIC_SUPABASE_URL --body "…"`.
 
 > **Never** put a secret key (service role key, ORS/Google server keys) in an `EXPO_PUBLIC_` variable. Everything
@@ -69,6 +75,18 @@ Roll back: expo.dev → Hosting → Deployments → pick an older one → "Promo
 - **Supabase Auth redirect URLs:** not needed today — the app only uses anonymous sign-in, which has no
   redirect. If email links or Google sign-in are added, add the production and preview addresses under
   Supabase dashboard → Authentication → URL Configuration.
+
+## Error reports and visit counts (DECISIONS D47)
+
+- **Website errors → Sentry:** set the `EXPO_PUBLIC_SENTRY_DSN` variable (above) and redeploy.
+- **Edge Function crashes → Sentry:** create a second Sentry project "scenic-stroll-functions" (platform:
+  Node / Other) and give its DSN to Supabase:
+  `npx supabase secrets set SENTRY_DSN=<dsn> --project-ref xelzbcuzopxcterkedru` (no redeploy needed).
+- **Visit counts → Umami:** set `EXPO_PUBLIC_UMAMI_WEBSITE_ID` and redeploy. Counts page views plus three events:
+  `route-planned`, `route-recorded`, `feedback-sent`. No cookies; respects "Do Not Track".
+- Personal data is removed before anything is sent (`shared/src/privacy.ts`): no IP address or user id, no query
+  strings, and coordinates become `[coord]`. If you add a new kind of report, keep it that way — and update
+  the privacy policy (`app/src/content/privacy.ts`).
 
 ## Custom domain (optional, later)
 

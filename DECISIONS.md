@@ -980,3 +980,33 @@ Migration `public_launch_safety`, `supabase/functions/_shared/guard.ts` + `cors.
   `expo-env.d.ts` in CI).
 - **CORS allow-list** for the Edge Functions: `https://scenic-stroll.expo.app,https://scenic-stroll--*.expo.app`
   (DEPLOY.md). Supabase Auth redirect URLs aren't needed: the app only uses anonymous sign-in.
+
+## D47 — Public-launch essentials (2026-11-20)
+
+- **Welcome screen (web only):** first visit to `/` shows what the app does, the coverage ("Smart walking
+  routes: CityU, Kowloon Tong MTR and Festival Walk. Transport comparison: all of Hong Kong"), a **Beta** label,
+  a location note and **Start**; links to privacy, terms, credits and feedback. Never shown over a shared link;
+  remembered per browser (localStorage — a convenience, the app works without it). Phones unchanged.
+- **Privacy policy and terms** (`/privacy`, `/terms`, text in `app/src/content/`): plain English, marked
+  **draft for team review, not legal advice**, mentions the PDPO. Every claim was checked against the code
+  (e.g. "Delete my data" does _not_ remove a live location share, friendships or reports — the policy says so).
+  The contact email is a placeholder to fill in before launch. Traditional Chinese: not yet.
+- **Credits** (`/attribution`): moved from Profile → About into `content/attribution.ts`; adds the web map tiles
+  (OpenFreeMap / OpenMapTiles / OSM) and place search (openrouteservice).
+- **Feedback:** `/feedback` (Profile → About, welcome screen) writes to `public.feedback`: insert-only for signed-in
+  users, 10 per person per hour (security-definer count in the policy), read only by the team (SETUP.md §9b).
+  "A route is wrong" is the first choice; single routes keep their "Report a problem" button (D44).
+- **Error reports — Sentry:** web via `@sentry/browser`, loaded only when `EXPO_PUBLIC_SENTRY_DSN` is set. Sentry v11
+  collects user info, headers, bodies and query strings by default, so `dataCollection` turns each off; console
+  breadcrumbs are dropped and `scrubText` (shared/src/privacy.ts) removes coordinates, ids in paths and query
+  strings. Edge Functions: `guard.ts` catches crashes, answers 500 and posts one scrubbed event to Sentry's
+  envelope endpoint (`_shared/error-report.ts`, ~60 lines) when the `SENTRY_DSN` secret is set — no SDK, so cold
+  starts stay fast and the payload is easy to audit.
+- **Visit counts — Umami Cloud** (free Hobby plan, cookie-free, no cross-site tracking, honours Do Not Track):
+  page views plus `route-planned`, `route-recorded`, `feedback-sent`; friend/recording ids and query strings are
+  removed from page addresses. Off unless `EXPO_PUBLIC_UMAMI_WEBSITE_ID` is set. Plausible was the alternative
+  (paid only).
+- **Sharing a link:** Open Graph / Twitter tags and a 1200×630 share image (`public/og-image.png`, drawn by
+  `scripts/make-web-icons.py`), pointing at the production address.
+- **Accessibility:** a visible `:focus-visible` outline for keyboard users; a scan found no icon-only button
+  without a label; the step-free filter stays a top-level chip on the map. Unknown pages: "Page not found" (D46).

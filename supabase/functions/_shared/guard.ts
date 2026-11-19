@@ -4,9 +4,11 @@
 //     public.rate_limit_hit, so they hold across all running copies of the function).
 // Phones and scripts send no Origin header, so CORS never blocks them; the rate limits still apply.
 // Health checks (GET, used by Profile → Diagnostics) are free. DECISIONS D44.
+// A crash inside a function is reported to Sentry (error-report.ts, D47) and answered with a 500.
 import { type SupabaseContext, withSupabase } from '@supabase/server';
 
 import { CORS_BASE, originAllowed } from './cors.ts';
+import { reportError } from './error-report.ts';
 import { errorResponse } from './http.ts';
 
 /** Requests per minute. Per-IP limits are generous: a whole campus can share one IP address. */
@@ -58,7 +60,13 @@ export function guarded(name: string, limits: Limits, handler: Handler) {
       res.headers.set('Retry-After', String(WINDOW_S));
       return res;
     }
-    return handler(req, ctx);
+    try {
+      return await handler(req, ctx);
+    } catch (err) {
+      console.error(`${name}: crashed`, err);
+      await reportError(name, err);
+      return errorResponse('Something went wrong on our side. Please try again.', 500);
+    }
   });
 
   return async (req: Request): Promise<Response> => {

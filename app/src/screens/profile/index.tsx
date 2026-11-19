@@ -351,49 +351,28 @@ export function ProfileScreen() {
             right={<Value text={String(TAGS.length)} />}
           />
           <ListRow
-            icon="map-outline"
-            title="Landmark data"
-            subtitle="© OpenStreetMap contributors (ODbL)"
+            icon="message-text-outline"
+            title="Send feedback"
+            subtitle="A wrong route, a bug or an idea"
+            onPress={() => router.push('/feedback')}
           />
           <ListRow
-            icon="weather-partly-cloudy"
-            title="Weather data"
-            subtitle="© Hong Kong Observatory, HKSAR Government · via DATA.GOV.HK"
+            icon="shield-account-outline"
+            title="Privacy policy"
+            subtitle="Draft · what we collect and how to delete it"
+            onPress={() => router.push('/privacy')}
           />
           <ListRow
-            icon="walk"
-            title="Walking network"
-            subtitle="3D Pedestrian Network © Lands Department, HKSAR Government · via CSDI / DATA.GOV.HK"
+            icon="file-document-outline"
+            title="Terms of use"
+            subtitle="Draft"
+            onPress={() => router.push('/terms')}
           />
           <ListRow
-            icon="weather-sunny-off"
-            title="Shade estimates"
-            subtitle="Building heights © Lands Department, HKSAR Government · trees © OpenStreetMap contributors (ODbL)"
-          />
-          <ListRow
-            icon="car"
-            title="Driving routes"
-            subtitle="Google Maps Platform (live traffic, when enabled) · openrouteservice.org, © OpenStreetMap contributors"
-          />
-          <ListRow
-            icon="train"
-            title="Public transport"
-            subtitle="MTR lines, stations and fares © MTR Corporation · via DATA.GOV.HK · station positions © OpenStreetMap contributors (ODbL) · Google Maps Platform (when enabled)"
-          />
-          <ListRow
-            icon="taxi"
-            title="Taxi fares"
-            subtitle="Urban taxi meter tariff (from 14 July 2024) · Transport Department, HKSAR Government"
-          />
-          <ListRow
-            icon="alert-outline"
-            title="Traffic and incidents"
-            subtitle="Road traffic layer by Google Maps / Apple Maps · incidents from Transport Department special traffic news · via DATA.GOV.HK"
-          />
-          <ListRow
-            icon="clock-fast"
-            title="Live arrivals"
-            subtitle="MTR Next Train, KMB/LWB, Citybus and green minibus (Transport Department) real-time data · via DATA.GOV.HK"
+            icon="database-outline"
+            title="Data sources & credits"
+            subtitle="OpenStreetMap, Hong Kong Government open data and more"
+            onPress={() => router.push('/attribution')}
           />
         </Section>
       </ScrollView>

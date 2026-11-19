@@ -15,6 +15,21 @@
       content="Shaded, sheltered walking routes around CityU, Kowloon Tong and Festival Walk, plus transport comparison for all of Hong Kong."
     />
 
+    <!-- How a shared link looks in WhatsApp, Instagram, X, … (needs full addresses) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Scenic Stroll" />
+    <meta property="og:title" content="Scenic Stroll — shaded, sheltered walking routes" />
+    <meta
+      property="og:description"
+      content="Find the shaded, sheltered or step-free way to walk around CityU, Kowloon Tong and Festival Walk, and compare it with the MTR, bus, taxi and car."
+    />
+    <meta property="og:url" content="https://scenic-stroll.expo.app/" />
+    <meta property="og:image" content="https://scenic-stroll.expo.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Scenic Stroll logo and tagline" />
+    <meta name="twitter:card" content="summary_large_image" />
+
     <!-- Install as an app -->
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#1BA136" />
@@ -42,6 +57,17 @@
         display: flex;
         height: 100%;
         flex: 1;
+      }
+      /* Keyboard users: a clear outline on whatever has focus (not shown for mouse clicks/taps).
+         !important because the map library removes the outline from its own controls. */
+      :focus-visible {
+        outline: 3px solid #14822a !important;
+        outline-offset: 2px;
+      }
+      @media (prefers-color-scheme: dark) {
+        :focus-visible {
+          outline-color: #34c152 !important;
+        }
       }
     </style>
   </head>
