@@ -220,6 +220,27 @@ GRAPH_LOADER_KEY=<key> npm run graph:load   # uploads (~15 s), then switches the
   MTR fares are not in the repo: `plan-trip` loads them into the server-only `mtr_fares` table on first use.
   To refresh them after a fare change, run `delete from public.mtr_fares;` in the SQL editor.
 
+## 9b. Checking shared routes (moderation)
+
+New shared routes are only visible to their author until someone on the team approves them (DECISIONS D44).
+In the Supabase dashboard → SQL editor:
+
+```sql
+-- Waiting for review (newest first)
+select id, title, start_label, end_label, distance_m, created_at
+from public.routes where review_status = 'pending' order by created_at desc;
+
+-- Approve one (or 'rejected' to keep it hidden)
+update public.routes set review_status = 'approved', reviewed_at = now() where id = '<route id>';
+
+-- Hidden by 3+ reports: look, then un-hide (status back to 'unverified') or leave it hidden
+select r.id, r.title, count(*) as reports from public.routes r
+join public.route_reports rr on rr.route_id = r.id where r.status = 'flagged' group by r.id, r.title;
+```
+
+Paid API usage today: `select api, ok, count(*) from public.api_calls where created_at > current_date group by 1, 2;`
+Function logs (dashboard → Edge Functions → Logs) show `COST ALARM` at 80 % of a daily cap.
+
 ## 10. Before you push code
 
 ```bash

@@ -58,6 +58,13 @@ async function as(userId, sql, params = []) {
   }
 }
 
+/** What the team does in the dashboard after checking a shared route (moderation, D44). */
+async function approve(...routeIds) {
+  await db.query(`update public.routes set review_status = 'approved' where id = any($1)`, [
+    routeIds,
+  ]);
+}
+
 async function rejects(promise, pattern) {
   await assert.rejects(
     promise,
@@ -205,6 +212,8 @@ describe('create_route', () => {
 });
 
 describe('privacy: who created a route stays hidden', () => {
+  before(() => approve(ROUTE));
+
   it('nobody can read routes.created_by through the API', async () => {
     await rejects(as(BOB, 'select created_by from public.routes'), /permission denied/);
     await rejects(as(null, 'select created_by from public.routes'), /permission denied/);
@@ -624,6 +633,7 @@ describe('checkpoints_near (floor selector)', () => {
       ],
     });
     await as(JOY, 'select public.create_route($1::jsonb)', [JSON.stringify(route)]);
+    await approve(routeId);
   });
 
   it('returns checkpoints within the radius, with floors, for signed-out users too', async () => {
@@ -1117,6 +1127,7 @@ describe('community routes saved from a planned route', () => {
     await as(CAROL, 'select public.create_route($1)', [
       payload({ id: PLANNED, origin: 'planned' }),
     ]);
+    await approve(RECORDED, PLANNED);
     const rows = (
       await as(
         null,
@@ -1182,5 +1193,135 @@ describe('mtr_fares (fallback transit planner)', () => {
   it('is server-only', async () => {
     await rejects(as(ALICE, 'select * from public.mtr_fares'), /permission denied/);
     await rejects(as(null, 'select * from public.mtr_fares'), /permission denied/);
+  });
+});
+
+describe('public launch safety (moderation, reports, rate limits — D44)', () => {
+  const KIM = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1'; // shares a route
+  const LEO = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2'; // another user
+  const MIA = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb3';
+  const NED = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb4';
+  const SHARED = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb5';
+  before(async () => {
+    await db.query('insert into auth.users (id) values ($1), ($2), ($3), ($4)', [
+      KIM,
+      LEO,
+      MIA,
+      NED,
+    ]);
+    await as(KIM, 'select public.create_route($1::jsonb)', [
+      JSON.stringify(payload({ id: SHARED, description: 'Lift to L2, covered all the way' })),
+    ]);
+  });
+
+  const visibleTo = async (user) =>
+    (await as(user, 'select id from public.routes_public where id = $1', [SHARED])).rows.length;
+
+  it('a newly shared route is hidden from everyone but its author until approved', async () => {
+    assert.equal(await visibleTo(KIM), 1);
+    assert.equal(await visibleTo(LEO), 0);
+    assert.equal(await visibleTo(null), 0); // signed-out browser
+    // Its checkpoints and description don't leak either.
+    const cps = await as(null, 'select 1 from public.route_checkpoints where route_id = $1', [
+      SHARED,
+    ]);
+    assert.equal(cps.rows.length, 0);
+    const desc = await as(LEO, 'select 1 from public.route_descriptions where route_id = $1', [
+      SHARED,
+    ]);
+    assert.equal(desc.rows.length, 0);
+  });
+
+  it('users can see the review status but cannot approve their own route', async () => {
+    const { rows } = await as(KIM, 'select review_status from public.routes where id = $1', [
+      SHARED,
+    ]);
+    assert.equal(rows[0].review_status, 'pending');
+    await rejects(
+      as(KIM, `update public.routes set review_status = 'approved' where id = $1`, [SHARED]),
+      /permission denied/,
+    );
+  });
+
+  it('once the team approves it, everyone sees it', async () => {
+    await approve(SHARED);
+    assert.equal(await visibleTo(LEO), 1);
+    assert.equal(await visibleTo(null), 1);
+  });
+
+  it('reports are write-only, one per person, and signed-out users cannot report', async () => {
+    await as(LEO, 'insert into public.route_reports (route_id, reason) values ($1, $2)', [
+      SHARED,
+      'wrong',
+    ]);
+    await rejects(
+      as(LEO, 'insert into public.route_reports (route_id, reason) values ($1, $2)', [
+        SHARED,
+        'other',
+      ]),
+      /duplicate key/,
+    );
+    await rejects(as(LEO, 'select * from public.route_reports'), /permission denied/);
+    await rejects(
+      as(null, 'insert into public.route_reports (route_id, reason) values ($1, $2)', [
+        SHARED,
+        'wrong',
+      ]),
+      /permission denied/,
+    );
+    assert.equal(await visibleTo(LEO), 1); // one report alone doesn't hide it
+  });
+
+  it('three different reporters hide the route (flagged) for everyone but its author', async () => {
+    for (const user of [MIA, NED]) {
+      await as(user, 'insert into public.route_reports (route_id, reason) values ($1, $2)', [
+        SHARED,
+        'unsafe',
+      ]);
+    }
+    assert.equal(await visibleTo(LEO), 0);
+    assert.equal(await visibleTo(null), 0);
+    assert.equal(await visibleTo(KIM), 1);
+  });
+
+  it('a signed-out browser cannot read anyone’s location or private profile data', async () => {
+    // Either refused outright or nothing comes back — both mean nothing leaks.
+    const nothingFor = async (sql) => {
+      try {
+        assert.equal((await as(null, sql)).rows.length, 0, sql);
+      } catch (err) {
+        assert.match(err.message, /permission denied/, sql);
+      }
+    };
+    await as(KIM, 'select public.start_location_share($1, $2, 8, $3, true, 60, $4)', [
+      22.3373,
+      114.1746,
+      'exact',
+      [],
+    ]);
+    await nothingFor('select * from public.location_shares');
+    await nothingFor('select * from public.friend_locations()');
+    await nothingFor('select * from public.location_share_recipients');
+    await nothingFor('select * from public.friendships');
+    await rejects(as(null, 'select created_by from public.routes'), /permission denied/);
+  });
+
+  it('only the server (service role) can count rate limits', async () => {
+    await rejects(
+      as(LEO, `select public.rate_limit_hit(array['x'], array[5], 60)`),
+      /permission denied/,
+    );
+    await rejects(
+      as(null, `select public.rate_limit_hit(array['x'], array[5], 60)`),
+      /permission denied/,
+    );
+    const hit = async () =>
+      (
+        await db.query(
+          `select public.rate_limit_hit(array['test:user:1', 'test:ip:1'], array[3, 100], 60) as over`,
+        )
+      ).rows[0].over;
+    assert.deepEqual([await hit(), await hit(), await hit()], [0, 0, 0]);
+    assert.equal(await hit(), 1); // 4th request this minute: over the first bucket's limit of 3
   });
 });

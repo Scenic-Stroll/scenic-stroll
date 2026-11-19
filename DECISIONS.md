@@ -910,3 +910,26 @@ weather / rush hour / walk, Test smart routing), the data-collection-mode switch
 (`savedDemoRoutes`, `savedDemoTrip` return nothing), since on a public site a simulated or saved answer could pass for
 live data. Verified on a production web build: none of them appear in Profile. The code still ships in the bundle; that's
 fine — these tools only change what that device shows and hold no secrets.
+
+## D44 — Backend safety for a public link (2026-11-19)
+
+Migration `public_launch_safety`, `supabase/functions/_shared/guard.ts` + `cors.ts`.
+
+- **Rate limits** on all 6 Edge Functions, per minute, per user and per IP, counted in Postgres
+  (`public.rate_limit_hit`, service role only) so they hold across function instances. Per-IP limits are
+  generous (a campus shares one IP); per-user limits do the real work (plan-trip, which calls paid APIs: 20/min).
+  Health-check GETs are free. If counting fails the request goes through (fail open, logged). Over the limit →
+  429 "Too many requests — wait a minute", which the app already shows as is.
+- **CORS:** browsers may call the functions only from origins in the `ALLOWED_ORIGINS` secret (comma-separated,
+  `*` = one subdomain level, for preview links) and from localhost. Until the secret is set (step 6, when the
+  domain exists) any origin still works. Phones send no Origin header and are unaffected.
+- **CAPTCHA: not switched on yet.** Supabase's CAPTCHA covers every sign-in, including the phone apps, which
+  have no CAPTCHA widget yet — turning it on today would break native sign-in. Meanwhile Supabase limits
+  anonymous sign-ups to 30 per hour per IP (checked on the live project). Needs a Cloudflare Turnstile key and
+  a native widget; tracked in the launch checklist.
+- **Moderation:** shared routes start `review_status = 'pending'` and are visible only to their author until the
+  team approves them (dashboard SQL, docs/SETUP.md). Checkpoints and descriptions follow their route's
+  visibility. Signed-in users can report a route (one report each, write-only); 3 reporters flag it (hidden).
+- **Cost alarm:** `COST ALARM` in the function logs at 80 % of a paid API's daily cap and when it's reached
+  (then plan-trip already falls back to the free provider).
+- 7 new database tests, incl. "a signed-out browser can't read anyone's location".

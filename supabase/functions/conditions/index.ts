@@ -5,14 +5,14 @@
 // defaults. Never fails.
 //
 // auth: 'user' → only signed-in app users (anonymous accounts count), like our other functions.
-import { withSupabase } from '@supabase/server';
 
+import { guarded, LIMITS } from '../_shared/guard.ts';
 import { loadConditions } from '../_shared/conditions-service.ts';
 import { errorResponse, json } from '../_shared/http.ts';
 import { ConditionsSchema, defaultConditions } from '../_shared/scenic/conditions.ts';
 
 export default {
-  fetch: withSupabase({ auth: 'user' }, async (req, ctx) => {
+  fetch: guarded('conditions', LIMITS.conditions, async (req, ctx) => {
     // GET = health check for Settings → "Test backend". HKO needs no key, so no secrets to report.
     if (req.method === 'GET') {
       return json({ ok: true, function: 'conditions', provider: 'hko', missingSecrets: [] });

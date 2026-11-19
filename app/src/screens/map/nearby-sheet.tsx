@@ -16,6 +16,7 @@ import {
 } from '@scenic/shared';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { ReportRoute } from '@/components/route/report-route';
 import { Chip } from '@/components/ui/chip';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorCard } from '@/components/ui/error-card';
@@ -159,6 +160,7 @@ function RouteRow({
             <Chip key={tag} small label={TAXONOMY[tag].en} />
           ))}
         </View>
+        {selected ? <ReportRoute routeId={route.id} /> : null}
       </View>
     </Pressable>
   );

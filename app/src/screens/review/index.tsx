@@ -284,7 +284,7 @@ function ReviewForm({ rec }: { rec: localDb.RecordingDetail }) {
             <ThemedText type="small" themeColor="textSecondary">
               {formatDistance(uploadLengthMeters(preview.upload))} ·{' '}
               {formatDuration(preview.upload.duration_s)} · {preview.upload.checkpoints.length}{' '}
-              checkpoint(s) will be shared
+              checkpoint(s) will be shared. Others see it after a quick check by the team.
             </ThemedText>
           ) : null}
 
@@ -292,7 +292,7 @@ function ReviewForm({ rec }: { rec: localDb.RecordingDetail }) {
             <Banner tone="warn" text={`Not uploaded yet: ${rec.lastError}`} />
           ) : null}
           {uploaded ? (
-            <Banner tone="ok" text="Uploaded — other people can find this route." />
+            <Banner tone="ok" text="Uploaded — others can find it once the team has checked it." />
           ) : null}
 
           {/* GPS gaps → ask for a checkpoint */}

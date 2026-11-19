@@ -3,14 +3,14 @@
 // The standard (grey) walking route. API keys stay here on the server.
 //
 // auth: 'user' → only signed-in app users (anonymous accounts count) can spend our routing quota.
-import { withSupabase } from '@supabase/server';
 
+import { guarded, LIMITS } from '../_shared/guard.ts';
 import { errorResponse, json, readBody } from '../_shared/http.ts';
 import { getRoutingProvider, ProviderError, routingHealth } from '../_shared/routing/index.ts';
 import { PlanRouteRequestSchema, PlanRouteResponseSchema } from '../_shared/scenic/api.ts';
 
 export default {
-  fetch: withSupabase({ auth: 'user' }, async (req) => {
+  fetch: guarded('plan-route', LIMITS.planRoute, async (req) => {
     // GET = health check for Settings → "Test backend" (reports secret NAMES only, never values).
     if (req.method === 'GET') {
       return json({ ok: true, function: 'plan-route', ...routingHealth((n) => Deno.env.get(n)) });

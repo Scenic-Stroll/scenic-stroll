@@ -2,14 +2,14 @@
 // Free-text place search, biased to the CityU / Kowloon Tong demo area.
 //
 // auth: 'user' → only signed-in app users (anonymous accounts count) can spend our geocoding quota.
-import { withSupabase } from '@supabase/server';
 
+import { guarded, LIMITS } from '../_shared/guard.ts';
 import { errorResponse, json, readBody } from '../_shared/http.ts';
 import { getRoutingProvider, ProviderError, routingHealth } from '../_shared/routing/index.ts';
 import { GeocodeRequestSchema, GeocodeResponseSchema } from '../_shared/scenic/api.ts';
 
 export default {
-  fetch: withSupabase({ auth: 'user' }, async (req) => {
+  fetch: guarded('geocode', LIMITS.geocode, async (req) => {
     // GET = health check for Settings → "Test backend" (reports secret NAMES only, never values).
     if (req.method === 'GET') {
       return json({ ok: true, function: 'geocode', ...routingHealth((n) => Deno.env.get(n)) });

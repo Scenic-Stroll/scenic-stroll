@@ -14,8 +14,8 @@
 // an error. No language model anywhere in here.
 //
 // auth: 'user' → only signed-in app users (anonymous accounts count) can spend our routing quota.
-import { withSupabase } from '@supabase/server';
 
+import { guarded, LIMITS } from '../_shared/guard.ts';
 import { budgetedCall, BudgetError, cacheKey } from '../_shared/api-budget.ts';
 import { googleDrive, orsDrive } from '../_shared/drive.ts';
 import { stopEta } from '../_shared/eta-fetch.ts';
@@ -60,7 +60,7 @@ const LIVE_ETA_WINDOW_MS = 20 * 60_000;
 const DEFAULT_GOOGLE_DAILY_CAP = 300;
 
 export default {
-  fetch: withSupabase({ auth: 'user' }, async (req, ctx) => {
+  fetch: guarded('plan-trip', LIMITS.planTrip, async (req, ctx) => {
     const env = (name: string) => Deno.env.get(name);
     // GET = health check for Settings → "Test backend" (secret NAMES only, never values).
     if (req.method === 'GET') {
