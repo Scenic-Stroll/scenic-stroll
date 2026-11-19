@@ -60,6 +60,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "eb11d319-8cfe-4854-af57-132e3014e283"
+      }
+    },
+    "owner": "spidexz"
   }
 }

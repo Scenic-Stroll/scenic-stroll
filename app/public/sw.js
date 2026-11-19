@@ -56,7 +56,10 @@ function isFingerprinted(url) {
 async function networkFirst(request, fallbackUrl) {
   const cache = await caches.open(CACHE);
   try {
-    const response = await fetch(request);
+    // 'no-cache': ask the server whether the file changed instead of trusting the browser's own
+    // cache (EAS Hosting lets browsers keep files for an hour). Otherwise a phone could load an old
+    // page that points at JavaScript files the new release no longer has.
+    const response = await fetch(request, { cache: 'no-cache' });
     if (response.ok) cache.put(fallbackUrl ?? request, response.clone());
     return response;
   } catch {

@@ -11,8 +11,8 @@ export const CORS_BASE = {
 
 /**
  * May a web page from `origin` call us? ALLOWED_ORIGINS is a comma-separated list such as
- * "https://scenicstroll.expo.app,https://*.scenicstroll.expo.app" (`*` = any subdomain, for preview
- * links). Not set yet → any origin (how it worked before the public launch). Local development
+ * "https://scenic-stroll.expo.app,https://scenic-stroll--*.expo.app" (`*` = letters, digits and
+ * dashes, no dots: the EAS Hosting preview links). Not set yet → any origin (how it worked before the public launch). Local development
  * (localhost / 127.0.0.1, any port) is always allowed.
  */
 export function originAllowed(origin: string, allowList: string | undefined): boolean {

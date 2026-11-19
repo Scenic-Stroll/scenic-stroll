@@ -1,0 +1,84 @@
+# Checks every pull request and puts the web app online (EAS Hosting). DECISIONS D46, docs/DEPLOY.md.
+#
+#   Pull request → type check, lint, tests, formatting, web build → preview link
+#                  https://scenic-stroll--<id>.expo.app (shown in the run summary)
+#   Merge to main → the same checks → production https://scenic-stroll.expo.app
+#
+# Needs (GitHub → repo Settings → Secrets and variables → Actions):
+#   secret   EXPO_TOKEN                          an Expo access token (expo.dev → Account settings → Access tokens)
+#   variable EXPO_PUBLIC_SUPABASE_URL            public: it ends up in the web page anyway
+#   variable EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY public (the "anon"/publishable key, never the service role key)
+# Never add a secret key as an EXPO_PUBLIC_ variable: everything in the web build is readable by anyone.
+name: Web
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A newer push to the same pull request cancels the older run.
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Tests (app, Edge Functions, database security)
+        run: npm test
+      - name: Formatting
+        run: npm run format:check
+
+      - name: Web build
+        working-directory: app
+        run: |
+          if [ -z "$EXPO_PUBLIC_SUPABASE_URL" ] || [ -z "$EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY" ]; then
+            echo "::error::Set the EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY repository variables (docs/DEPLOY.md)."
+            exit 1
+          fi
+          npm run build:web
+
+      # Pull requests from forks get no secrets, so they are checked but not deployed.
+      - name: Deploy
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+        working-directory: app
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::warning::No EXPO_TOKEN secret, so nothing was deployed (docs/DEPLOY.md)."
+            exit 0
+          fi
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            npx -y eas-cli@27.11.0 deploy --non-interactive --prod
+            echo "Production: https://scenic-stroll.expo.app" >> "$GITHUB_STEP_SUMMARY"
+          else
+            # Each preview gets its own address, https://scenic-stroll--<id>.expo.app (read from
+            # the JSON that eas prints). Named aliases didn't resolve in our test (D46).
+            npx -y eas-cli@27.11.0 deploy --json > deploy.json
+            url=$(jq -r '.url' deploy.json)
+            echo "Preview for pull request #$PR_NUMBER: $url" >> "$GITHUB_STEP_SUMMARY"
+            echo "::notice title=Preview::$url"
+          fi

@@ -10,9 +10,10 @@ const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'd
 const swPath = path.join(dist, 'sw.js');
 const page = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
 
-// The page lists the hashed JavaScript files, so its hash changes whenever the app changes.
-const buildId = createHash('sha256').update(page).digest('hex').slice(0, 12);
+// The page lists the hashed JavaScript files, so its hash changes whenever the app changes;
+// sw.js is included too, for releases that only change the service worker.
 const sw = fs.readFileSync(swPath, 'utf8');
+const buildId = createHash('sha256').update(page).update(sw).digest('hex').slice(0, 12);
 if (!sw.includes('__BUILD_ID__')) {
   console.error('stamp-service-worker: dist/sw.js has no __BUILD_ID__ placeholder');
   process.exit(1);

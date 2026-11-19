@@ -956,3 +956,27 @@ Migration `public_launch_safety`, `supabase/functions/_shared/guard.ts` + `cors.
 - **Offline banner (web only):** opened offline from the saved copy, a thin bar says "You’re offline — maps,
   weather and routes come back when you reconnect." Phones keep their per-screen messages.
 - Hosting must serve `sw.js` with `Cache-Control: no-cache` (step 6), so new releases are picked up.
+
+## D46 — Hosting and CI (2026-11-20)
+
+`.github/workflows/web.yml`, `docs/DEPLOY.md`, `app/app.json` (`owner`, `extra.eas.projectId`).
+
+- **EAS Hosting** (D41), Expo project `@spidexz/scenic-stroll`. Production `https://scenic-stroll.expo.app`
+  (nothing deployed there until step 9); previews `https://scenic-stroll--<id>.expo.app`.
+- **Deep links:** EAS Hosting answers unknown paths with `index.html` (checked on the preview), so no rewrite
+  config is needed. Unknown app paths now show a plain "Page not found" screen (`src/app/+not-found.tsx`)
+  instead of Expo Router's developer screen with a sitemap.
+- **CI** (GitHub Actions, one job): `npm ci`, typecheck, lint, all tests, format check, web build; then a
+  preview deploy for same-repo pull requests and a production deploy on push to `main`. Fork PRs are checked,
+  not deployed. eas-cli is pinned (27.11.0). Public values come from repository _variables_, the Expo token from
+  a _secret_; no secret key is ever an `EXPO_PUBLIC_` variable.
+- **Preview addresses:** named aliases (`--alias pr-12`) were created but returned 404 for several minutes in
+  our test, so CI reports each deployment's own address instead (from `eas deploy --json`).
+- **Cache:** EAS Hosting lets browsers cache files for 1 h and has no per-file header setting for single-page
+  builds. The service worker fetches pages and unhashed files with `cache: 'no-cache'`, so a new release can't
+  be shadowed by an old cached `index.html` pointing at deleted bundles. The build id hashes `index.html` and
+  `sw.js`.
+- `src/css.d.ts` declares `*.css` imports so the type check passes on a fresh checkout (no generated
+  `expo-env.d.ts` in CI).
+- **CORS allow-list** for the Edge Functions: `https://scenic-stroll.expo.app,https://scenic-stroll--*.expo.app`
+  (DEPLOY.md). Supabase Auth redirect URLs aren't needed: the app only uses anonymous sign-in.
