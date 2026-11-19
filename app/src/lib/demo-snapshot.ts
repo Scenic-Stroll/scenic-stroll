@@ -13,6 +13,7 @@ import {
   type SmartRouteResponse,
 } from '@scenic/shared';
 
+import { ADMIN_TOOLS } from '@/lib/admin-tools';
 import snapshot from '@/demo/smart-route-snapshot.json';
 
 /** A saved answer: the response plus when it was computed for ("13:00 on 2026-10-24"). */
@@ -32,6 +33,8 @@ export function savedDemoRoutes(args: {
   profile: RoutingProfile;
   condition: ConditionMode;
 }): SavedRoutes | null {
+  // Only for the team's demos: on the public app a saved answer could pass for live data.
+  if (!ADMIN_TOOLS) return null;
   const entry = snapshot.entries.find(
     (e) =>
       e.profile === args.profile &&

@@ -901,3 +901,12 @@ Audit in `docs/WEB_LAUNCH_AUDIT.md`. Decisions agreed with the team:
   browser has no barcode reader (iPhone Safari, Firefox, Windows). Typing a friend code always works.
 - **Location denied** now says how to fix it per platform and offers the alternatives (pick from the list,
   drop a pin) — the "My location" button used to fail silently.
+
+## D43 — Team-only tools hidden in the public web app (2026-11-19)
+
+One flag, `ADMIN_TOOLS` (`app/src/lib/admin-tools.ts`): on in development (Expo Go, `npm run web`) and in builds made
+with `EXPO_PUBLIC_ADMIN_TOOLS=1`; off in the public web build. Behind it: the Diagnostics card (Test backend, Simulate
+weather / rush hour / walk, Test smart routing), the data-collection-mode switch, and the answers saved for the demo
+(`savedDemoRoutes`, `savedDemoTrip` return nothing), since on a public site a simulated or saved answer could pass for
+live data. Verified on a production web build: none of them appear in Profile. The code still ships in the bundle; that's
+fine — these tools only change what that device shows and hold no secrets.

@@ -22,6 +22,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DiagnosticsCard } from '@/components/diagnostics-card';
+import { ADMIN_TOOLS } from '@/lib/admin-tools';
 import { Avatar } from '@/components/ui/avatar';
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
@@ -312,26 +313,31 @@ export function ProfileScreen() {
             />
           </View>
           <ListRow icon="translate" title="Language" subtitle="English · 繁體中文 coming soon" />
-          <ListRow
-            icon="clipboard-list-outline"
-            title="Data collection mode"
-            subtitle="Team walks: bigger buttons, auto-numbered titles, “Save & record another”, no 50 m trim"
-            right={
-              <Switch
-                value={settings.dataCollectionMode}
-                onValueChange={settings.setDataCollectionMode}
-                accessibilityLabel="Data collection mode"
-                trackColor={{ true: t.primary, false: t.border }}
-              />
-            }
-          />
+          {/* Team-only (admin-tools.ts): hidden in the public web app. */}
+          {ADMIN_TOOLS ? (
+            <ListRow
+              icon="clipboard-list-outline"
+              title="Data collection mode"
+              subtitle="Team walks: bigger buttons, auto-numbered titles, “Save & record another”, no 50 m trim"
+              right={
+                <Switch
+                  value={settings.dataCollectionMode}
+                  onValueChange={settings.setDataCollectionMode}
+                  accessibilityLabel="Data collection mode"
+                  trackColor={{ true: t.primary, false: t.border }}
+                />
+              }
+            />
+          ) : null}
         </Section>
 
-        <Section title="Diagnostics">
-          <View style={styles.inset}>
-            <DiagnosticsCard />
-          </View>
-        </Section>
+        {ADMIN_TOOLS ? (
+          <Section title="Diagnostics">
+            <View style={styles.inset}>
+              <DiagnosticsCard />
+            </View>
+          </Section>
+        ) : null}
 
         <Section title="About">
           <ListRow

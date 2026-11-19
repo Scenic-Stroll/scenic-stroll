@@ -194,6 +194,9 @@ GRAPH_LOADER_KEY=<key> npm run graph:load   # uploads (~15 s), then switches the
   npm run eval:multimodal                   # Markdown table per trip → eval/results/multimodal-<day>.md
   ```
 
+  The demo switches (Profile → Diagnostics) and the saved demo answers exist in Expo Go and `npm run web`. A web build
+  made for a team demo needs `EXPO_PUBLIC_ADMIN_TOOLS=1`; the public web app never shows them (DECISIONS D43).
+
   If the network or server fails during the pitch, the demo trips (presets: Exit A1, Exit C1, Festival Walk ↔
   MMW, YEUNG, AC2, AC3, Student Residence) still show computed routes, labelled "saved for the demo".
   Profile → Diagnostics → **Test smart routing** checks the live function in one tap.
