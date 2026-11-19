@@ -37,6 +37,7 @@ setWorkerUrl(`/maplibre-gl-worker.mjs?v=${getVersion()}`);
 
 /** Hold a finger this long on the map to drop a pin (iPhone Safari has no long-press event). */
 const LONG_PRESS_MS = 550;
+const LONG_PRESS_SLOP_PX = 10;
 const MAX_FIT_ZOOM = 18;
 
 export type Region = {
@@ -151,21 +152,40 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       handlers.current.onLongPress?.({
         nativeEvent: { coordinate: { latitude: lngLat.lat, longitude: lngLat.lng } },
       });
-    m.on('contextmenu', (e) => longPress(e.lngLat));
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const cancel = () => clearTimeout(timer);
+    // Phones: decide when the finger lifts, using the events' own timestamps (when the finger
+    // really went down and up). A timer would misfire if the page is briefly busy, turning a
+    // normal tap into a dropped pin.
+    let press: { at: number; lngLat: LngLat; x: number; y: number } | null = null;
+    let lastTouchAt = -Infinity;
+    const cancel = () => {
+      press = null;
+    };
     m.on('touchstart', (e) => {
-      cancel();
-      if (e.originalEvent.touches.length !== 1) return;
-      timer = setTimeout(() => longPress(e.lngLat), LONG_PRESS_MS);
+      lastTouchAt = e.originalEvent.timeStamp;
+      press =
+        e.originalEvent.touches.length === 1
+          ? { at: e.originalEvent.timeStamp, lngLat: e.lngLat, x: e.point.x, y: e.point.y }
+          : null;
     });
-    m.on('touchend', cancel);
-    m.on('touchmove', cancel);
+    m.on('touchend', (e) => {
+      lastTouchAt = e.originalEvent.timeStamp;
+      if (press && e.originalEvent.timeStamp - press.at >= LONG_PRESS_MS) longPress(press.lngLat);
+      press = null;
+    });
+    // A finger always wobbles a little; only a real drag cancels the press.
+    m.on('touchmove', (e) => {
+      if (press && Math.hypot(e.point.x - press.x, e.point.y - press.y) > LONG_PRESS_SLOP_PX)
+        cancel();
+    });
     m.on('movestart', cancel);
+    // Computers: right-click. (Android Chrome also sends this after a long touch — skip it then,
+    // the touch handler above already dropped the pin.)
+    m.on('contextmenu', (e) => {
+      if (e.originalEvent.timeStamp - lastTouchAt > 1000) longPress(e.lngLat);
+    });
 
     setMap(m);
     return () => {
-      cancel();
       m.remove();
       setMap(null);
     };

@@ -24,6 +24,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { geocode } from '@/lib/api';
+import { locationDeniedMessage } from '@/lib/location-denied';
 
 import type { Place } from './types';
 
@@ -90,7 +91,7 @@ export function PlacePicker({
     try {
       const { granted } = await Location.requestForegroundPermissionsAsync();
       if (!granted) {
-        setLocationError('Location permission is off. Turn it on in your phone settings.');
+        setLocationError(locationDeniedMessage());
         return;
       }
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });

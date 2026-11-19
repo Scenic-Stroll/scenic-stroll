@@ -890,3 +890,14 @@ Audit in `docs/WEB_LAUNCH_AUDIT.md`. Decisions agreed with the team:
   map would need a public, billed key. Consequence: no Traffic layer on web (hidden there).
 - **Backend: Supabase Pro** (the free plan pauses after 7 days without activity, which silently breaks a public link).
   Upgrading is a billing step the team does in the Supabase dashboard.
+
+## D42 — Web layout and input details (2026-11-19)
+
+- **Wide screens (≥ 900 px) get a side panel** instead of the bottom sheet (`map-panel.tsx`); routes are fitted
+  clear of whichever panel is showing. Phones (native and narrow browsers) keep the bottom sheet.
+- **Long-press on the web map** is decided when the finger lifts, from the touch events' own timestamps, with
+  10 px of wobble allowed; right-click does the same on computers. A timer misfired when the page was busy.
+- **QR scanning on web** uses `expo-camera`'s built-in fallback (the `barcode-detector` polyfill) where the
+  browser has no barcode reader (iPhone Safari, Firefox, Windows). Typing a friend code always works.
+- **Location denied** now says how to fix it per platform and offers the alternatives (pick from the list,
+  drop a pin) — the "My location" button used to fail silently.
