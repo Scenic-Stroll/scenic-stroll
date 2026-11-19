@@ -4,10 +4,15 @@ import { StatusBar } from 'expo-status-bar';
 import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { OfflineBanner } from '@/components/offline-banner';
 import { useBackgroundSync } from '@/hooks/use-background-sync';
 import { queryClient } from '@/lib/query-client';
+import { registerServiceWorker } from '@/lib/service-worker';
 import { AuthProvider } from '@/providers/auth-provider';
 import { palettes, useColorSchemeName } from '@/theme';
+
+// Web only: installable app + offline copy (does nothing on phones).
+registerServiceWorker();
 
 export default function RootLayout() {
   // Follows Profile → Theme (system / light / dark).
@@ -49,6 +54,7 @@ export default function RootLayout() {
                 options={{ presentation: 'modal', headerShown: true, title: 'Review route' }}
               />
             </Stack>
+            <OfflineBanner />
           </ThemeProvider>
         </AuthProvider>
       </QueryClientProvider>

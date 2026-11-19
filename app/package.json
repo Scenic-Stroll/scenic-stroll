@@ -65,7 +65,7 @@
     "web": "node scripts/copy-map-worker.mjs && expo start --web",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "build:web": "node scripts/copy-map-worker.mjs && expo export --platform web"
+    "build:web": "node scripts/copy-map-worker.mjs && expo export --platform web && node scripts/stamp-service-worker.mjs"
   },
   "private": true
 }

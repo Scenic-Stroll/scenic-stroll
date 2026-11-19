@@ -933,3 +933,26 @@ Migration `public_launch_safety`, `supabase/functions/_shared/guard.ts` + `cors.
 - **Cost alarm:** `COST ALARM` in the function logs at 80 % of a paid API's daily cap and when it's reached
   (then plan-trip already falls back to the free provider).
 - 7 new database tests, incl. "a signed-out browser can't read anyone's location".
+
+## D45 — Installable web app (PWA) (2026-11-20)
+
+`app/public/` (manifest, index.html, sw.js, offline.html, icons), `src/lib/service-worker*.ts`,
+`src/components/offline-banner*.tsx`.
+
+- **Icon:** the template's `assets/images/icon.png` is Expo's logo, not ours, so the web icons are a
+  placeholder of our own (white winding path ending in a map pin on `#1BA136`), drawn by
+  `app/scripts/make-web-icons.py`. Everything sits inside the maskable safe zone, so one image serves "any" and
+  "maskable". The phone apps still use the Expo icon — **replace both with a designed logo before launch.**
+- **Manifest:** name/short name "Scenic Stroll", theme `#1BA136`, background `#0B2A18`, standalone. iPhone
+  Safari ignores most of the manifest, so `public/index.html` (Expo's template for single-page builds) adds
+  `apple-touch-icon` and the `apple-mobile-web-app-*` tags. Status bar style "default" (not translucent), so
+  the app never draws under the iPhone status bar.
+- **Service worker** (hand-written, ~100 lines, no Workbox — easier for the team to read): only our own site's
+  GET requests. Pages: network first, offline → saved app, or `offline.html` if never saved. Hashed build
+  files (`/_expo/static/`, `/assets/`): cache first. **Live data is never cached by the worker** — Supabase,
+  map tiles and weather are other origins and pass straight through. `scripts/stamp-service-worker.mjs` gives
+  each build its own cache name; old caches are deleted on activate.
+- Registered only in production builds (`__DEV__` off), so `npm run web` never serves stale code.
+- **Offline banner (web only):** opened offline from the saved copy, a thin bar says "You’re offline — maps,
+  weather and routes come back when you reconnect." Phones keep their per-screen messages.
+- Hosting must serve `sw.js` with `Cache-Control: no-cache` (step 6), so new releases are picked up.

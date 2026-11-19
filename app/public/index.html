@@ -1,0 +1,53 @@
+<!doctype html>
+<!--
+  The web app's page. Expo fills in the language, title and the app's script tags when it builds.
+  The extra tags below make it installable ("Add to Home Screen") on Android Chrome and iPhone
+  Safari. DECISIONS D45.
+-->
+<html lang="%LANG_ISO_CODE%">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>%WEB_TITLE%</title>
+    <meta
+      name="description"
+      content="Shaded, sheltered walking routes around CityU, Kowloon Tong and Festival Walk, plus transport comparison for all of Hong Kong."
+    />
+
+    <!-- Install as an app -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#1BA136" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+    <!-- iPhone / iPad: Safari ignores most of the manifest and reads these instead. -->
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Scenic Stroll" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+
+    <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
+    <style id="expo-reset">
+      /* These styles make the body full-height */
+      html,
+      body {
+        height: 100%;
+      }
+      /* These styles disable body scrolling if you are using <ScrollView> */
+      body {
+        overflow: hidden;
+      }
+      /* These styles make the root element full-height */
+      #root {
+        display: flex;
+        height: 100%;
+        flex: 1;
+      }
+    </style>
+  </head>
+
+  <body>
+    <noscript>Scenic Stroll needs JavaScript. Please turn it on and reload the page.</noscript>
+    <div id="root"></div>
+  </body>
+</html>
