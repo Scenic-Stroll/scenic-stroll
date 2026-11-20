@@ -1039,3 +1039,13 @@ Migration `public_launch_safety`, `supabase/functions/_shared/guard.ts` + `cors.
   bar); the welcome logo is a plain `<img alt="">`; `robots.txt` added (SEO 100).
 - **Not met:** phone Performance 38 (desktop 79) — JavaScript size; and the free database handles ~5 smart routes at
   once. Both are launch-checklist items (bundle splitting; Supabase Pro + bigger compute).
+
+## D49 — Production deploy (2026-11-21)
+
+- `eas deploy --prod` from the `web-launch` branch: https://scenic-stroll.expo.app. Before it: production build scanned
+  for secret-key patterns (none), iOS and Android bundles exported (native code still compiles), smoke test passed.
+  After it: 41/41 Playwright tests against production; no test data in the live database.
+- Deployed by hand because `web-launch` isn't merged yet; from the first merge to `main`, CI deploys production.
+- Shared knowingly before the "Before sharing the link" items in `docs/LAUNCH_CHECKLIST.md` (keys, Supabase Pro, CORS
+  secret, contact email): the address isn't announced, the page says Beta, and the limits (rate limits, Google cap,
+  moderation) are active. Roll back: DEPLOY.md.

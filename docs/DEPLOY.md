@@ -88,6 +88,51 @@ Roll back: expo.dev → Hosting → Deployments → pick an older one → "Promo
   strings, and coordinates become `[coord]`. If you add a new kind of report, keep it that way — and update
   the privacy policy (`app/src/content/privacy.ts`).
 
+## Server functions and the database
+
+The website only shows things; routes, weather and saving happen in the Supabase Edge Functions and database.
+They are deployed separately from the website (docs/SETUP.md §8):
+
+```bash
+npm run sync-shared
+npx supabase functions deploy plan-route geocode conditions smart-route plan-trip eta --use-api --project-ref xelzbcuzopxcterkedru
+npm run smoke:routing            # sign in, plan a route, weather, a computed route — all against the live project
+```
+
+Database changes are migrations in `supabase/migrations/`, applied in the dashboard (SQL editor) or with the
+Supabase MCP `apply_migration`. Run `npm run test:db` first — it applies every migration to a local Postgres and checks
+the security rules.
+
+## Rotating keys
+
+Do this when a key may have leaked (pasted in a chat, shown in a log, a teammate leaves) — and **once before the public
+launch**, because the ORS, Google and Supabase keys were pasted in chat during the hackathon and the ORS key appeared in a
+function log (DECISIONS D48).
+
+| Key                                            | Where it lives                    | How to rotate                                                                                                                                                                                                                        |
+| ---------------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| openrouteservice (`ORS_API_KEY`)               | Supabase secret                   | openrouteservice.org → Dashboard → Tokens → create a new token, then `npx supabase secrets set ORS_API_KEY=<new> --project-ref xelzbcuzopxcterkedru`, run `npm run smoke:routing`, then delete the old token.                        |
+| Google Maps Platform (`GOOGLE_ROUTES_API_KEY`) | Supabase secret                   | Google Cloud console → APIs & Services → Credentials → create a new key, restrict it to the Routes API (API restrictions), set it the same way, smoke test, then delete the old key. Check the daily cap: `GOOGLE_DAILY_CAP` secret. |
+| Supabase personal access token (`sbp_…`)       | your computer (CLI/MCP login)     | supabase.com/dashboard/account/tokens → revoke it, create a new one, `npx supabase login`.                                                                                                                                           |
+| Expo access token (`EXPO_TOKEN`)               | GitHub secret                     | expo.dev → Account settings → Access tokens → revoke and create; update the GitHub secret.                                                                                                                                           |
+| Supabase publishable key                       | `app/.env`, GitHub variable       | Public by design (it is in every web page and phone app); rotate only if abused: dashboard → Project Settings → API Keys. Update `app/.env`, the GitHub variable, and ship new phone builds.                                         |
+| Sentry DSN                                     | GitHub variable / Supabase secret | Public by design; if spammed: Sentry → Client Keys → disable and create a new one.                                                                                                                                                   |
+
+Server secrets take effect on the next request — no function redeploy is needed. **Never** paste a key into a chat,
+issue or commit; give it to `npx supabase secrets set` directly.
+
+## Limits to keep an eye on
+
+- **EAS Hosting free plan: 100,000 requests a month.** A first visit loads ~25–50 files (later visits mostly come
+  from the phone's saved copy), so roughly 2,000–4,000 new visitors a month. Usage: expo.dev → Billing.
+- **Database:** on the free ("nano") compute the walking-route function handles about **5 requests at the same time**
+  (docs/TESTING.md). Supabase Pro + a bigger compute size before promoting the link widely.
+- **Supabase free projects pause after 7 days without use** — Pro doesn't.
+- **openrouteservice free tier:** 2,000 directions a day (`plan-trip` stops using it at 1,500 a day). It was down
+  several times during the hackathon and on 20 November; the computed walking routes keep working without it, the
+  standard street route and place search don't.
+- **Google:** the daily cap (`GOOGLE_DAILY_CAP`) protects the bill; `COST ALARM` lines appear in the function logs at 80 %.
+
 ## Custom domain (optional, later)
 
 If the team buys a domain (e.g. `scenicstroll.hk`):

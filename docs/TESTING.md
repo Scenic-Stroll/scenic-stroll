@@ -77,7 +77,7 @@ Use the preview or production link. Tick each on **iPhone (Safari)** and **Andro
 
 ## Results — 20 November 2026
 
-**Playwright:** 41 tests (6 scenarios + page checks × 4 browsers). Final run on the preview: **29 passed, 12 failed** —
+**Playwright against production (21 November): 41 / 41 passed.** **Playwright:** 41 tests (6 scenarios + page checks × 4 browsers). Final run on the preview: **29 passed, 12 failed** —
 all 12 are the three route-planning tests, failing only because openrouteservice was down (connection refused) and
 the standard street route couldn't be fetched; the computed routes showed. All three had passed in all four browsers
 in the run before the outage. Writing the tests found four real bugs in the web app, all fixed (D48):
