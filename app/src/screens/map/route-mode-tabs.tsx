@@ -40,6 +40,7 @@ export function RouteModeTabs({
     >
       {ROUTE_MODES.map((m) => (
         <Chip
+          role="tab"
           key={m.key}
           icon={m.icon}
           label={m.label}

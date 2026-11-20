@@ -1,7 +1,6 @@
 // The website's first-run screen: what Scenic Stroll does, where it works, "Beta", and Start.
 // Shown over the map on the first visit to the home page only (never over a shared link such as
 // /privacy). Remembered in this browser once you tap Start. DECISIONS D47.
-import { Image } from 'expo-image';
 import { router, usePathname } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -47,11 +46,13 @@ export function Welcome() {
           accessibilityLabel="Welcome to Scenic Stroll"
         >
           <View style={styles.titleRow}>
-            <Image
-              source={{ uri: '/icons/icon-192.png' }}
-              style={styles.logo}
-              accessibilityIgnoresInvertColors
+            {/* A plain <img> (this file is web-only): expo-image drops alt text in browsers. */}
+            <img
+              src="/icons/icon-192.png"
               alt=""
+              width={48}
+              height={48}
+              style={{ borderRadius: radius.md }}
             />
             <Text accessibilityRole="header" style={[type.heading, { color: t.textPrimary }]}>
               Scenic Stroll
@@ -124,7 +125,6 @@ const styles = StyleSheet.create({
     boxShadow: '0 12px 32px rgba(0, 0, 0, 0.25)',
   },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, flexWrap: 'wrap' },
-  logo: { width: 48, height: 48, borderRadius: radius.md },
   beta: { paddingHorizontal: space.sm, paddingVertical: 2, borderRadius: 999, borderWidth: 1 },
   betaText: { fontWeight: '700', letterSpacing: 1 },
   coverage: { padding: space.md, borderRadius: radius.md, gap: space.xs },

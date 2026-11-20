@@ -1010,3 +1010,32 @@ Migration `public_launch_safety`, `supabase/functions/_shared/guard.ts` + `cors.
   `scripts/make-web-icons.py`), pointing at the production address.
 - **Accessibility:** a visible `:focus-visible` outline for keyboard users; a scan found no icon-only button
   without a label; the step-free filter stays a top-level chip on the map. Unknown pages: "Page not found" (D46).
+
+## D48 — Testing before launch, and what it found (2026-11-20)
+
+`e2e/`, `playwright.config.ts`, `scripts/load-test.mjs`, `docs/TESTING.md` (results and the real-phone checklist).
+
+- **Playwright** at the repo root (test tooling, not part of the app): Chromium + WebKit × phone + desktop, against the
+  live site (`BASE_URL`). One shared anonymous session (Supabase: 30 new anonymous accounts per hour per IP), one test
+  at a time, service workers blocked except in the offline test (EAS Hosting answered 429 when every fresh browser
+  downloaded the app twice). The recording upload is faked by replacing `fetch` in the page: WebKit sends requests from
+  a service-worker page past `page.route`, which let an earlier version create 5 real (pending, hidden) routes — deleted.
+  Not in CI yet (live services, hosting quota).
+- **Web bugs found and fixed:**
+  - `lib/watch-position(.web).ts`: expo-location's web `watchPositionAsync` labels positions with the browser's
+    watch id but files callbacks under its own counter; once the map's location dot also watches, positions go
+    nowhere (and the watch is cancelled). Recording, follow mode and location sharing now use the browser directly
+    on the web; phones still use expo-location.
+  - Recording failed to start when the browser refused the screen Wake Lock; keep-awake is now best effort.
+  - `query-client.ts`: on-device queries (`['local', …]`) use `networkMode: 'always'` — TanStack Query paused them
+    offline in browsers ("Review route" spun forever).
+  - Service worker: saves every JS/CSS file of the build and the icon font at install (list written by
+    `stamp-service-worker.mjs`), so screens never opened before still open offline.
+  - `use-background-sync.ts`: also listens to the browser's `online` event; NetInfo didn't report reconnecting.
+  - `geocode` sent the openrouteservice key in the URL, which appeared in a logged error; it now goes in the
+    `Authorization` header like the other ORS calls (test added). **The ORS key must be rotated.**
+- **Accessibility** (Lighthouse 84 → 100): on the web the bottom sheet no longer exposes three "slider"s without
+  values (the phones keep "adjustable"); tab rows are real tabs (`Chip role="tab"`, the record button in the tab
+  bar); the welcome logo is a plain `<img alt="">`; `robots.txt` added (SEO 100).
+- **Not met:** phone Performance 38 (desktop 79) — JavaScript size; and the free database handles ~5 smart routes at
+  once. Both are launch-checklist items (bundle splitting; Supabase Pro + bigger compute).

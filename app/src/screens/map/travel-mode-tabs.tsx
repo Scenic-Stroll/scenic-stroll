@@ -54,6 +54,7 @@ export function TravelModeTabs({
         const t = times[m.key];
         return (
           <Chip
+            role="tab"
             key={m.key}
             icon={m.icon}
             label={Number.isFinite(t) ? `${m.label} · ${formatDuration(t)}` : m.label}

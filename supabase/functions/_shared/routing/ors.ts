@@ -53,8 +53,9 @@ export function createOrsProvider(apiKey: string): RoutingProvider {
     },
 
     async geocode(text) {
+      // The key goes in a header, never in the address: addresses end up in error logs (a failed
+      // request logged the whole URL, key included — found in the step 8 load test, D48).
       const params = new URLSearchParams({
-        api_key: apiKey,
         text,
         size: '8',
         'boundary.country': 'HK',
@@ -63,6 +64,7 @@ export function createOrsProvider(apiKey: string): RoutingProvider {
         'focus.point.lon': String(DEMO_CENTER.lng),
       });
       const res = await fetch(`${BASE}/geocode/search?${params}`, {
+        headers: { Authorization: apiKey },
         signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
       });
       if (!res.ok) throw new ProviderError(`OpenRouteService geocode error ${res.status}`);

@@ -16,6 +16,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import * as Location from 'expo-location';
 import { create } from 'zustand';
 
+import { watchPosition } from '@/lib/watch-position';
 import * as localDb from '@/lib/local-db';
 import { refreshLocalData } from '@/lib/query-client';
 
@@ -98,11 +99,15 @@ export async function startRecording(options: { trimEnds: boolean }): Promise<bo
   const id = randomUUID();
   const startedAt = Date.now();
   await localDb.createRecording(id, startedAt, options.trimEnds);
-  await activateKeepAwakeAsync(KEEP_AWAKE_TAG);
+  // Keeping the screen on is a nice-to-have. Browsers may refuse (battery saver, older Safari,
+  // a background tab): record anyway instead of failing. Found by e2e/record-offline.spec.ts (D48).
+  await activateKeepAwakeAsync(KEEP_AWAKE_TAG).catch((err: unknown) =>
+    console.warn('Screen may turn off while recording:', err),
+  );
   useRecorder.setState({ status: 'recording', recordingId: id, startedAt });
 
   try {
-    subscription = await Location.watchPositionAsync(
+    subscription = await watchPosition(
       {
         accuracy: Location.Accuracy.BestForNavigation,
         timeInterval: SAMPLE_EVERY_MS,
@@ -165,7 +170,7 @@ export async function stopRecording(): Promise<string | null> {
   subscription?.remove();
   subscription = null;
   await writes;
-  await deactivateKeepAwake(KEEP_AWAKE_TAG);
+  await deactivateKeepAwake(KEEP_AWAKE_TAG).catch(() => {}); // wasn't on (see startRecording)
   if (recordingId) await localDb.finishRecording(recordingId);
   useRecorder.setState(initialState);
   await refreshLocalData();

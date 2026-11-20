@@ -18,5 +18,22 @@ if (!sw.includes('__BUILD_ID__')) {
   console.error('stamp-service-worker: dist/sw.js has no __BUILD_ID__ placeholder');
   process.exit(1);
 }
-fs.writeFileSync(swPath, sw.replace('__BUILD_ID__', buildId));
-console.log(`stamp-service-worker: dist/sw.js build ${buildId}`);
+
+// Every JavaScript/CSS file of the build, plus the icon font the app uses, as site paths
+// ("/_expo/static/js/web/entry-….js"). The worker saves them all when it installs.
+const listFiles = (dir) =>
+  fs.readdirSync(dir, { recursive: true }).map((f) => path.join(dir, String(f)));
+const buildFiles = [
+  ...listFiles(path.join(dist, '_expo', 'static')).filter((f) => /\.(js|css)$/.test(f)),
+  ...listFiles(path.join(dist, 'assets')).filter((f) =>
+    /MaterialCommunityIcons\.[0-9a-f]+\.ttf$/.test(f),
+  ),
+].map((f) => '/' + path.relative(dist, f).split(path.sep).join('/'));
+
+const stamped = sw
+  .replace('__BUILD_ID__', buildId)
+  .replace('/*__BUILD_FILES__*/ []', JSON.stringify(buildFiles));
+fs.writeFileSync(swPath, stamped);
+console.log(
+  `stamp-service-worker: dist/sw.js build ${buildId}, ${buildFiles.length} files to save`,
+);

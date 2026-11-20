@@ -11,12 +11,15 @@ export function Chip({
   onPress,
   icon,
   small = false,
+  role = 'button',
 }: {
   label: string;
   selected?: boolean;
   onPress?: () => void;
   icon?: IconName;
   small?: boolean;
+  /** 'tab' when the chip is one of a row of tabs (inside accessibilityRole="tablist"). */
+  role?: 'button' | 'tab';
 }) {
   const t = useAppTheme();
   const fg = selected ? t.onPrimary : t.textPrimary;
@@ -25,7 +28,7 @@ export function Chip({
 
   return (
     <Pressable
-      accessibilityRole={onPress ? 'button' : 'text'}
+      accessibilityRole={onPress ? role : 'text'}
       accessibilityState={onPress ? { selected } : undefined}
       accessibilityLabel={label}
       disabled={!onPress}

@@ -2,7 +2,7 @@
 // DECISIONS D45.
 //
 // What it saves on the device ("cache"):
-//   * the app itself — the page, its JavaScript, fonts, images and icons from OUR site.
+//   * the app itself — the page, all its JavaScript, the icon font, images and icons from OUR site.
 // What it never saves:
 //   * live data: weather, routes, bus/MTR arrivals, friends' locations, map tiles. Those come from
 //     other sites (Supabase, OpenFreeMap), and this worker doesn't touch other sites' requests.
@@ -22,12 +22,17 @@ const CACHE = `scenic-stroll-${BUILD_ID}`;
 
 // Saved when the worker installs, so the offline page can always be shown.
 const PRECACHE = ['/', '/offline.html', '/manifest.webmanifest', '/icons/icon-192.png'];
+// Every JavaScript/CSS file of this build and the icon font, listed by the build script. The app
+// loads each screen's code only when it's first opened; saving it all up front means a screen
+// still opens offline even if it was never opened before (e.g. "Review route" after recording in
+// the MTR). Found by e2e/record-offline.spec.ts (DECISIONS D48).
+const BUILD_FILES = /*__BUILD_FILES__*/ [];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(CACHE)
-      .then((cache) => cache.addAll(PRECACHE))
+      .then((cache) => cache.addAll([...PRECACHE, ...BUILD_FILES]))
       // Take over straight away: safe, because page loads always try the network first.
       .then(() => self.skipWaiting()),
   );
