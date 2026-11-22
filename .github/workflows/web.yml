@@ -1,11 +1,11 @@
-# Checks every pull request and puts the web app online (EAS Hosting). DECISIONS D46, docs/DEPLOY.md.
+# Checks every pull request and push to main (type check, lint, tests, web build). DECISIONS D46, D50, docs/DEPLOY.md.
 #
-#   Pull request → type check, lint, tests, formatting, web build → preview link
-#                  https://scenic-stroll--<id>.expo.app (shown in the run summary)
-#   Merge to main → the same checks → production https://scenic-stroll.expo.app
+#   Pull request → type check, lint, tests, formatting, web build (→ EAS preview link if EXPO_TOKEN is set)
+#   Merge to main → the same checks (→ EAS production https://scenic-stroll.expo.app if EXPO_TOKEN is set)
+# Vercel builds and deploys the site on its own (vercel.json); this workflow then only checks.
 #
 # Needs (GitHub → repo Settings → Secrets and variables → Actions):
-#   secret   EXPO_TOKEN                          an Expo access token (expo.dev → Account settings → Access tokens)
+#   secret   EXPO_TOKEN    optional: only to also deploy to EAS Hosting (expo.dev → Account settings → Access tokens)
 #   variable EXPO_PUBLIC_SUPABASE_URL            public: it ends up in the web page anyway
 #   variable EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY public (the "anon"/publishable key, never the service role key)
 #   variable EXPO_PUBLIC_SENTRY_DSN, EXPO_PUBLIC_UMAMI_WEBSITE_ID   optional: error reports, visit counts
@@ -63,8 +63,10 @@ jobs:
           fi
           npm run build:web
 
-      # Pull requests from forks get no secrets, so they are checked but not deployed.
-      - name: Deploy
+      # Optional second host. Vercel deploys the site itself (vercel.json, D50), so without an
+      # EXPO_TOKEN secret this step skips and the run stays green. Pull requests from forks get no
+      # secrets either, so they are checked but not deployed.
+      - name: Deploy to EAS Hosting (optional)
         if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
         working-directory: app
         env:
@@ -72,7 +74,8 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           if [ -z "$EXPO_TOKEN" ]; then
-            echo "::warning::No EXPO_TOKEN secret, so nothing was deployed (docs/DEPLOY.md)."
+            echo "::notice title=EAS deploy skipped::No EXPO_TOKEN secret. Vercel builds and deploys this site itself; add EXPO_TOKEN only to also deploy to EAS Hosting (docs/DEPLOY.md)."
+            echo "Skipped: no EXPO_TOKEN (Vercel deploys the site)." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then

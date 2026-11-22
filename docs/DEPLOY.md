@@ -1,6 +1,7 @@
 # Deploying the web app
 
-The web version of Scenic Stroll is hosted on **EAS Hosting** (Expo's hosting, DECISIONS D41 and D46).
+The web version of Scenic Stroll is hosted on **Vercel** (D50) and/or **EAS Hosting** (Expo's hosting, D41, D46) —
+the same build works on both.
 It is a single-page app: `npm run build:web` (in `app/`) makes the `app/dist/` folder, and that folder is
 uploaded.
 
@@ -12,31 +13,39 @@ uploaded.
 
 The Expo project is `@spidexz/scenic-stroll` (its ID is in `app/app.json` → `extra.eas.projectId`).
 
-## Normal way: GitHub does it
+## CI: GitHub checks every change
 
 `.github/workflows/web.yml` runs on every pull request and every push to `main`:
 
 1. `npm ci`, then type check, lint, all tests (app, Edge Functions, database security) and formatting.
-2. `npm run build:web` (export + service-worker stamp).
-3. Deploy: a pull request gets its own preview link (shown in the run's summary and as a notice on the run); a merge to `main`
-   **goes straight to production**. Pull requests from forks are checked but not deployed (no secrets).
+2. `npm run build:web` (export + service-worker stamp) — proves the website builds.
+3. **Deploy to EAS Hosting (optional).** We deploy with **Vercel**, which builds the site itself (see "Alternative:
+   Vercel" below), so this step normally **skips**: without an `EXPO_TOKEN` secret it logs
+   "EAS deploy skipped … Vercel builds and deploys this site itself" and the run stays green. With the secret, a pull
+   request gets an EAS preview link and a merge to `main` goes to EAS production too.
 
-### One-time setup (team lead)
+### Repository settings CI needs
 
-GitHub → the repo → Settings → Secrets and variables → Actions:
+GitHub → the repo → Settings → Secrets and variables → Actions.
 
-- **Secret** `EXPO_TOKEN`: expo.dev → Account settings → Access tokens → create one called "GitHub Actions".
-- **Variables** (not secrets — they are public anyway, because they end up in the web page):
-  - `EXPO_PUBLIC_SUPABASE_URL` — same value as in `app/.env`
-  - `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — same value as in `app/.env`
+| Name                                   | Kind     | Needed?                                     | Value                                       |
+| -------------------------------------- | -------- | ------------------------------------------- | ------------------------------------------- |
+| `EXPO_PUBLIC_SUPABASE_URL`             | variable | **required** — the build step stops without | same as in `app/.env`                       |
+| `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | variable | **required**                                | same as in `app/.env` (`sb_publishable_…`)  |
+| `EXPO_PUBLIC_SENTRY_DSN`               | variable | optional — website error reports            | sentry.io → project → Client Keys (DSN)     |
+| `EXPO_PUBLIC_UMAMI_WEBSITE_ID`         | variable | optional — visit counts                     | cloud.umami.is → website → Website ID       |
+| `EXPO_TOKEN`                           | secret   | optional — only to also deploy to EAS       | expo.dev → Account settings → Access tokens |
 
-- **Optional variables** (each feature is off while its variable is missing):
-  - `EXPO_PUBLIC_SENTRY_DSN` — error reports from the website. sentry.io (free plan) → create a project
-    "scenic-stroll-web" (platform: Browser JavaScript) → Settings → Client Keys (DSN).
-  - `EXPO_PUBLIC_UMAMI_WEBSITE_ID` — visit counts. cloud.umami.is (free Hobby plan) → Add website
-    `scenic-stroll.expo.app` → the Website ID.
+They are **variables**, not secrets, because they are public anyway (they end up in the web page). Set them from
+`app/.env` without typing or printing the values (from the repo root):
 
-Or with the GitHub CLI: `gh secret set EXPO_TOKEN`, `gh variable set EXPO_PUBLIC_SUPABASE_URL --body "…"`.
+```bash
+grep '^EXPO_PUBLIC_SUPABASE_URL=' app/.env | cut -d= -f2- | gh variable set EXPO_PUBLIC_SUPABASE_URL
+grep '^EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=' app/.env | cut -d= -f2- | gh variable set EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+gh variable list        # names only
+```
+
+Check first that the key starts with `sb_publishable_` (or, for an old-style key, that it is the "anon" key).
 
 > **Never** put a secret key (service role key, ORS/Google server keys) in an `EXPO_PUBLIC_` variable. Everything
 > in the web build can be read by anyone. Server keys live only in Supabase (`npx supabase secrets set`).
@@ -102,9 +111,13 @@ workspace), build with `npm run build:web --workspace app`, publish `app/dist`, 
    `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (same values as `app/.env`; optional: `EXPO_PUBLIC_SENTRY_DSN`,
    `EXPO_PUBLIC_UMAMI_WEBSITE_ID`). Never a secret key.
 4. Deploy. You get `https://<project>.vercel.app`; every pull request gets its own preview link.
-5. If `ALLOWED_ORIGINS` is set in Supabase, add the Vercel addresses to it, e.g.
-   `https://scenic-stroll.vercel.app,https://scenic-stroll-*.vercel.app` — otherwise the site loads but can't plan
-   routes.
+5. **CORS — let the Vercel site call the Edge Functions.** Add the Vercel addresses to `ALLOWED_ORIGINS` (keep the
+   EAS ones if that host stays). Replace `scenic-stroll` with your Vercel project name if it differs:
+   ```bash
+   npx supabase secrets set "ALLOWED_ORIGINS=https://scenic-stroll.vercel.app,https://scenic-stroll-*.vercel.app,https://scenic-stroll.expo.app,https://scenic-stroll--*.expo.app" --project-ref xelzbcuzopxcterkedru
+   ```
+   While `ALLOWED_ORIGINS` is not set, every site may call them (nothing to do). Once it is set, a Vercel address
+   missing from it loads the page but can't plan routes ("This website may not use the Scenic Stroll API").
 
 The share image and `og:url` in `app/public/index.html` point at `scenic-stroll.expo.app`; change them if Vercel becomes
 the main address.
