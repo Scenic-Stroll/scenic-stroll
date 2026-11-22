@@ -12,6 +12,7 @@ import {
   findStop,
   isTag,
   type CommunityRoute,
+  type MapPin,
 } from '@scenic/shared';
 import { Pressable, Share, StyleSheet, Text, View } from 'react-native';
 
@@ -26,6 +27,8 @@ import { placeId, type Place } from './types';
 
 /** Community routes that end within this distance count as "routes to this place". */
 const ARRIVING_METERS = 100;
+/** Knowledge pins within this distance are "pins at this place" (D54). */
+const PINS_AT_PLACE_METERS = 60;
 
 export function PlaceSheet({
   place,
@@ -34,9 +37,13 @@ export function PlaceSheet({
   onRouteFrom,
   onClose,
   onSelectRoute,
+  pins,
+  onOpenPin,
 }: {
   place: Place;
   communityRoutes: CommunityRoute[];
+  pins: MapPin[];
+  onOpenPin: (pin: MapPin) => void;
   onRouteHere: () => void;
   onRouteFrom: () => void;
   onClose: () => void;
@@ -67,6 +74,7 @@ export function PlaceSheet({
     (r) => haversineMeters(r.line.at(-1)!, place.point) <= ARRIVING_METERS,
   );
   const tags = [...new Set(arriving.flatMap((r) => r.tags))].filter(isTag);
+  const pinsHere = pins.filter((p) => haversineMeters(p, place.point) <= PINS_AT_PLACE_METERS);
 
   const share = () =>
     Share.share({
@@ -142,6 +150,27 @@ export function PlaceSheet({
           checkpoints — that’s how floors get mapped.
         </Text>
       </Section>
+
+      {/* Knowledge pins near this place (only shown when there are any) */}
+      {pinsHere.length > 0 ? (
+        <Section title="Pins at this place">
+          {pinsHere.map((p) => (
+            <Pressable
+              key={p.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Pin: ${p.title}`}
+              onPress={() => onOpenPin(p)}
+              style={styles.infoRow}
+            >
+              <Icon name="lightbulb-on-outline" size={20} color={t.accent} />
+              <Text style={[type.body, styles.flex1, { color: t.textPrimary }]} numberOfLines={1}>
+                {p.title}
+              </Text>
+              <Icon name="chevron-right" size={20} color={t.textSecondary} />
+            </Pressable>
+          ))}
+        </Section>
+      ) : null}
 
       {/* Community */}
       <Section title="Community routes to here">

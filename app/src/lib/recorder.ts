@@ -16,6 +16,9 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import * as Location from 'expo-location';
 import { create } from 'zustand';
 
+import { queueWalkForPoints } from '@/lib/points';
+import { feedFixForPins, resetPinCollector } from '@/lib/pin-collector';
+import { currentFeatureRules } from '@/lib/user-settings';
 import { watchPosition } from '@/lib/watch-position';
 import * as localDb from '@/lib/local-db';
 import { refreshLocalData } from '@/lib/query-client';
@@ -68,6 +71,7 @@ function onLocation(loc: Location.LocationObject) {
     accuracy: loc.coords.accuracy ?? null,
     timestamp: loc.timestamp,
   };
+  void feedFixForPins(sample); // collect pins walked past (it does its own GPS checks) — D54
   const verdict = acceptSample(points.at(-1) ?? null, sample);
   if (!verdict.ok) {
     useRecorder.setState((s) => ({ lastFix: sample, rejectedCount: s.rejectedCount + 1 }));
@@ -85,7 +89,13 @@ function onLocation(loc: Location.LocationObject) {
 /** Starts a new recording. Returns false (and sets `error`) if location isn't allowed. */
 export async function startRecording(options: { trimEnds: boolean }): Promise<boolean> {
   if (useRecorder.getState().status !== 'idle') return false;
+  // Safety mode (under-18s) never records; the database refuses their uploads too (D52).
+  if (!currentFeatureRules().recordRoutes) {
+    useRecorder.setState({ error: 'Route recording is off in safety mode.' });
+    return false;
+  }
   useRecorder.setState({ ...initialState, status: 'starting' });
+  resetPinCollector();
 
   const permission = await Location.requestForegroundPermissionsAsync();
   if (!permission.granted) {
@@ -106,6 +116,11 @@ export async function startRecording(options: { trimEnds: boolean }): Promise<bo
   );
   useRecorder.setState({ status: 'recording', recordingId: id, startedAt });
 
+  await startWatching();
+  return true;
+}
+
+async function startWatching() {
   try {
     subscription = await watchPosition(
       {
@@ -119,7 +134,19 @@ export async function startRecording(options: { trimEnds: boolean }): Promise<bo
   } catch (err) {
     useRecorder.setState({ error: `GPS could not start: ${String(err)}` });
   }
-  return true;
+}
+
+/**
+ * "Recording paused — tap to resume" (web, D56): browsers stop sending positions while the page is
+ * hidden or the screen is locked. Restart the GPS watch and the screen wake lock. The time in
+ * between shows up as a gap on the review screen, where a checkpoint can be added.
+ */
+export async function resumeRecording() {
+  if (useRecorder.getState().status !== 'recording') return;
+  subscription?.remove();
+  subscription = null;
+  await activateKeepAwakeAsync(KEEP_AWAKE_TAG).catch(() => undefined);
+  await startWatching();
 }
 
 /**
@@ -171,7 +198,10 @@ export async function stopRecording(): Promise<string | null> {
   subscription = null;
   await writes;
   await deactivateKeepAwake(KEEP_AWAKE_TAG).catch(() => {}); // wasn't on (see startRecording)
-  if (recordingId) await localDb.finishRecording(recordingId);
+  if (recordingId) {
+    await localDb.finishRecording(recordingId);
+    queueWalkForPoints(recordingId); // distance points (adults; the server works them out) — D55
+  }
   useRecorder.setState(initialState);
   await refreshLocalData();
   return recordingId;

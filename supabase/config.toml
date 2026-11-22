@@ -434,3 +434,12 @@ verify_jwt = false
 
 [functions.eta]
 verify_jwt = false
+
+[functions.pin-tools]
+verify_jwt = false
+
+[functions.generate-pin-versions]
+verify_jwt = false
+
+[functions.award-points]
+verify_jwt = false

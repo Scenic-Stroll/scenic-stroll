@@ -78,6 +78,9 @@ export const FUNCTIONS = {
   smartRoute: 'smart-route',
   planTrip: 'plan-trip',
   eta: 'eta',
+  pinTools: 'pin-tools',
+  generatePinVersions: 'generate-pin-versions',
+  awardPoints: 'award-points',
 } as const;
 export type FunctionName = (typeof FUNCTIONS)[keyof typeof FUNCTIONS];
 

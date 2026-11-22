@@ -6,7 +6,7 @@ import type { Doc } from './types';
 export const PRIVACY: Doc = {
   draftNote:
     'Draft for the Scenic Stroll team to review. This is not legal advice and has not been checked by a lawyer.',
-  updated: '20 November 2026',
+  updated: '24 November 2026',
   intro:
     'Scenic Stroll is a student project (beta) that helps you find shaded, sheltered and step-free walking routes in Hong Kong. This page explains, in plain words, what data the app uses, why, how long we keep it and how you can download or delete it. We aim to follow the Personal Data (Privacy) Ordinance (Cap. 486) and its six Data Protection Principles.',
   sections: [
@@ -35,6 +35,9 @@ export const PRIVACY: Doc = {
       heading: 'Other data we keep',
       body: [
         [
+          'Your age band (under 18 or 18 and over), your consent and your two optional choices (research, government sharing — both off unless you tick them), and your reading style.',
+          'Knowledge pins you collect and read (adults): which pin and when. Under 18: this stays on your device; the server only counts that a pin was unlocked on a day, without saying by whom.',
+          'Points (adults): how far you walked on each day while recording (in metres — not the route itself), and the points it earned. Under 18s don’t earn points and nothing is stored for them.',
           'Place searches: the text you type goes to our server and to openrouteservice to find matching places. We don’t store it.',
           'Feedback you send and routes you report: kept so the team can act on them; nobody else can read them.',
           'Friends: the friend code you share and the friendships you accept, until you remove a friend.',
@@ -47,6 +50,12 @@ export const PRIVACY: Doc = {
       body: [
         'On the website we count visits with Umami, which uses no cookies and doesn’t follow you to other sites. It counts pages opened and three events — a route planned, a route recorded, feedback sent — and never the places you searched for. If your browser sends “Do Not Track”, nothing is counted.',
         'If the website crashes, an error report goes to Sentry so we can fix it. Before it is sent we remove your IP address, any map coordinates and anything typed in addresses.',
+      ],
+    },
+    {
+      heading: 'If you are under 18',
+      body: [
+        'Safety mode is always on for you: no route recording, no friends or location sharing, no shop offers and no points (you still get badges). The pins you collect stay on your device. You can still plan routes and read pins.',
       ],
     },
     {
@@ -66,8 +75,8 @@ export const PRIVACY: Doc = {
       heading: 'Download or delete your data',
       body: [
         'Profile → Download my data saves a file with everything stored on your device and your profile.',
-        'Profile → Delete my data deletes your shared routes and descriptions, removes your display name, and clears everything stored by the app on your device (on the website: in this browser).',
-        'It does not remove a live location share (use Profile → Location sharing → Stop), your friendships (remove friends in Friends) or reports and feedback you sent. To have those or your whole account deleted, or to ask for a copy or a correction of your data, contact the team.',
+        'Profile → Delete my data deletes your shared routes and descriptions and your pin collection, removes your display name, and clears everything stored by the app on your device (on the website: in this browser).',
+        'It does not remove a live location share (use Profile → Location sharing → Stop), your friendships (remove friends in Friends), your points history or reports and feedback you sent. To have those or your whole account deleted, or to ask for a copy or a correction of your data, contact the team.',
       ],
     },
     {

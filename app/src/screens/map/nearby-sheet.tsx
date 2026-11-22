@@ -16,6 +16,7 @@ import {
 } from '@scenic/shared';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { useFeatureRules } from '@/lib/user-settings';
 import { ReportRoute } from '@/components/route/report-route';
 import { Chip } from '@/components/ui/chip';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -48,6 +49,8 @@ export function NearbySheet({
   onSelectRoute: (route: CommunityRoute) => void;
   onRecord: () => void;
 }) {
+  // Safety mode (under-18s): no recording, so no "Record a route" button (D52).
+  const canRecord = useFeatureRules().recordRoutes;
   const t = useAppTheme();
 
   const nearby = (routes ?? [])
@@ -82,7 +85,11 @@ export function NearbySheet({
           icon="map-marker-path"
           title="No community routes here yet"
           body="Be the first to log one — record the way you actually walk, with lifts, malls and footbridges."
-          action={<PrimaryButton label="Record a route" icon="record-rec" onPress={onRecord} />}
+          action={
+            canRecord ? (
+              <PrimaryButton label="Record a route" icon="record-rec" onPress={onRecord} />
+            ) : undefined
+          }
         />
       ) : null}
       {!isLoading && !error && nearby.length > 0 && shown.length === 0 ? (

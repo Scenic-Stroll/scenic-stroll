@@ -5,7 +5,7 @@
  * Points, stats and badges are calculated on this phone from your recordings (works offline and for
  * anonymous users). Verification-based points/badges unlock when route verification ships (Phase 5).
  */
-import { badgesFor, levelFor, pointsFor, TAGS } from '@scenic/shared';
+import { badgesFor, featureRules, levelFor, TAGS, type ReadingLevel } from '@scenic/shared';
 import { useQuery } from '@tanstack/react-query';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
@@ -21,6 +21,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { usePointsSummary } from '@/lib/points';
 import { DiagnosticsCard } from '@/components/diagnostics-card';
 import { ADMIN_TOOLS } from '@/lib/admin-tools';
 import { Avatar } from '@/components/ui/avatar';
@@ -37,12 +38,20 @@ import { useSharing } from '@/lib/location-sharing';
 import { useSavedPlaces } from '@/lib/saved-places-store';
 import { ShareLocationSheet } from '@/screens/friends/share-location-sheet';
 import { useSettings, type ThemePreference } from '@/lib/settings-store';
+import { setReadingStyle, useUserSettings } from '@/lib/user-settings';
 import { useAuth } from '@/providers/auth-provider';
 import { radius, space, TAP_TARGET, type, useAppTheme } from '@/theme';
 import { showAlert } from '@/lib/alert';
 
 import { BadgeTile } from './badge-tile';
+import { PointsCard } from './points-card';
 import { EditProfileSheet } from './edit-profile-sheet';
+
+const READING_OPTIONS = [
+  { key: 'child', label: 'Child' },
+  { key: 'teen', label: 'Teen' },
+  { key: 'adult', label: 'Adult' },
+] as const satisfies readonly { key: ReadingLevel; label: string }[];
 
 const THEME_OPTIONS = [
   { key: 'system', label: 'System' },
@@ -60,6 +69,8 @@ export function ProfileScreen() {
   const stats = useQuery({ queryKey: localKeys.stats, queryFn: getMyStats });
   const savedCount = useSavedPlaces((s) => s.places.length);
   const settings = useSettings();
+  const { settings: userSettings } = useUserSettings();
+  const rules = featureRules(userSettings);
 
   const [editing, setEditing] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -69,16 +80,11 @@ export function ProfileScreen() {
 
   // Verification (Phase 5) isn't built yet, so these are honestly 0 for now.
   const routesVerified = 0;
-  const verifiedWalks = 0;
   const s = stats.data;
-  const points = s
-    ? pointsFor({
-        routes: s.routesLogged,
-        descriptions: s.descriptions,
-        verifiedWalks,
-        routesVerified,
-      })
-    : 0;
+  // Points (D55): the server's ledger plus earlier points from the old rules (frozen on 24 Nov 2026).
+  // Under-18s (safety mode) see badges only — no points, level or ring.
+  const pointsSummary = usePointsSummary();
+  const points = (pointsSummary.data?.balance ?? 0) + (pointsSummary.data?.earlierPoints ?? 0);
   const level = levelFor(points);
   const badges = badgesFor({
     routesLogged: s?.routesLogged ?? 0,
@@ -138,26 +144,30 @@ export function ProfileScreen() {
             <Text style={[type.heading, { color: t.textPrimary }]} numberOfLines={1}>
               {displayName ?? 'Anonymous walker'}
             </Text>
-            <Text style={[type.small, { color: t.textSecondary }]}>
-              Level {level.number} · {level.name}
-              {level.pointsToNext !== null
-                ? ` — ${level.pointsToNext} pts to next level`
-                : ' — top level'}
-            </Text>
-            <View
-              style={[styles.progressTrack, { backgroundColor: t.surface }]}
-              accessible
-              accessibilityRole="progressbar"
-              accessibilityLabel="Progress to next level"
-              accessibilityValue={{ min: 0, max: 100, now: Math.round(level.progress * 100) }}
-            >
-              <View
-                style={[
-                  styles.progressFill,
-                  { width: `${Math.round(level.progress * 100)}%`, backgroundColor: t.primary },
-                ]}
-              />
-            </View>
+            {rules.points ? (
+              <>
+                <Text style={[type.small, { color: t.textSecondary }]}>
+                  Level {level.number} · {level.name}
+                  {level.pointsToNext !== null
+                    ? ` — ${level.pointsToNext} pts to next level`
+                    : ' — top level'}
+                </Text>
+                <View
+                  style={[styles.progressTrack, { backgroundColor: t.surface }]}
+                  accessible
+                  accessibilityRole="progressbar"
+                  accessibilityLabel="Progress to next level"
+                  accessibilityValue={{ min: 0, max: 100, now: Math.round(level.progress * 100) }}
+                >
+                  <View
+                    style={[
+                      styles.progressFill,
+                      { width: `${Math.round(level.progress * 100)}%`, backgroundColor: t.primary },
+                    ]}
+                  />
+                </View>
+              </>
+            ) : null}
           </View>
         </View>
         <View style={styles.inset}>
@@ -216,12 +226,8 @@ export function ProfileScreen() {
               label="Verified by others"
               value={String(routesVerified)}
             />
-            <StatTile icon="star-outline" label="Points" value={String(points)} />
           </View>
-          <Text style={[type.caption, { color: t.textSecondary }]}>
-            Counted on this phone: +10 per uploaded route, +5 per description. Verification points
-            arrive with route verification.
-          </Text>
+          {rules.points ? <PointsCard /> : null}
         </View>
 
         {/* Badges */}
@@ -278,14 +284,23 @@ export function ProfileScreen() {
               />
             }
           />
-          <ListRow
-            icon={sharingOn ? 'access-point' : 'map-marker-account-outline'}
-            title="Location sharing"
-            subtitle={
-              sharingOn ? 'On — tap to change or stop' : 'Off · share live with chosen friends'
-            }
-            onPress={() => setSharingSheet(true)}
-          />
+          {userSettings?.safety_mode ? (
+            <ListRow
+              icon="shield-check-outline"
+              title="Safety mode: on"
+              subtitle="For everyone under 18: no route recording or friends, pins stay on this device. It can’t be turned off."
+            />
+          ) : null}
+          {rules.friends ? (
+            <ListRow
+              icon={sharingOn ? 'access-point' : 'map-marker-account-outline'}
+              title="Location sharing"
+              subtitle={
+                sharingOn ? 'On — tap to change or stop' : 'Off · share live with chosen friends'
+              }
+              onPress={() => setSharingSheet(true)}
+            />
+          ) : null}
           <ListRow
             icon="download-outline"
             title="Download my data"
@@ -312,6 +327,20 @@ export function ProfileScreen() {
               onChange={settings.setThemePreference}
             />
           </View>
+          {userSettings && userId ? (
+            <View style={styles.themeRow}>
+              <Text style={[type.body, { color: t.textPrimary }]}>Reading style</Text>
+              <SegmentedTabs
+                options={READING_OPTIONS}
+                value={userSettings.reading_style}
+                onChange={(style) =>
+                  void setReadingStyle(userId, style).catch((err: unknown) =>
+                    showAlert('Reading style', err instanceof Error ? err.message : String(err)),
+                  )
+                }
+              />
+            </View>
+          ) : null}
           <ListRow icon="translate" title="Language" subtitle="English · 繁體中文 coming soon" />
           {/* Team-only (admin-tools.ts): hidden in the public web app. */}
           {ADMIN_TOOLS ? (
@@ -367,6 +396,12 @@ export function ProfileScreen() {
             title="Terms of use"
             subtitle="Draft"
             onPress={() => router.push('/terms')}
+          />
+          <ListRow
+            icon="eye-outline"
+            title="Previews"
+            subtitle="Mock-ups of coming features (made-up data)"
+            onPress={() => router.push('/preview')}
           />
           <ListRow
             icon="database-outline"

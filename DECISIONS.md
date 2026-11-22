@@ -1057,3 +1057,132 @@ The team wants a Vercel link as well. `vercel.json` (repo root) builds the same 
 (Vercel, unlike EAS Hosting, 404s unknown paths), `no-cache` for `sw.js`, one-year cache for hashed files. EAS
 Hosting stays (D41/D46). Vercel Hobby is for non-commercial use only — fine for a student project; revisit if that
 changes. Steps: DEPLOY.md → Alternative: Vercel.
+
+## D51 — Knowledge pins: data model (2026-11-23)
+
+Migration `*_knowledge_pins.sql`, `shared/src/pins.ts`, audit in `docs/PINS_AUDIT.md`.
+
+- **Roles:** `admins` (added by hand in the dashboard) review and publish; `experts` (added by admins only, ORCID iD
+  stored as a plain field) write pins. Expert names and fields are readable by signed-in users; ORCID iDs aren't.
+- **Pins:** the point is the truth; `place_kind` + `ped_build_id/ped_node_id` (graph node ids change per build),
+  `osm_id` (`node/123`) or a required `place_description` (custom: trees, boundary stones). Radius 30–50 m. A
+  "beyond Hong Kong" line needs its own source. `is_sample` marks seeded examples.
+- **Review:** versions/questions start `in_review`; only admins approve (trigger records reviewer and time). Editing a
+  version's text sends it and all its questions back to review, and a live pin whose adult text changed back to
+  `in_review` — readers never see unchecked text. Pins go live only through `publish_pin` (admins), which requires the
+  adult version and all its questions approved and sets the label: `expert_verified` when the author is a verified
+  expert and a verified expert approved the adult text, else `ai_summarized`.
+- **Collection:** adults' `collection_entries` on the server (insert only for live pins; `read_at` is set by the
+  server, phase 5). Under-18s and users without settings can't store a collection; they call `record_pin_unlock`,
+  which keeps only an anonymous count per pin and Hong Kong day.
+- **Points ledger:** no client grants at all; unique (user, source, ref_id) makes awards idempotent; a trigger makes it
+  append-only for everyone, the server functions included.
+- **Settings:** `safety_mode` is a generated column (`age_band = 'under_18'`) — nobody can write it; once under-18 an
+  account can't switch to adult (only an admin can fix a mistake), and settings rows can't be deleted.
+
+## D52 — Consent and under-18 safety mode (2026-11-23)
+
+`app/src/components/consent-screen.tsx`, `app/src/lib/user-settings.ts`, `shared/src/safety.ts`, migration
+`*_safety_mode_enforcement.sql`.
+
+- **One consent screen** on first launch (and when `CONSENT_VERSION` changes), on every platform; it replaces the web
+  welcome card (D47). Age band (Under 18 / 18 or over), a required agreement with links to the privacy policy and terms,
+  and two **unticked** opt-ins (research, government sharing) — offered to adults only.
+- **Safety mode = under-18**, computed by the database; there is no switch. Turned off for them: route recording,
+  friends, location sharing, shop offers, points (badges only), server-side collection. The app hides these
+  (`featureRules`), and the **database refuses them** whatever the client sends: triggers on routes, descriptions,
+  friend codes, friendships and location shares. Switching an account to under-18 deletes those rows; switching back
+  is refused (phase 1). Unknown settings (not answered yet, offline first launch) are treated as safety mode in the app.
+- Accounts from before the consent screen (no settings row) keep working on the server; the app asks them first thing.
+- Reading style (child / teen / adult) is a separate Profile setting for everyone; it never affects safety mode.
+- A minor can still create a new anonymous account and answer "18 or over" — the age band is self-declared. Stronger
+  age checks are out of scope for the MVP.
+
+## D53 — Pin authoring and review (2026-11-23)
+
+`/admin` (`app/src/app/admin/`, `app/src/screens/admin/`), Edge Functions `pin-tools` and `generate-pin-versions`,
+migration `*_pin_authoring.sql`, seed `supabase/seed/sample_pin.sql`.
+
+- **Sign-in:** experts and reviewers sign in with an **email code** (`signInWithOtp` + `verifyOtp`) on `/admin`;
+  everyone else stays anonymous. The Supabase "Magic link" email template must contain `{{ .Token }}` (docs/PINS.md).
+  A new account shows its id; an admin adds it as an expert on the same page (after checking them by hand).
+- **Expert form:** tap the map → `pin-tools` snaps to the nearest pedestrian node (`nearest_ped_node`, active graph,
+  25 m) and the nearest OSM place (openrouteservice reverse geocoder, 25 m; no OSM copy kept), or "custom place" with
+  a required description. Sources: DOI or title → **OpenAlex, then Crossref** (Google Scholar has no API and its terms
+  forbid automated use); or a web page by hand. The expert's own `summary` is stored on the pin.
+- **AI versions:** `generate-pin-versions` uses **Gemini** (the provider in docs/SETUP.md; key `GEMINI_API_KEY`, model
+  `GEMINI_MODEL`, default `gemini-2.5-flash`), key in a header. The prompt allows only facts from the summary (and the
+  "beyond Hong Kong" line), child version ≤ ~80 words; the answer must pass `GeneratedVersionsSchema` (one version per
+  level, 1–2 questions each, answer among the options, child ≤ 100 words), one retry. It runs with the **caller's**
+  rights, so the database decides who may write; everything is saved `in_review`. Until the key is set it answers
+  503 with a clear message.
+- **Review page:** summary, sources, "beyond Hong Kong" and each version with its questions side by side; edit,
+  approve, reject (version → draft; question → deleted); "Publish" only when the adult version and its questions are
+  approved (the database checks again). The label comes from `publish_pin` (D51).
+- **Sample pin** "Why Kent Road is in Kowloon": a SQL file run by hand once an expert exists — `in_review`,
+  `is_sample`, two checked sources (SCMP, 5 Nov 2018; Gwulo "Kowloon Tong Garden Estate [c.1922- ]"), **no summary or
+  facts written by us**, an approximate point to be corrected on site. Never set live automatically.
+
+## D54 — Collect while walking, read later (2026-11-23)
+
+`shared/src/collect.ts`, `shared/src/cluster.ts`, `app/src/lib/pin-collector.ts`, `pin-collection.ts`, map
+`pin-markers.tsx` / `pin-sheet.tsx`, `app/src/screens/collection/`, `app/src/screens/pin-reader/`.
+
+- **Collect rule** (pure, unit-tested): a fix with accuracy ≤ 30 m inside the radius, and the _next_ fix is a good
+  fix inside too — or, if vague/jumped fixes came in between, still inside after ≥ 5 s. The recorder's jump filter
+  (`acceptSample`, > 3 m/s) drops GPS jumps. Fed only while tracking: route recording and walking with directions
+  (real GPS, never the demo walker). No route needed. The walker sees only a quiet toast "Pin saved: <title>".
+- **Collection on the device for everyone** (zustand persisted to IndexedDB on the web, AsyncStorage on phones), so it
+  works offline and is the only copy for under-18s. Sync when online: adults → `collection_entries`; under-18s →
+  `record_pin_unlock` (anonymous count). Per-account: another account on the device starts empty. Included in
+  Download my data; Delete my data clears it on the device and the server.
+- **Map:** live pins as small round markers (white ring = not collected, filled = collected), grid-clustered below
+  zoom 17 by one shared function for both maps; tapping a cluster zooms in. The pin sheet shows title, label, sources
+  and "Route to this pin" (the normal comfort-route planner with the pin as destination) — never the pin's text.
+  The place card lists "Pins at this place" within 60 m.
+- **My collection** replaces Record as the centre tab (unread count badge); Record stays reachable (Phase 6 moves its
+  button). The **reader** shows the version for the reading style (nearest level if missing), the label badge, sources
+  with links, the "beyond Hong Kong" line and an ungraded question; only collected pins can be read.
+
+## D55 — Points and the daily ring (2026-11-24)
+
+`shared/src/pointsRules.ts` (every number), `shared/src/points.ts` (pure, tested), Edge Function `award-points`,
+migration `*_points.sql`, `app/src/lib/points.ts`, `app/src/screens/profile/points-card.tsx`.
+
+- **Only the server writes points**, in `award-points` with the service role; the ledger has no client grants (D51).
+  The app sends what happened — a finished recording's fixes, or "done reading pin X" — never an amount.
+- **Distance:** recorded walks only (adults), through the existing GPS filter (`filterSamples`) and the speed check
+  (> 7 km/h averaged over ≥ 30 s earns nothing; same for walking and wheeling). The server stores only the counted
+  metres per walk and Hong Kong day (`walk_days`), not the GPS track. Each time, it recomputes the day's points from
+  all stored walks (tiers 25/50/100 per 1,000 steps, 0.75 km = 1,000 steps, cap 450, rounded down) and adds only what
+  is still owed (`distancePointsOwed`), keyed `walk:<id>:<day>` — retries and repeats pay nothing extra. Walks are
+  queued on the device and sent when online, like route uploads. Known limit: two walks sent at the same moment for
+  the same day could both be paid the same difference; the app sends them one at a time.
+- **Pin reading:** `start_pin_read` (server time) when the reader opens; `award-points` records `read_at` and pays
+  `pinRead.amount` (20, TBD) once per pin, only for a collected pin and only after ≥ 10 s.
+- **Old rules:** stopped. Points from before **24 Nov 2026** (+10 route, +5 description) are kept as "earlier points"
+  (`private.legacy_points`) and shown on Profile; the Friends leaderboard and profile totals are now earlier points +
+  ledger (`points_since`). **Levels** use that total, so nobody drops a level; **badges** are unchanged (they count
+  activity, not points). Board and contribution amounts are placeholders, not wired.
+- **Profile (adults):** balance, today's points and a ring of steps today out of 10,000, labelled as estimated from
+  distance. **Under-18s:** badges only — no points, level or ring; the server refuses to award them anything.
+
+## D56 — Tabs and recording on the web (2026-11-24)
+
+- **Tabs:** Map · Explore · My collection (centre) · Friends · Profile. Routes and Record are no longer tabs but
+  ordinary pages (`/routes`, `/record`) — a tab hidden with `href: null` can't be opened at all on the web (found by
+  the browser tests). Routes: Profile → My routes; Record is reached with a "Record a route" button on the map (hidden in safety mode), which
+  turns red while a recording runs. Explore is a placeholder for topic boards.
+- **Recording on the web:** a "Keep this page open while recording" note; when the page was hidden (`visibilitychange`)
+  or no good fix came for 20 s (`GPS_RULES.gapSeconds`, the existing gap rule), a "Recording paused — tap to resume"
+  banner restarts the GPS watch and the wake lock (`resumeRecording`). The time in between is a gap on the review
+  screen, where the existing gap checkpoints apply. Native background recording is not built: design note in
+  `docs/BACKGROUND_RECORDING.md`.
+
+## D57 — Preview mock-ups (2026-11-24)
+
+`/preview` (`app/src/screens/preview/`): clickable screens with made-up data and **no backend**, each with a
+"Preview — made-up data, nothing is saved" banner — topic boards list and detail (UC2), a teacher's course-walk builder
+and a student's question (UC3), a shop offer with a one-time QR code and the staff check (UC6). Shop screens are hidden
+in safety mode. Offers in the mock-up unlock by level; nothing spends, sells or transfers points. Reached from Explore →
+"See a preview" and Profile → Previews. The feedback form (phase 7's other item) already existed (web step 7, D47).

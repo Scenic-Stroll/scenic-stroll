@@ -5,7 +5,8 @@ import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { OfflineBanner } from '@/components/offline-banner';
-import { Welcome } from '@/components/welcome';
+import { ConsentGate } from '@/components/consent-screen';
+import { ToastHost } from '@/components/toast';
 import { useBackgroundSync } from '@/hooks/use-background-sync';
 import { queryClient } from '@/lib/query-client';
 import { registerServiceWorker } from '@/lib/service-worker';
@@ -55,6 +56,20 @@ export default function RootLayout() {
                 name="saved-places"
                 options={{ headerShown: true, title: 'Saved places', headerBackTitle: 'Profile' }}
               />
+              {/* Not tabs (D56): Record opens from the map's button, Routes from Profile → My
+                  routes. Ordinary pages, because a hidden tab can't be opened on the web. */}
+              <Stack.Screen
+                name="record"
+                options={{ headerShown: true, title: 'Record a route', headerBackTitle: 'Map' }}
+              />
+              <Stack.Screen
+                name="routes"
+                options={{ headerShown: true, title: 'Routes', headerBackTitle: 'Back' }}
+              />
+              <Stack.Screen
+                name="pin/[id]"
+                options={{ headerShown: true, title: 'Pin', headerBackTitle: 'Back' }}
+              />
               <Stack.Screen
                 name="feedback"
                 options={{ headerShown: true, title: 'Send feedback', headerBackTitle: 'Back' }}
@@ -81,7 +96,8 @@ export default function RootLayout() {
               />
             </Stack>
             <OfflineBanner />
-            <Welcome />
+            <ToastHost />
+            <ConsentGate />
           </ThemeProvider>
         </AuthProvider>
       </QueryClientProvider>
