@@ -42,3 +42,5 @@ export * from './privacy.ts';
 export * from './pins.ts';
 export * from './safety.ts';
 export * from './pin-api.ts';
+export * from './collect.ts';
+export * from './cluster.ts';

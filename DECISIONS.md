@@ -1122,3 +1122,24 @@ migration `*_pin_authoring.sql`, seed `supabase/seed/sample_pin.sql`.
 - **Sample pin** "Why Kent Road is in Kowloon": a SQL file run by hand once an expert exists — `in_review`,
   `is_sample`, two checked sources (SCMP, 5 Nov 2018; Gwulo "Kowloon Tong Garden Estate [c.1922- ]"), **no summary or
   facts written by us**, an approximate point to be corrected on site. Never set live automatically.
+
+## D54 — Collect while walking, read later (2026-11-23)
+
+`shared/src/collect.ts`, `shared/src/cluster.ts`, `app/src/lib/pin-collector.ts`, `pin-collection.ts`, map
+`pin-markers.tsx` / `pin-sheet.tsx`, `app/src/screens/collection/`, `app/src/screens/pin-reader/`.
+
+- **Collect rule** (pure, unit-tested): a fix with accuracy ≤ 30 m inside the radius, and the _next_ fix is a good
+  fix inside too — or, if vague/jumped fixes came in between, still inside after ≥ 5 s. The recorder's jump filter
+  (`acceptSample`, > 3 m/s) drops GPS jumps. Fed only while tracking: route recording and walking with directions
+  (real GPS, never the demo walker). No route needed. The walker sees only a quiet toast "Pin saved: <title>".
+- **Collection on the device for everyone** (zustand persisted to IndexedDB on the web, AsyncStorage on phones), so it
+  works offline and is the only copy for under-18s. Sync when online: adults → `collection_entries`; under-18s →
+  `record_pin_unlock` (anonymous count). Per-account: another account on the device starts empty. Included in
+  Download my data; Delete my data clears it on the device and the server.
+- **Map:** live pins as small round markers (white ring = not collected, filled = collected), grid-clustered below
+  zoom 17 by one shared function for both maps; tapping a cluster zooms in. The pin sheet shows title, label, sources
+  and "Route to this pin" (the normal comfort-route planner with the pin as destination) — never the pin's text.
+  The place card lists "Pins at this place" within 60 m.
+- **My collection** replaces Record as the centre tab (unread count badge); Record stays reachable (Phase 6 moves its
+  button). The **reader** shows the version for the reading style (nearest level if missing), the label badge, sources
+  with links, the "beyond Hong Kong" line and an ungraded question; only collected pins can be read.

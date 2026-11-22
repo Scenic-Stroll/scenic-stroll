@@ -6,6 +6,7 @@ import { pointAlong, WALK_SPEED_MPS, type LatLng } from '@scenic/shared';
 import * as Location from 'expo-location';
 import { useCallback, useEffect, useRef } from 'react';
 
+import { feedFixForPins, resetPinCollector } from '@/lib/pin-collector';
 import { watchPosition } from '@/lib/watch-position';
 
 export type Fix = { point: LatLng; accuracyM: number | null; atMs: number };
@@ -37,17 +38,26 @@ export function usePositionFeed({
     if (simulate) return;
     let sub: Location.LocationSubscription | null = null;
     let cancelled = false;
+    resetPinCollector();
     void (async () => {
       const { granted } = await Location.requestForegroundPermissionsAsync();
       if (!granted || cancelled) return;
       sub = await watchPosition(
         { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1000, distanceInterval: 2 },
-        (pos) =>
+        (pos) => {
           onFixRef.current({
             point: { lat: pos.coords.latitude, lng: pos.coords.longitude },
             accuracyM: pos.coords.accuracy ?? null,
             atMs: pos.timestamp,
-          }),
+          });
+          // Walking with directions collects pins too (real GPS only, never the demo walker) — D54.
+          void feedFixForPins({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: pos.coords.accuracy ?? null,
+            timestamp: pos.timestamp,
+          });
+        },
       );
       if (cancelled) sub.remove();
     })();

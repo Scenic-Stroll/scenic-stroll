@@ -14,9 +14,11 @@ import {
   isOnFloor,
   matchesFilters,
   PRESETS,
+  zoomFromLongitudeDelta,
   type CommunityRoute,
   type FilterKey,
   type LatLng,
+  type MapPin,
 } from '@scenic/shared';
 import { useQuery } from '@tanstack/react-query';
 import * as Location from 'expo-location';
@@ -31,6 +33,7 @@ import MapView, {
 } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useLivePins } from '@/lib/pins';
 import { Avatar } from '@/components/ui/avatar';
 import { Chip } from '@/components/ui/chip';
 import { Icon, type IconName } from '@/components/ui/icon';
@@ -62,6 +65,8 @@ import { MapControls, type MapLayers } from './map-controls';
 import { DARK_MAP_STYLE, LIGHT_MAP_STYLE } from './map-style';
 import { NearbySheet } from './nearby-sheet';
 import { PlacePicker } from './place-picker';
+import { PinMarkers } from './pin-markers';
+import { PinSheet } from './pin-sheet';
 import { PlaceSheet } from './place-sheet';
 import { PlanningSheet, STANDARD_OPTION_ID } from './planning-sheet';
 import { ShadeLayer, ShadeLegend } from './shade-layer';
@@ -140,6 +145,10 @@ export function MapHome() {
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
   /** The place card being shown (landmark, search result or dropped pin). */
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
+  // A knowledge pin tapped on the map (D54).
+  const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
+  const livePins = useLivePins();
+  const selectedPin = livePins.data?.find((p) => p.id === selectedPinId) ?? null;
   /** The route option chosen in the planning sheet (shows its directions). */
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   /** Where the place picker's result goes: the search bar opens a place card instead of routing. */
@@ -302,14 +311,26 @@ export function MapHome() {
   /** Show the place card for `place` (replaces route planning, like tapping a pin in a map app). */
   const openPlace = (place: Place) => {
     setPlanning(false);
+    setSelectedPinId(null);
     setSelectedPlace(place);
     setSelectedRouteId(null);
     mapRef.current?.animateCamera({ center: toMap(place.point) }, { duration: 400 });
     sheetRef.current?.snapToIndex(SHEET_HALF);
   };
 
+  /** Show a knowledge pin's sheet: title, label, sources, "Route to this pin" (D54). */
+  const openPin = (pin: MapPin) => {
+    setPlanning(false);
+    setSelectedPlace(null);
+    setSelectedRouteId(null);
+    setSelectedPinId(pin.id);
+    mapRef.current?.animateCamera({ center: toMap(pin) }, { duration: 400 });
+    sheetRef.current?.snapToIndex(SHEET_HALF);
+  };
+
   /** Start planning a trip to `place` (from your location when known). */
   const routeTo = (place: Place) => {
+    setSelectedPinId(null);
     setDestination(place);
     if (!origin && userLocation) setOrigin({ label: 'My location', point: userLocation });
     setPlanning(true);
@@ -512,6 +533,20 @@ export function MapHome() {
               />
             ))
           : null}
+        {!following && livePins.data ? (
+          <PinMarkers
+            pins={livePins.data}
+            longitudeDelta={mapBox ? mapBox.box.maxLng - mapBox.box.minLng : 0.01}
+            onPressPin={openPin}
+            onPressCluster={(c) => {
+              const lngDelta = mapBox ? mapBox.box.maxLng - mapBox.box.minLng : 0.01;
+              mapRef.current?.animateCamera(
+                { center: toMap(c), zoom: zoomFromLongitudeDelta(lngDelta) + 2 },
+                { duration: 400 },
+              );
+            }}
+          />
+        ) : null}
         {layers.places
           ? PRESETS.map((p) => (
               <Marker
@@ -755,9 +790,11 @@ export function MapHome() {
             ? 'Walking directions'
             : planning
               ? 'Route planning'
-              : selectedPlace
-                ? selectedPlace.label
-                : 'Nearby routes'
+              : selectedPin
+                ? `Pin: ${selectedPin.title}`
+                : selectedPlace
+                  ? selectedPlace.label
+                  : 'Nearby routes'
         }
       >
         {following ? (
@@ -815,8 +852,24 @@ export function MapHome() {
               },
             }}
           />
+        ) : selectedPin ? (
+          <PinSheet
+            pin={selectedPin}
+            onRoute={() =>
+              routeTo({
+                label: selectedPin.title,
+                point: { lat: selectedPin.lat, lng: selectedPin.lng },
+              })
+            }
+            onClose={() => {
+              setSelectedPinId(null);
+              sheetRef.current?.snapToIndex(SHEET_PEEK);
+            }}
+          />
         ) : selectedPlace ? (
           <PlaceSheet
+            pins={livePins.data ?? []}
+            onOpenPin={openPin}
             place={selectedPlace}
             communityRoutes={community.data ?? []}
             onRouteHere={() => routeTo(selectedPlace)}

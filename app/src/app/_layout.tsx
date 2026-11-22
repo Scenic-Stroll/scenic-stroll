@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { OfflineBanner } from '@/components/offline-banner';
 import { ConsentGate } from '@/components/consent-screen';
+import { ToastHost } from '@/components/toast';
 import { useBackgroundSync } from '@/hooks/use-background-sync';
 import { queryClient } from '@/lib/query-client';
 import { registerServiceWorker } from '@/lib/service-worker';
@@ -56,6 +57,10 @@ export default function RootLayout() {
                 options={{ headerShown: true, title: 'Saved places', headerBackTitle: 'Profile' }}
               />
               <Stack.Screen
+                name="pin/[id]"
+                options={{ headerShown: true, title: 'Pin', headerBackTitle: 'Back' }}
+              />
+              <Stack.Screen
                 name="feedback"
                 options={{ headerShown: true, title: 'Send feedback', headerBackTitle: 'Back' }}
               />
@@ -81,6 +86,7 @@ export default function RootLayout() {
               />
             </Stack>
             <OfflineBanner />
+            <ToastHost />
             <ConsentGate />
           </ThemeProvider>
         </AuthProvider>

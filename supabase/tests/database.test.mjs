@@ -1825,3 +1825,17 @@ describe('sample pin seed (supabase/seed/sample_pin.sql)', () => {
     assert.deepEqual(rows, [{ status: 'in_review', is_sample: true, sources: 2 }]);
   });
 });
+
+describe('deleting your pin collection (pins phase 4, D54)', () => {
+  const EXPERT = 'c0000000-0000-4000-8000-000000000002';
+  const READER = 'c0000000-0000-4000-8000-000000000003';
+
+  it('users delete only their own collection entries', async () => {
+    const before = await db.query('select count(*)::int as n from public.collection_entries');
+    assert.ok(before.rows[0].n >= 1); // READER collected a pin in the phase 1 tests
+    const theirs = await as(EXPERT, 'delete from public.collection_entries returning pin_id');
+    assert.equal(theirs.rows.length, 0); // EXPERT can't touch READER's entries
+    const mine = await as(READER, 'delete from public.collection_entries returning pin_id');
+    assert.equal(mine.rows.length, before.rows[0].n);
+  });
+});

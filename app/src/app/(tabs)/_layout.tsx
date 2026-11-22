@@ -1,12 +1,13 @@
 /**
- * Bottom tab bar: Map · Routes · Record · Friends · Profile.
- * White bar, thin top border, green active tab; Record is a raised round green button in the centre.
+ * Bottom tab bar: Map · Routes · My collection · Friends · Profile.
+ * White bar, thin top border, green active tab; My collection is a raised round green button in the
+ * centre (knowledge pins, D54). Record is reachable from the map, not a tab.
  */
 import { Tabs } from 'expo-router/js-tabs';
-import { Pressable, StyleSheet, View, type ColorValue } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type ColorValue } from 'react-native';
 
 import { Icon, type IconName } from '@/components/ui/icon';
-import { useRecorder } from '@/lib/recorder';
+import { useCollection } from '@/lib/pin-collection';
 import { radius, shadow, TAP_TARGET, useAppTheme } from '@/theme';
 
 export default function TabsLayout() {
@@ -41,14 +42,16 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="record"
+        name="collection"
         options={{
-          title: 'Record',
+          title: 'My collection',
           tabBarLabel: () => null,
-          tabBarAccessibilityLabel: 'Record a route',
-          tabBarButton: (props) => <RecordTabButton onPress={props.onPress} />,
+          tabBarAccessibilityLabel: 'My collection',
+          tabBarButton: (props) => <CollectionTabButton onPress={props.onPress} />,
         }}
       />
+      {/* Recording is paused as a main feature (D54): reachable from the map, not a tab. */}
+      <Tabs.Screen name="record" options={{ title: 'Record', href: null }} />
       <Tabs.Screen
         name="friends"
         options={{
@@ -86,28 +89,32 @@ function TabIcon({
   return <Icon name={focused ? filled : outline} size={24} color={color} />;
 }
 
-/** The big round centre button. Turns red with a stop icon while a recording is running. */
-function RecordTabButton({ onPress }: { onPress?: (e: never) => void }) {
+/** The big round centre button: My collection, with the number of unread pins. */
+function CollectionTabButton({ onPress }: { onPress?: (e: never) => void }) {
   const t = useAppTheme();
-  const recording = useRecorder((s) => s.status !== 'idle');
+  const unread = useCollection((s) => Object.values(s.pins).filter((p) => !p.readAt).length);
   return (
     <View style={styles.slot}>
       <Pressable
-        // "tab": it sits in the tab bar and opens the Record tab (a "button" inside a tab list
-        // breaks screen readers' tab navigation — Lighthouse accessibility, D48).
+        // "tab": it sits in the tab bar and opens a tab (a "button" inside a tab list breaks
+        // screen readers' tab navigation — Lighthouse accessibility, D48).
         accessibilityRole="tab"
-        accessibilityLabel={recording ? 'Recording in progress — open recorder' : 'Record a route'}
+        accessibilityLabel={unread > 0 ? `My collection, ${unread} unread` : 'My collection'}
         onPress={(e) => onPress?.(e as never)}
         style={({ pressed }) => [
           styles.recordButton,
           shadow,
-          {
-            backgroundColor: recording ? t.danger : pressed ? t.primaryPressed : t.primary,
-            borderColor: t.background,
-          },
+          { backgroundColor: pressed ? t.primaryPressed : t.primary, borderColor: t.background },
         ]}
       >
-        <Icon name={recording ? 'record-circle' : 'record-rec'} size={32} color={t.onPrimary} />
+        <Icon name="bookmark-multiple" size={28} color={t.onPrimary} />
+        {unread > 0 ? (
+          <View style={[styles.badge, { backgroundColor: t.danger, borderColor: t.background }]}>
+            <Text style={[styles.badgeText, { color: t.onDanger }]}>
+              {unread > 9 ? '9+' : unread}
+            </Text>
+          </View>
+        ) : null}
       </Pressable>
     </View>
   );
@@ -124,4 +131,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  badge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  badgeText: { fontSize: 11, fontWeight: '700' },
 });

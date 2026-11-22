@@ -16,6 +16,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import * as Location from 'expo-location';
 import { create } from 'zustand';
 
+import { feedFixForPins, resetPinCollector } from '@/lib/pin-collector';
 import { currentFeatureRules } from '@/lib/user-settings';
 import { watchPosition } from '@/lib/watch-position';
 import * as localDb from '@/lib/local-db';
@@ -69,6 +70,7 @@ function onLocation(loc: Location.LocationObject) {
     accuracy: loc.coords.accuracy ?? null,
     timestamp: loc.timestamp,
   };
+  void feedFixForPins(sample); // collect pins walked past (it does its own GPS checks) — D54
   const verdict = acceptSample(points.at(-1) ?? null, sample);
   if (!verdict.ok) {
     useRecorder.setState((s) => ({ lastFix: sample, rejectedCount: s.rejectedCount + 1 }));
@@ -92,6 +94,7 @@ export async function startRecording(options: { trimEnds: boolean }): Promise<bo
     return false;
   }
   useRecorder.setState({ ...initialState, status: 'starting' });
+  resetPinCollector();
 
   const permission = await Location.requestForegroundPermissionsAsync();
   if (!permission.granted) {

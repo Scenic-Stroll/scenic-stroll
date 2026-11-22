@@ -1,6 +1,7 @@
 /**
  * Privacy (Hong Kong PDPO): "Download my data" and "Delete my data".
  */
+import { useCollection } from '@/lib/pin-collection';
 import * as localDb from '@/lib/local-db';
 import { queryClient, refreshLocalData } from '@/lib/query-client';
 import { saveExport } from '@/lib/save-export';
@@ -25,6 +26,7 @@ export async function downloadMyData(userId: string | null): Promise<void> {
     userId,
     profile,
     savedPlaces: useSavedPlaces.getState().places,
+    pinCollection: Object.values(useCollection.getState().pins),
     ...(await localDb.exportLocalData()),
   };
 
@@ -46,12 +48,18 @@ export async function deleteMyData(userId: string | null): Promise<void> {
     if (descriptions.error) {
       throw new Error(`Couldn’t delete your descriptions: ${descriptions.error.message}`);
     }
+    // Pins collected (adults; under-18s never had any on the server). D54.
+    const collection = await supabase.from('collection_entries').delete().not('pin_id', 'is', null);
+    if (collection.error) {
+      throw new Error(`Couldn’t delete your pin collection: ${collection.error.message}`);
+    }
     const profile = await supabase.from('profiles').update({ display_name: null }).eq('id', userId);
     if (profile.error) throw new Error(`Couldn’t reset your profile: ${profile.error.message}`);
   }
 
   await localDb.deleteAllLocalData();
   useSavedPlaces.setState({ places: [] });
+  useCollection.getState().clear();
   await refreshLocalData();
   await queryClient.invalidateQueries();
 }
