@@ -398,6 +398,12 @@ export function ProfileScreen() {
             onPress={() => router.push('/terms')}
           />
           <ListRow
+            icon="eye-outline"
+            title="Previews"
+            subtitle="Mock-ups of coming features (made-up data)"
+            onPress={() => router.push('/preview')}
+          />
+          <ListRow
             icon="database-outline"
             title="Data sources & credits"
             subtitle="OpenStreetMap, Hong Kong Government open data and more"

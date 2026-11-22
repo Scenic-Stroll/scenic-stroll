@@ -1177,3 +1177,11 @@ migration `*_points.sql`, `app/src/lib/points.ts`, `app/src/screens/profile/poin
   banner restarts the GPS watch and the wake lock (`resumeRecording`). The time in between is a gap on the review
   screen, where the existing gap checkpoints apply. Native background recording is not built: design note in
   `docs/BACKGROUND_RECORDING.md`.
+
+## D57 — Preview mock-ups (2026-11-24)
+
+`/preview` (`app/src/screens/preview/`): clickable screens with made-up data and **no backend**, each with a
+"Preview — made-up data, nothing is saved" banner — topic boards list and detail (UC2), a teacher's course-walk builder
+and a student's question (UC3), a shop offer with a one-time QR code and the staff check (UC6). Shop screens are hidden
+in safety mode. Offers in the mock-up unlock by level; nothing spends, sells or transfers points. Reached from Explore →
+"See a preview" and Profile → Previews. The feedback form (phase 7's other item) already existed (web step 7, D47).
