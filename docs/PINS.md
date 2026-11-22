@@ -14,10 +14,12 @@ and read them later. Background: `docs/PINS_AUDIT.md`; decisions D51–D57 in `D
 2. **AI reading versions:** `npx supabase secrets set GEMINI_API_KEY=<key> --project-ref xelzbcuzopxcterkedru`
    (Google AI Studio). Optional: `GEMINI_MODEL` (default `gemini-2.5-flash`). Without the key, "Write reading versions"
    answers that AI versions aren't set up; everything else works.
-3. **Email codes for experts and reviewers:** Supabase dashboard → Authentication → Emails → "Magic link" template:
-   make sure it contains `{{ .Token }}` (the 6-digit code), e.g. "Your Scenic Stroll code is {{ .Token }}".
-   Supabase's built-in email sender allows only a few emails per hour — enough for a handful of experts; add your own
-   SMTP (Authentication → SMTP) before inviting many.
+3. **Sign-in emails for experts and reviewers:** Supabase dashboard → Authentication → **URL Configuration**:
+   Site URL `https://scenic-stroll.vercel.app`, and Redirect URLs `https://scenic-stroll.vercel.app/**` and
+   `https://scenic-stroll.expo.app/**`. `/admin` emails a **sign-in link** that opens `/admin` and signs you in (open it
+   in the same browser; it works once). The default Supabase email is fine. A 6-digit code instead needs a custom
+   email sender (Authentication → SMTP) so the template can include `{{ .Token }}`; the page accepts both. Supabase's
+   built-in sender allows only a few emails per hour.
 4. **Make yourself an admin (reviewer):** sign in at `https://<site>/admin` with your email, copy the account id it
    shows, then in the SQL editor:
    ```sql

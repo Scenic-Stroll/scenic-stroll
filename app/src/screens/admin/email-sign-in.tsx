@@ -1,8 +1,11 @@
-// Experts and reviewers sign in with an email code (D53). Everyone else stays anonymous.
-// Supabase emails a 6-digit code (the "Magic link" email template must contain {{ .Token }} —
-// docs/PINS.md); typing it here signs in on any device.
+// Experts and reviewers sign in with their email (D53). Everyone else stays anonymous.
+//
+// Supabase emails a sign-in link (its default email — editing the text needs a custom email
+// sender). The link opens this site's /admin page and signs you in; open it in the same browser.
+// If the team later adds the 6-digit code to the email ({{ .Token }}), it can be typed here instead.
+// Supabase → Authentication → URL Configuration must allow this site's address (docs/PINS.md).
 import { useState } from 'react';
-import { Text } from 'react-native';
+import { Platform, Text } from 'react-native';
 
 import { supabase } from '@/lib/supabase';
 import { type, useAppTheme } from '@/theme';
@@ -20,7 +23,12 @@ export function EmailSignIn() {
   const send = async () => {
     setBusy(true);
     setError(null);
-    const { error: err } = await supabase.auth.signInWithOtp({ email: email.trim() });
+    const { error: err } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      // Come back to this site's admin page (not Supabase's default "Site URL").
+      options:
+        Platform.OS === 'web' ? { emailRedirectTo: `${window.location.origin}/admin` } : undefined,
+    });
     setBusy(false);
     if (err) setError(err.message);
     else setSent(true);
@@ -35,14 +43,14 @@ export function EmailSignIn() {
       type: 'email',
     });
     setBusy(false);
-    if (err) setError('That code didn’t work. Check it, or ask for a new one.');
+    if (err) setError('That code didn’t work. Check it, or ask for a new email.');
   };
 
   return (
     <Section title="Sign in for experts and reviewers">
       <Text style={[type.body, { color: t.textSecondary }]}>
-        Pins are written by experts and checked by reviewers. Sign in with your email; we’ll send
-        you a 6-digit code.
+        Pins are written by experts and checked by reviewers. Sign in with your email — we’ll send
+        you a sign-in link.
       </Text>
       <Field
         label="Email"
@@ -55,23 +63,26 @@ export function EmailSignIn() {
       />
       {!sent ? (
         <Button
-          label="Send code"
+          label="Email me a sign-in link"
           tone="primary"
           disabled={busy || !/^\S+@\S+\.\S+$/.test(email.trim())}
           onPress={() => void send()}
         />
       ) : (
         <>
+          <Text accessibilityRole="alert" style={[type.body, { color: t.textPrimary }]}>
+            Check your email and open the link in this browser. It works once and expires after an
+            hour.
+          </Text>
           <Field
-            label="Code from the email"
+            label="Or type the code, if your email has one"
             value={code}
             onChangeText={setCode}
             keyboardType="number-pad"
             autoComplete="one-time-code"
           />
           <Button
-            label="Sign in"
-            tone="primary"
+            label="Sign in with the code"
             disabled={busy || code.trim().length < 6}
             onPress={() => void verify()}
           />
