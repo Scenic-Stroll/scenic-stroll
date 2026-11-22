@@ -88,6 +88,27 @@ Roll back: expo.dev → Hosting → Deployments → pick an older one → "Promo
   strings, and coordinates become `[coord]`. If you add a new kind of report, keep it that way — and update
   the privacy policy (`app/src/content/privacy.ts`).
 
+## Alternative: Vercel
+
+The same website can also be hosted on Vercel (free Hobby plan — personal, non-commercial projects only).
+`vercel.json` at the repo root has everything Vercel needs: install from the root (the app uses the `shared/`
+workspace), build with `npm run build:web --workspace app`, publish `app/dist`, send every address to `index.html`
+(so `/privacy` and shared links don't 404), and cache headers (`sw.js` always re-checked, hashed files for a year).
+
+1. Push the branch to GitHub.
+2. vercel.com → Add New → Project → import `Scenic-Stroll/scenic-stroll`. Leave **Root Directory** empty (the repo
+   root) — the settings come from `vercel.json`.
+3. Environment Variables (Production and Preview): `EXPO_PUBLIC_SUPABASE_URL` and
+   `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (same values as `app/.env`; optional: `EXPO_PUBLIC_SENTRY_DSN`,
+   `EXPO_PUBLIC_UMAMI_WEBSITE_ID`). Never a secret key.
+4. Deploy. You get `https://<project>.vercel.app`; every pull request gets its own preview link.
+5. If `ALLOWED_ORIGINS` is set in Supabase, add the Vercel addresses to it, e.g.
+   `https://scenic-stroll.vercel.app,https://scenic-stroll-*.vercel.app` — otherwise the site loads but can't plan
+   routes.
+
+The share image and `og:url` in `app/public/index.html` point at `scenic-stroll.expo.app`; change them if Vercel becomes
+the main address.
+
 ## Server functions and the database
 
 The website only shows things; routes, weather and saving happen in the Supabase Edge Functions and database.

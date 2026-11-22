@@ -1049,3 +1049,11 @@ Migration `public_launch_safety`, `supabase/functions/_shared/guard.ts` + `cors.
 - Shared knowingly before the "Before sharing the link" items in `docs/LAUNCH_CHECKLIST.md` (keys, Supabase Pro, CORS
   secret, contact email): the address isn't announced, the page says Beta, and the limits (rate limits, Google cap,
   moderation) are active. Roll back: DEPLOY.md.
+
+## D50 — Vercel as a second host (2026-11-23)
+
+The team wants a Vercel link as well. `vercel.json` (repo root) builds the same static site: `npm ci` at the root (the
+`shared/` workspace), `npm run build:web --workspace app`, output `app/dist`, a catch-all rewrite to `index.html`
+(Vercel, unlike EAS Hosting, 404s unknown paths), `no-cache` for `sw.js`, one-year cache for hashed files. EAS
+Hosting stays (D41/D46). Vercel Hobby is for non-commercial use only — fine for a student project; revisit if that
+changes. Steps: DEPLOY.md → Alternative: Vercel.
