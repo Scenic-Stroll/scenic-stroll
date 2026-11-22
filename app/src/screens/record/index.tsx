@@ -14,7 +14,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import MapView from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -32,6 +32,7 @@ import {
   addCheckpoint,
   cancelRecording,
   removeCheckpoint,
+  resumeRecording,
   startRecording,
   stopRecording,
   useRecorder,
@@ -141,6 +142,21 @@ function RecordingView() {
   const [sheetKind, setSheetKind] = useState<CheckpointKind | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
+  // Web (D56): browsers stop sending positions while the page is hidden or the screen is locked.
+  // Remember that it happened, so the walker sees "Recording paused — tap to resume".
+  const [pageWasHidden, setPageWasHidden] = useState(false);
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const onVisibility = () => {
+      if (document.hidden) setPageWasHidden(true);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
+  const lastPointAt = points.at(-1)?.timestamp ?? null;
+  const gpsGap = lastPointAt !== null && now - lastPointAt > GPS_RULES.gapSeconds * 1000;
+  const paused = Platform.OS === 'web' && (pageWasHidden || gpsGap);
+
   // Tick once a second for the timer and the "no GPS for N s" warning.
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -238,7 +254,26 @@ function RecordingView() {
             </ThemedText>
           </View>
           {recorderError ? <ThemedText type="small">{recorderError}</ThemedText> : null}
+          {Platform.OS === 'web' ? (
+            <ThemedText type="small" themeColor="textSecondary">
+              Keep this page open while recording — phones stop sending your location when the
+              screen locks or you switch apps.
+            </ThemedText>
+          ) : null}
         </ThemedView>
+        {paused ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLiveRegion="polite"
+            onPress={() => {
+              setPageWasHidden(false);
+              void resumeRecording();
+            }}
+            style={[styles.followButton, styles.shadow, { backgroundColor: t.warningSurface }]}
+          >
+            <ThemedText type="smallBold">Recording paused — tap to resume</ThemedText>
+          </Pressable>
+        ) : null}
         {!follow ? (
           <Pressable
             accessibilityRole="button"

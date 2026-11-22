@@ -116,6 +116,11 @@ export async function startRecording(options: { trimEnds: boolean }): Promise<bo
   );
   useRecorder.setState({ status: 'recording', recordingId: id, startedAt });
 
+  await startWatching();
+  return true;
+}
+
+async function startWatching() {
   try {
     subscription = await watchPosition(
       {
@@ -129,7 +134,19 @@ export async function startRecording(options: { trimEnds: boolean }): Promise<bo
   } catch (err) {
     useRecorder.setState({ error: `GPS could not start: ${String(err)}` });
   }
-  return true;
+}
+
+/**
+ * "Recording paused — tap to resume" (web, D56): browsers stop sending positions while the page is
+ * hidden or the screen is locked. Restart the GPS watch and the screen wake lock. The time in
+ * between shows up as a gap on the review screen, where a checkpoint can be added.
+ */
+export async function resumeRecording() {
+  if (useRecorder.getState().status !== 'recording') return;
+  subscription?.remove();
+  subscription = null;
+  await activateKeepAwakeAsync(KEEP_AWAKE_TAG).catch(() => undefined);
+  await startWatching();
 }
 
 /**

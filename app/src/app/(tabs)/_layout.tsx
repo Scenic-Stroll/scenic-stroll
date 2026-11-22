@@ -1,5 +1,5 @@
 /**
- * Bottom tab bar: Map · Routes · My collection · Friends · Profile.
+ * Bottom tab bar: Map · Explore · My collection · Friends · Profile (D56).
  * White bar, thin top border, green active tab; My collection is a raised round green button in the
  * centre (knowledge pins, D54). Record is reachable from the map, not a tab.
  */
@@ -35,10 +35,10 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="routes"
+        name="explore"
         options={{
-          title: 'Routes',
-          tabBarIcon: (p) => <TabIcon {...p} outline="map-marker-path" filled="map-marker-path" />,
+          title: 'Explore',
+          tabBarIcon: (p) => <TabIcon {...p} outline="compass-outline" filled="compass" />,
         }}
       />
       <Tabs.Screen
@@ -50,8 +50,9 @@ export default function TabsLayout() {
           tabBarButton: (props) => <CollectionTabButton onPress={props.onPress} />,
         }}
       />
-      {/* Recording is paused as a main feature (D54): reachable from the map, not a tab. */}
+      {/* Not tabs any more (D56): Record from the map's button, Routes from Profile → My routes. */}
       <Tabs.Screen name="record" options={{ title: 'Record', href: null }} />
+      <Tabs.Screen name="routes" options={{ title: 'Routes', href: null }} />
       <Tabs.Screen
         name="friends"
         options={{

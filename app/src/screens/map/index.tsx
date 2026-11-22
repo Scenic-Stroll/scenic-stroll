@@ -33,6 +33,8 @@ import MapView, {
 } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useRecorder } from '@/lib/recorder';
+import { useFeatureRules } from '@/lib/user-settings';
 import { useLivePins } from '@/lib/pins';
 import { Avatar } from '@/components/ui/avatar';
 import { Chip } from '@/components/ui/chip';
@@ -148,6 +150,8 @@ export function MapHome() {
   // A knowledge pin tapped on the map (D54).
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
   const livePins = useLivePins();
+  const rules = useFeatureRules();
+  const recording = useRecorder((r) => r.status !== 'idle');
   const selectedPin = livePins.data?.find((p) => p.id === selectedPinId) ?? null;
   /** The route option chosen in the planning sheet (shows its directions). */
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
@@ -764,6 +768,8 @@ export function MapHome() {
             onZoomIn={() => void zoomBy(true)}
             onZoomOut={() => void zoomBy(false)}
             onMyLocation={() => void goToMyLocation()}
+            onRecord={rules.recordRoutes ? () => router.navigate('/record') : undefined}
+            recording={recording}
           />
           {focusedBuilding ? (
             <View style={styles.floors}>

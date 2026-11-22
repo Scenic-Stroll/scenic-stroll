@@ -1166,3 +1166,14 @@ migration `*_points.sql`, `app/src/lib/points.ts`, `app/src/screens/profile/poin
   activity, not points). Board and contribution amounts are placeholders, not wired.
 - **Profile (adults):** balance, today's points and a ring of steps today out of 10,000, labelled as estimated from
   distance. **Under-18s:** badges only — no points, level or ring; the server refuses to award them anything.
+
+## D56 — Tabs and recording on the web (2026-11-24)
+
+- **Tabs:** Map · Explore · My collection (centre) · Friends · Profile. Routes is no longer a tab but still exists
+  (Profile → My routes); Record is reached with a "Record a route" button on the map (hidden in safety mode), which
+  turns red while a recording runs. Explore is a placeholder for topic boards.
+- **Recording on the web:** a "Keep this page open while recording" note; when the page was hidden (`visibilitychange`)
+  or no good fix came for 20 s (`GPS_RULES.gapSeconds`, the existing gap rule), a "Recording paused — tap to resume"
+  banner restarts the GPS watch and the wake lock (`resumeRecording`). The time in between is a gap on the review
+  screen, where the existing gap checkpoints apply. Native background recording is not built: design note in
+  `docs/BACKGROUND_RECORDING.md`.

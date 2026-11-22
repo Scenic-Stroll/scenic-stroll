@@ -31,8 +31,13 @@ export function MapControls({
   onZoomIn,
   onZoomOut,
   onMyLocation,
+  onRecord,
+  recording = false,
 }: {
   layers: MapLayers;
+  /** Record a route (D56: Record is no longer a tab). Not given in safety mode. */
+  onRecord?: () => void;
+  recording?: boolean;
   onLayersChange: (layers: MapLayers) => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
@@ -48,6 +53,16 @@ export function MapControls({
         accessibilityLabel="Show my location"
         onPress={onMyLocation}
       />
+      {onRecord ? (
+        <FloatingMapButton
+          icon={recording ? 'record-circle' : 'record-rec'}
+          accessibilityLabel={
+            recording ? 'Recording in progress — open recorder' : 'Record a route'
+          }
+          onPress={onRecord}
+          active={recording}
+        />
+      ) : null}
       <FloatingMapButton
         icon="layers-outline"
         accessibilityLabel="Map layers"
