@@ -1057,3 +1057,25 @@ The team wants a Vercel link as well. `vercel.json` (repo root) builds the same 
 (Vercel, unlike EAS Hosting, 404s unknown paths), `no-cache` for `sw.js`, one-year cache for hashed files. EAS
 Hosting stays (D41/D46). Vercel Hobby is for non-commercial use only — fine for a student project; revisit if that
 changes. Steps: DEPLOY.md → Alternative: Vercel.
+
+## D51 — Knowledge pins: data model (2026-11-23)
+
+Migration `*_knowledge_pins.sql`, `shared/src/pins.ts`, audit in `docs/PINS_AUDIT.md`.
+
+- **Roles:** `admins` (added by hand in the dashboard) review and publish; `experts` (added by admins only, ORCID iD
+  stored as a plain field) write pins. Expert names and fields are readable by signed-in users; ORCID iDs aren't.
+- **Pins:** the point is the truth; `place_kind` + `ped_build_id/ped_node_id` (graph node ids change per build),
+  `osm_id` (`node/123`) or a required `place_description` (custom: trees, boundary stones). Radius 30–50 m. A
+  "beyond Hong Kong" line needs its own source. `is_sample` marks seeded examples.
+- **Review:** versions/questions start `in_review`; only admins approve (trigger records reviewer and time). Editing a
+  version's text sends it and all its questions back to review, and a live pin whose adult text changed back to
+  `in_review` — readers never see unchecked text. Pins go live only through `publish_pin` (admins), which requires the
+  adult version and all its questions approved and sets the label: `expert_verified` when the author is a verified
+  expert and a verified expert approved the adult text, else `ai_summarized`.
+- **Collection:** adults' `collection_entries` on the server (insert only for live pins; `read_at` is set by the
+  server, phase 5). Under-18s and users without settings can't store a collection; they call `record_pin_unlock`,
+  which keeps only an anonymous count per pin and Hong Kong day.
+- **Points ledger:** no client grants at all; unique (user, source, ref_id) makes awards idempotent; a trigger makes it
+  append-only for everyone, the server functions included.
+- **Settings:** `safety_mode` is a generated column (`age_band = 'under_18'`) — nobody can write it; once under-18 an
+  account can't switch to adult (only an admin can fix a mistake), and settings rows can't be deleted.

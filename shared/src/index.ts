@@ -39,3 +39,4 @@ export * from './live-trip.ts';
 export * from './transit/live-departures.ts';
 export * from './rush-hour.ts';
 export * from './privacy.ts';
+export * from './pins.ts';

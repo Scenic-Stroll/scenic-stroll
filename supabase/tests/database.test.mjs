@@ -1369,3 +1369,329 @@ describe('feedback form (web step 7, D47)', () => {
     await send(ALICE, 'still fine');
   });
 });
+
+describe('knowledge pins (pins phase 1, D51)', () => {
+  const ADMIN = 'c0000000-0000-4000-8000-000000000001';
+  const EXPERT = 'c0000000-0000-4000-8000-000000000002';
+  const READER = 'c0000000-0000-4000-8000-000000000003'; // an adult user
+  const KID = 'c0000000-0000-4000-8000-000000000004'; // under 18
+  const NEWBIE = 'c0000000-0000-4000-8000-000000000005'; // signed in, no settings yet
+  let pin; // a pin by EXPERT that goes live during these tests
+
+  const newPin = async (title = 'Why Kent Road is in Kowloon') =>
+    (
+      await as(
+        EXPERT,
+        `insert into public.pins (title, location, place_kind, place_description, author_expert_id, status)
+         values ($1, extensions.st_setsrid(extensions.st_makepoint(114.1745, 22.3372), 4326),
+                 'custom', 'Street sign at the corner of Kent Road', $2, 'in_review')
+         returning id`,
+        [title, EXPERT],
+      )
+    ).rows[0].id;
+  const addVersion = async (who, pinId, level) =>
+    (
+      await as(
+        who,
+        `insert into public.pin_versions (pin_id, reading_level, body, generated_by_ai)
+         values ($1, $2, $3, true) returning id`,
+        [pinId, level, `A ${level} reading version of the pin.`],
+      )
+    ).rows[0].id;
+  const addQuestion = async (who, versionId) =>
+    (
+      await as(
+        who,
+        `insert into public.pin_questions (pin_version_id, prompt, options, answer, explanation)
+         values ($1, 'Which side of the boundary is it on?', '["Kowloon","New Kowloon"]', 'Kowloon',
+                 'Boundary Street was the 1860 limit.') returning id`,
+        [versionId],
+      )
+    ).rows[0].id;
+
+  before(async () => {
+    await db.query('insert into auth.users (id) values ($1), ($2), ($3), ($4), ($5)', [
+      ADMIN,
+      EXPERT,
+      READER,
+      KID,
+      NEWBIE,
+    ]);
+    // What the team does by hand in the dashboard (docs/PINS.md).
+    await db.query('insert into public.admins (user_id) values ($1)', [ADMIN]);
+    await as(
+      ADMIN,
+      `insert into public.experts (user_id, display_name, field, verification_method, orcid_id, verified_by, verified_at)
+       values ($1, 'Dr Lee', 'Urban history', 'orcid', '0000-0002-1825-0097', $2, now())`,
+      [EXPERT, ADMIN],
+    );
+    await as(
+      READER,
+      `insert into public.user_settings (age_band, consent_version) values ('adult', 'v1')`,
+    );
+    await as(
+      KID,
+      `insert into public.user_settings (age_band, consent_version) values ('under_18', 'v1')`,
+    );
+  });
+
+  it('only admins add experts; everyone signed in sees names, not ORCID iDs', async () => {
+    await rejects(
+      as(
+        READER,
+        `insert into public.experts (user_id, display_name, field, verification_method)
+         values ($1, 'Me', 'Anything', 'manual')`,
+        [READER],
+      ),
+      /row-level security/,
+    );
+    const { rows } = await as(READER, 'select display_name, field from public.experts');
+    assert.deepEqual(rows, [{ display_name: 'Dr Lee', field: 'Urban history' }]);
+    await rejects(as(READER, 'select orcid_id from public.experts'), /permission denied/);
+  });
+
+  it('only experts create pins, as themselves, and never straight to live', async () => {
+    await rejects(
+      as(
+        READER,
+        `insert into public.pins (title, location, place_kind, place_description, author_expert_id)
+         values ('Mine', extensions.st_setsrid(extensions.st_makepoint(114.17, 22.33), 4326),
+                 'custom', 'Somewhere nice', $1)`,
+        [READER],
+      ),
+      /row-level security/,
+    );
+    await rejects(
+      as(
+        EXPERT,
+        `insert into public.pins (title, location, place_kind, place_description, author_expert_id, status)
+         values ('Too soon', extensions.st_setsrid(extensions.st_makepoint(114.17, 22.33), 4326),
+                 'custom', 'Somewhere nice', $1, 'live')`,
+        [EXPERT],
+      ),
+      /row-level security|start as draft/,
+    );
+    pin = await newPin();
+    assert.ok(pin);
+  });
+
+  it('a custom place needs a description; the radius stays within 30–50 m', async () => {
+    await rejects(
+      as(
+        EXPERT,
+        `insert into public.pins (title, location, place_kind, author_expert_id)
+         values ('No description', extensions.st_setsrid(extensions.st_makepoint(114.17, 22.33), 4326),
+                 'custom', $1)`,
+        [EXPERT],
+      ),
+      /check constraint/,
+    );
+    await rejects(
+      as(EXPERT, 'update public.pins set radius_m = 80 where id = $1', [pin]),
+      /check constraint/,
+    );
+  });
+
+  it('pins that are not live are visible only to their author and admins', async () => {
+    const count = async (who) =>
+      (await as(who, 'select id from public.pins where id = $1', [pin])).rows.length;
+    assert.equal(await count(READER), 0);
+    assert.equal(await count(EXPERT), 1);
+    assert.equal(await count(ADMIN), 1);
+    await rejects(as(null, 'select id from public.pins'), /permission denied/);
+  });
+
+  it('nobody sets a pin live by hand — not experts, not admins (publish_pin checks first)', async () => {
+    await rejects(
+      as(EXPERT, `update public.pins set status = 'live' where id = $1`, [pin]),
+      /row-level security|publish_pin/,
+    );
+    await rejects(
+      as(ADMIN, `update public.pins set status = 'live' where id = $1`, [pin]),
+      /publish_pin/,
+    );
+    await rejects(as(EXPERT, 'select public.publish_pin($1)', [pin]), /Only reviewers/);
+  });
+
+  it('experts write versions and questions but cannot approve them; admins approve', async () => {
+    const adult = await addVersion(EXPERT, pin, 'adult');
+    await addVersion(EXPERT, pin, 'teen');
+    const q = await addQuestion(EXPERT, adult);
+    await rejects(
+      as(EXPERT, `update public.pin_versions set status = 'approved' where id = $1`, [adult]),
+      /Only reviewers/,
+    );
+    await rejects(
+      as(EXPERT, `update public.pin_questions set status = 'approved' where id = $1`, [q]),
+      /Only reviewers/,
+    );
+    await rejects(
+      as(ADMIN, 'select public.publish_pin($1)', [pin]),
+      /adult version must be approved/,
+    );
+    const { rows } = await as(
+      ADMIN,
+      `update public.pin_versions set status = 'approved' where id = $1 returning reviewed_by`,
+      [adult],
+    );
+    assert.equal(rows[0].reviewed_by, ADMIN);
+    await rejects(
+      as(ADMIN, 'select public.publish_pin($1)', [pin]),
+      /questions of the adult version/,
+    );
+    await as(ADMIN, `update public.pin_questions set status = 'approved' where id = $1`, [q]);
+  });
+
+  it('publishing labels the pin "ai_summarized" unless a verified expert approved the text', async () => {
+    const first = await as(ADMIN, 'select public.publish_pin($1) as label', [pin]);
+    assert.equal(first.rows[0].label, 'ai_summarized'); // the approving admin is not an expert
+    // An admin who is also a verified expert approved it → expert_verified.
+    await as(
+      ADMIN,
+      `insert into public.experts (user_id, display_name, field, verification_method, verified_by, verified_at)
+       values ($1, 'Prof Chan', 'Geography', 'org_email', $1, now())`,
+      [ADMIN],
+    );
+    const again = await as(ADMIN, 'select public.publish_pin($1) as label', [pin]);
+    assert.equal(again.rows[0].label, 'expert_verified');
+  });
+
+  it('readers see live pins with only approved versions and questions, plus sources', async () => {
+    // The pin is live, so its author can no longer add sources; an admin can.
+    await rejects(
+      as(
+        EXPERT,
+        `insert into public.pin_sources (pin_id, title, url, source_db)
+         values ($1, 'Gwulo: Kowloon Tong', 'https://gwulo.com/', 'web')`,
+        [pin],
+      ),
+      /row-level security/,
+    );
+    await as(
+      ADMIN,
+      `insert into public.pin_sources (pin_id, title, url, source_db)
+       values ($1, 'Gwulo: Kowloon Tong', 'https://gwulo.com/', 'web')`,
+      [pin],
+    );
+    const onMap = await as(READER, 'select id from public.pins_map where id = $1', [pin]);
+    assert.equal(onMap.rows.length, 1);
+    const versions = await as(
+      READER,
+      'select reading_level from public.pin_versions where pin_id = $1',
+      [pin],
+    );
+    assert.deepEqual(versions.rows, [{ reading_level: 'adult' }]); // the teen version is in review
+    assert.equal((await as(READER, 'select id from public.pin_questions')).rows.length, 1);
+    const sources = await as(READER, 'select id from public.pin_sources where pin_id = $1', [pin]);
+    assert.equal(sources.rows.length, 1);
+  });
+
+  it('authors cannot edit a live pin', async () => {
+    const { rows } = await as(
+      EXPERT,
+      `update public.pins set title = 'Changed' where id = $1 returning id`,
+      [pin],
+    );
+    assert.equal(rows.length, 0);
+  });
+
+  it('editing a version sends it, its questions and the live pin back to review', async () => {
+    await as(
+      ADMIN,
+      `update public.pin_versions set body = 'A corrected adult reading version.'
+       where pin_id = $1 and reading_level = 'adult'`,
+      [pin],
+    );
+    const { rows } = await db.query(
+      `select v.status as version, q.status as question, p.status as pin
+       from public.pin_versions v join public.pin_questions q on q.pin_version_id = v.id
+       join public.pins p on p.id = v.pin_id where v.pin_id = $1 and v.reading_level = 'adult'`,
+      [pin],
+    );
+    assert.deepEqual(rows, [{ version: 'in_review', question: 'in_review', pin: 'in_review' }]);
+    const seen = await as(READER, 'select id from public.pins where id = $1', [pin]);
+    assert.equal(seen.rows.length, 0);
+    // Approve and publish again for the tests below.
+    await as(ADMIN, `update public.pin_versions set status = 'approved' where pin_id = $1`, [pin]);
+    await as(ADMIN, `update public.pin_questions set status = 'approved'`);
+    await as(ADMIN, 'select public.publish_pin($1)', [pin]);
+  });
+
+  it('adults collect live pins as themselves; nobody else reads their collection', async () => {
+    await as(READER, 'insert into public.collection_entries (pin_id) values ($1)', [pin]);
+    assert.equal((await as(READER, 'select pin_id from public.collection_entries')).rows.length, 1);
+    assert.equal((await as(EXPERT, 'select pin_id from public.collection_entries')).rows.length, 0);
+    // read_at is set by the server (phase 5), never by the client.
+    await rejects(
+      as(READER, 'update public.collection_entries set read_at = now() where pin_id = $1', [pin]),
+      /permission denied/,
+    );
+    const draft = await newPin('A pin still in review');
+    await rejects(
+      as(READER, 'insert into public.collection_entries (pin_id) values ($1)', [draft]),
+      /row-level security/,
+    );
+  });
+
+  it('under-18s (and users without settings) never store a collection on the server', async () => {
+    for (const who of [KID, NEWBIE]) {
+      await rejects(
+        as(who, 'insert into public.collection_entries (pin_id) values ($1)', [pin]),
+        /row-level security/,
+      );
+    }
+    // Only an anonymous count per pin and day.
+    await as(KID, 'select public.record_pin_unlock($1)', [pin]);
+    const { rows } = await db.query('select * from public.pin_unlock_counts where pin_id = $1', [
+      pin,
+    ]);
+    assert.equal(rows.length, 1);
+    assert.deepEqual(Object.keys(rows[0]).sort(), ['pin_id', 'unlocked_on', 'unlocks']);
+    await rejects(as(KID, 'select * from public.pin_unlock_counts'), /permission denied/);
+  });
+
+  it('points: clients cannot add points; the ledger is append-only, even for the server', async () => {
+    await rejects(
+      as(
+        READER,
+        `insert into public.points_ledger (user_id, source, amount, ref_id)
+         values ($1, 'pin_read', 999, 'x')`,
+        [READER],
+      ),
+      /permission denied/,
+    );
+    const award = () =>
+      db.query(
+        `insert into public.points_ledger (user_id, source, amount, ref_id)
+         values ($1, 'pin_read', 20, $2)`,
+        [READER, pin],
+      );
+    await award();
+    assert.equal((await as(READER, 'select amount from public.points_ledger')).rows.length, 1);
+    assert.equal((await as(EXPERT, 'select amount from public.points_ledger')).rows.length, 0);
+    await rejects(db.query('update public.points_ledger set amount = 1000'), /append-only/);
+    await rejects(db.query('delete from public.points_ledger'), /append-only/);
+    await rejects(award(), /duplicate key/); // one award per user, source and thing
+  });
+
+  it('settings: safety mode follows the age band and cannot be switched off', async () => {
+    const kid = await as(KID, 'select safety_mode, reading_style from public.user_settings');
+    assert.deepEqual(kid.rows, [{ safety_mode: true, reading_style: 'adult' }]);
+    // A child may pick any reading style; safety mode stays on.
+    await as(KID, `update public.user_settings set reading_style = 'adult'`);
+    await rejects(
+      as(KID, `update public.user_settings set age_band = 'adult'`),
+      /can't be turned off/,
+    );
+    await rejects(
+      as(KID, 'update public.user_settings set safety_mode = false'),
+      /permission denied|can only be updated to DEFAULT/,
+    );
+    await rejects(as(KID, 'delete from public.user_settings'), /permission denied/);
+    const after = await as(KID, 'select safety_mode from public.user_settings');
+    assert.deepEqual(after.rows, [{ safety_mode: true }]);
+    // Users only see their own settings.
+    const mine = await as(READER, 'select user_id from public.user_settings');
+    assert.deepEqual(mine.rows, [{ user_id: READER }]);
+  });
+});
