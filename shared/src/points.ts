@@ -29,6 +29,15 @@ export function distancePointsAdded(stepsBefore: number, walkSteps: number): num
   return distancePointsForDay(stepsBefore + walkSteps) - distancePointsForDay(stepsBefore);
 }
 
+/**
+ * Points still owed for a day: what the day's total distance is worth, minus what was already
+ * awarded for that day. Recomputed from stored data every time, so a retried or repeated request
+ * never pays twice (and never negative).
+ */
+export function distancePointsOwed(dayMeters: number, alreadyAwarded: number): number {
+  return Math.max(0, distancePointsForDay(stepsFromMeters(dayMeters)) - alreadyAwarded);
+}
+
 /** The calendar day in Hong Kong ("2026-11-23") of a time in milliseconds. */
 export function hkDay(ms: number): string {
   return new Date(ms + POINTS_RULES.utcOffsetHours * 3600_000).toISOString().slice(0, 10);

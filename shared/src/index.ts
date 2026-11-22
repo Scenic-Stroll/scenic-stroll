@@ -46,3 +46,4 @@ export * from './collect.ts';
 export * from './cluster.ts';
 export * from './pointsRules.ts';
 export * from './points.ts';
+export * from './points-api.ts';

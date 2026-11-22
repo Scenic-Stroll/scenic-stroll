@@ -23,6 +23,7 @@ export const LIMITS = {
   smartRoute: { perUser: 30, perIp: 300 },
   pinTools: { perUser: 30, perIp: 120 },
   generatePinVersions: { perUser: 5, perIp: 30 }, // calls a paid LLM
+  awardPoints: { perUser: 30, perIp: 300 },
 } satisfies Record<string, Limits>;
 
 const WINDOW_S = 60;

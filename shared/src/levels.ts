@@ -2,8 +2,10 @@
  * Points, levels and badges (inspired by community map guides). Pure functions so the Profile,
  * Friends leaderboard and server can all agree on the numbers.
  *
- * Points (build prompt §5 Phase 5): +10 per route logged, +5 per description, +5 per verified walk,
- * +20 when one of your routes becomes verified.
+ * OLD points rules (+10 per route, +5 per description, …): no longer awarded since 24 Nov 2026.
+ * POINTS / pointsFor stay only to explain "earlier points" kept from before then (the database's
+ * private.legacy_points uses the same numbers). New points: shared/src/pointsRules.ts (D55).
+ * Levels now use the server's points total (ledger + earlier points); badges are unchanged.
  */
 
 export const POINTS = {

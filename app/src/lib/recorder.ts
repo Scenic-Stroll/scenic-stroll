@@ -16,6 +16,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import * as Location from 'expo-location';
 import { create } from 'zustand';
 
+import { queueWalkForPoints } from '@/lib/points';
 import { feedFixForPins, resetPinCollector } from '@/lib/pin-collector';
 import { currentFeatureRules } from '@/lib/user-settings';
 import { watchPosition } from '@/lib/watch-position';
@@ -180,7 +181,10 @@ export async function stopRecording(): Promise<string | null> {
   subscription = null;
   await writes;
   await deactivateKeepAwake(KEEP_AWAKE_TAG).catch(() => {}); // wasn't on (see startRecording)
-  if (recordingId) await localDb.finishRecording(recordingId);
+  if (recordingId) {
+    await localDb.finishRecording(recordingId);
+    queueWalkForPoints(recordingId); // distance points (adults; the server works them out) — D55
+  }
   useRecorder.setState(initialState);
   await refreshLocalData();
   return recordingId;

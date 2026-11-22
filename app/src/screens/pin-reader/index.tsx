@@ -30,8 +30,9 @@ export function PinReader({ pinId }: { pinId: string }) {
   const collected = useCollection((s) => s.pins[pinId]);
   const content = usePinContent(collected ? pinId : undefined);
   const style = useUserSettings().settings?.reading_style ?? 'adult';
-  const finish = useRef<((level: ReadingLevel) => Promise<void>) | null>(null);
+  const finish = useRef<((level: ReadingLevel) => Promise<number>) | null>(null);
   const [done, setDone] = useState(false);
+  const [awarded, setAwarded] = useState(0);
 
   // The reading starts when the page opens (the server times it for points — phase 5).
   useEffect(() => {
@@ -69,7 +70,7 @@ export function PinReader({ pinId }: { pinId: string }) {
   }
 
   const markRead = async () => {
-    await finish.current?.(version.reading_level);
+    setAwarded((await finish.current?.(version.reading_level)) ?? 0);
     setDone(true);
   };
 
@@ -136,7 +137,7 @@ export function PinReader({ pinId }: { pinId: string }) {
 
       {done || collected.readAt ? (
         <Text accessibilityRole="alert" style={[type.small, { color: t.primary }]}>
-          Marked as read.
+          Marked as read.{awarded > 0 ? ` +${awarded} points` : ''}
         </Text>
       ) : (
         <PrimaryButton label="Done reading" icon="check" onPress={() => void markRead()} />

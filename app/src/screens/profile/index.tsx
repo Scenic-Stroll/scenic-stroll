@@ -5,14 +5,7 @@
  * Points, stats and badges are calculated on this phone from your recordings (works offline and for
  * anonymous users). Verification-based points/badges unlock when route verification ships (Phase 5).
  */
-import {
-  badgesFor,
-  featureRules,
-  levelFor,
-  pointsFor,
-  TAGS,
-  type ReadingLevel,
-} from '@scenic/shared';
+import { badgesFor, featureRules, levelFor, TAGS, type ReadingLevel } from '@scenic/shared';
 import { useQuery } from '@tanstack/react-query';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
@@ -28,6 +21,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { usePointsSummary } from '@/lib/points';
 import { DiagnosticsCard } from '@/components/diagnostics-card';
 import { ADMIN_TOOLS } from '@/lib/admin-tools';
 import { Avatar } from '@/components/ui/avatar';
@@ -50,6 +44,7 @@ import { radius, space, TAP_TARGET, type, useAppTheme } from '@/theme';
 import { showAlert } from '@/lib/alert';
 
 import { BadgeTile } from './badge-tile';
+import { PointsCard } from './points-card';
 import { EditProfileSheet } from './edit-profile-sheet';
 
 const READING_OPTIONS = [
@@ -85,16 +80,11 @@ export function ProfileScreen() {
 
   // Verification (Phase 5) isn't built yet, so these are honestly 0 for now.
   const routesVerified = 0;
-  const verifiedWalks = 0;
   const s = stats.data;
-  const points = s
-    ? pointsFor({
-        routes: s.routesLogged,
-        descriptions: s.descriptions,
-        verifiedWalks,
-        routesVerified,
-      })
-    : 0;
+  // Points (D55): the server's ledger plus earlier points from the old rules (frozen on 24 Nov 2026).
+  // Under-18s (safety mode) see badges only — no points, level or ring.
+  const pointsSummary = usePointsSummary();
+  const points = (pointsSummary.data?.balance ?? 0) + (pointsSummary.data?.earlierPoints ?? 0);
   const level = levelFor(points);
   const badges = badgesFor({
     routesLogged: s?.routesLogged ?? 0,
@@ -154,26 +144,30 @@ export function ProfileScreen() {
             <Text style={[type.heading, { color: t.textPrimary }]} numberOfLines={1}>
               {displayName ?? 'Anonymous walker'}
             </Text>
-            <Text style={[type.small, { color: t.textSecondary }]}>
-              Level {level.number} · {level.name}
-              {level.pointsToNext !== null
-                ? ` — ${level.pointsToNext} pts to next level`
-                : ' — top level'}
-            </Text>
-            <View
-              style={[styles.progressTrack, { backgroundColor: t.surface }]}
-              accessible
-              accessibilityRole="progressbar"
-              accessibilityLabel="Progress to next level"
-              accessibilityValue={{ min: 0, max: 100, now: Math.round(level.progress * 100) }}
-            >
-              <View
-                style={[
-                  styles.progressFill,
-                  { width: `${Math.round(level.progress * 100)}%`, backgroundColor: t.primary },
-                ]}
-              />
-            </View>
+            {rules.points ? (
+              <>
+                <Text style={[type.small, { color: t.textSecondary }]}>
+                  Level {level.number} · {level.name}
+                  {level.pointsToNext !== null
+                    ? ` — ${level.pointsToNext} pts to next level`
+                    : ' — top level'}
+                </Text>
+                <View
+                  style={[styles.progressTrack, { backgroundColor: t.surface }]}
+                  accessible
+                  accessibilityRole="progressbar"
+                  accessibilityLabel="Progress to next level"
+                  accessibilityValue={{ min: 0, max: 100, now: Math.round(level.progress * 100) }}
+                >
+                  <View
+                    style={[
+                      styles.progressFill,
+                      { width: `${Math.round(level.progress * 100)}%`, backgroundColor: t.primary },
+                    ]}
+                  />
+                </View>
+              </>
+            ) : null}
           </View>
         </View>
         <View style={styles.inset}>
@@ -232,12 +226,8 @@ export function ProfileScreen() {
               label="Verified by others"
               value={String(routesVerified)}
             />
-            <StatTile icon="star-outline" label="Points" value={String(points)} />
           </View>
-          <Text style={[type.caption, { color: t.textSecondary }]}>
-            Counted on this phone: +10 per uploaded route, +5 per description. Verification points
-            arrive with route verification.
-          </Text>
+          {rules.points ? <PointsCard /> : null}
         </View>
 
         {/* Badges */}

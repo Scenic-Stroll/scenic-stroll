@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   distancePointsAdded,
+  distancePointsOwed,
   distancePointsForDay,
   hkDay,
   pinReadEarns,
@@ -118,5 +119,15 @@ describe('daily ring', () => {
   it('fills up to 10,000 steps', () => {
     expect(ringProgress(5000)).toBe(0.5);
     expect(ringProgress(15000)).toBe(1);
+  });
+});
+
+describe('idempotency', () => {
+  it('a repeated award for the same day pays nothing more', () => {
+    const first = distancePointsOwed(3000, 0); // 3 km, nothing paid yet
+    expect(first).toBe(100);
+    expect(distancePointsOwed(3000, first)).toBe(0); // the same request again
+    expect(distancePointsOwed(3750, first)).toBe(25); // a second walk: only the difference
+    expect(distancePointsOwed(100, 450)).toBe(0); // never negative
   });
 });

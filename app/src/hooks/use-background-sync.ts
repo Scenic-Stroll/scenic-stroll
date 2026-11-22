@@ -7,6 +7,7 @@ import { useRecorder } from '@/lib/recorder';
 import { refreshLocalData } from '@/lib/query-client';
 import { cleanUpLeftoverShare, subscribeToFriendLocations } from '@/lib/location-sharing';
 import { syncPinCollection } from '@/lib/pin-collector';
+import { processWalkQueue } from '@/lib/points';
 import { processUploadQueue } from '@/lib/upload-queue';
 import { useAuth } from '@/providers/auth-provider';
 
@@ -30,6 +31,7 @@ export function useBackgroundSync() {
     if (!signedIn) return;
     void processUploadQueue();
     void syncPinCollection(); // pins collected offline (D54)
+    void processWalkQueue(); // distance points for walks recorded offline (D55)
     // Sharing is foreground-only: a share left by a previous (closed) session is removed.
     void cleanUpLeftoverShare().catch((err) => console.warn('share cleanup failed', err));
 
@@ -47,6 +49,7 @@ export function useBackgroundSync() {
     const onOnline = () => {
       void processUploadQueue();
       void syncPinCollection();
+      void processWalkQueue();
     };
     if (Platform.OS === 'web') window.addEventListener('online', onOnline);
     // Friends' live locations: one Realtime subscription for the whole app.

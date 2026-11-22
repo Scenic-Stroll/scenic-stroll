@@ -1143,3 +1143,26 @@ migration `*_pin_authoring.sql`, seed `supabase/seed/sample_pin.sql`.
 - **My collection** replaces Record as the centre tab (unread count badge); Record stays reachable (Phase 6 moves its
   button). The **reader** shows the version for the reading style (nearest level if missing), the label badge, sources
   with links, the "beyond Hong Kong" line and an ungraded question; only collected pins can be read.
+
+## D55 — Points and the daily ring (2026-11-24)
+
+`shared/src/pointsRules.ts` (every number), `shared/src/points.ts` (pure, tested), Edge Function `award-points`,
+migration `*_points.sql`, `app/src/lib/points.ts`, `app/src/screens/profile/points-card.tsx`.
+
+- **Only the server writes points**, in `award-points` with the service role; the ledger has no client grants (D51).
+  The app sends what happened — a finished recording's fixes, or "done reading pin X" — never an amount.
+- **Distance:** recorded walks only (adults), through the existing GPS filter (`filterSamples`) and the speed check
+  (> 7 km/h averaged over ≥ 30 s earns nothing; same for walking and wheeling). The server stores only the counted
+  metres per walk and Hong Kong day (`walk_days`), not the GPS track. Each time, it recomputes the day's points from
+  all stored walks (tiers 25/50/100 per 1,000 steps, 0.75 km = 1,000 steps, cap 450, rounded down) and adds only what
+  is still owed (`distancePointsOwed`), keyed `walk:<id>:<day>` — retries and repeats pay nothing extra. Walks are
+  queued on the device and sent when online, like route uploads. Known limit: two walks sent at the same moment for
+  the same day could both be paid the same difference; the app sends them one at a time.
+- **Pin reading:** `start_pin_read` (server time) when the reader opens; `award-points` records `read_at` and pays
+  `pinRead.amount` (20, TBD) once per pin, only for a collected pin and only after ≥ 10 s.
+- **Old rules:** stopped. Points from before **24 Nov 2026** (+10 route, +5 description) are kept as "earlier points"
+  (`private.legacy_points`) and shown on Profile; the Friends leaderboard and profile totals are now earlier points +
+  ledger (`points_since`). **Levels** use that total, so nobody drops a level; **badges** are unchanged (they count
+  activity, not points). Board and contribution amounts are placeholders, not wired.
+- **Profile (adults):** balance, today's points and a ring of steps today out of 10,000, labelled as estimated from
+  distance. **Under-18s:** badges only — no points, level or ring; the server refuses to award them anything.
