@@ -7,7 +7,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 // EXPO_PUBLIC_* vars are inlined at build time from app/.env — they must be read with dot notation.
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -25,7 +25,9 @@ export const supabase = createClient(
       storage: AsyncStorage, // keep the (anonymous) session across app restarts
       autoRefreshToken: true,
       persistSession: true,
-      detectSessionInUrl: false, // no browser redirects in a native app
+      // Web: experts and reviewers sign in to /admin with an emailed link (D53), which lands back
+      // on the site with the session in the address. Phones never get redirects.
+      detectSessionInUrl: Platform.OS === 'web',
     },
   },
 );
