@@ -1839,3 +1839,89 @@ describe('deleting your pin collection (pins phase 4, D54)', () => {
     assert.equal(mine.rows.length, before.rows[0].n);
   });
 });
+
+describe('points (pins phase 5, D55)', () => {
+  const READER = 'c0000000-0000-4000-8000-000000000003'; // adult, from the phase 1 tests
+  const KID = 'c0000000-0000-4000-8000-000000000004'; // under 18
+  const WALK = 'e0000000-0000-4000-8000-000000000001';
+  let pin;
+
+  before(async () => {
+    pin = (await db.query(`select id from public.pins where status = 'live' limit 1`)).rows[0].id;
+    await as(
+      READER,
+      'insert into public.collection_entries (pin_id) values ($1) on conflict do nothing',
+      [pin],
+    );
+  });
+
+  it('clients cannot write walk distances or read timers; they read only their own walks', async () => {
+    await rejects(
+      as(
+        READER,
+        `insert into public.walk_days (user_id, walk_id, day, counted_m) values ($1, $2, current_date, 9999)`,
+        [READER, WALK],
+      ),
+      /permission denied/,
+    );
+    await db.query(
+      `insert into public.walk_days (user_id, walk_id, day, counted_m) values ($1, $2, (now() at time zone 'Asia/Hong_Kong')::date, 3000)`,
+      [READER, WALK],
+    ); // what the award-points function does
+    assert.equal((await as(READER, 'select walk_id from public.walk_days')).rows.length, 1);
+    assert.equal((await as(KID, 'select walk_id from public.walk_days')).rows.length, 0);
+    await rejects(as(READER, 'select * from public.pin_read_sessions'), /permission denied/);
+  });
+
+  it('start_pin_read times only collected pins of adults', async () => {
+    await as(READER, 'select public.start_pin_read($1)', [pin]);
+    await as(KID, 'select public.start_pin_read($1)', [pin]); // under 18: nothing stored
+    const { rows } = await db.query(
+      'select user_id from public.pin_read_sessions where pin_id = $1',
+      [pin],
+    );
+    assert.deepEqual(rows, [{ user_id: READER }]);
+  });
+
+  it('my_points_summary: balance, today, metres walked today and earlier points', async () => {
+    await db.query(
+      `insert into public.points_ledger (user_id, source, amount, ref_id, occurred_on)
+       values ($1, 'distance', 100, $2, (now() at time zone 'Asia/Hong_Kong')::date)`,
+      [READER, `walk:${WALK}`],
+    );
+    const { rows } = await as(READER, 'select * from public.my_points_summary()');
+    assert.ok(rows[0].today_points >= 100); // + 20 pin-read points from the phase 1 test
+    assert.ok(rows[0].balance >= 100); // + the pin-read points from the phase 1 test
+    assert.equal(Number(rows[0].today_meters), 3000);
+    assert.equal(rows[0].earlier_points, 0);
+  });
+
+  it('old-rule points stop at the cutoff: later routes add nothing, earlier ones stay', async () => {
+    // Earlier points count only routes/descriptions created before the cutoff (24 Nov 2026).
+    const { rows } = await db.query(
+      `select private.legacy_points($1, '-infinity') as before_cutoff`,
+      [ALICE],
+    );
+    const routesBefore = await db.query(
+      `select count(*)::int as n from public.routes where created_by = $1 and created_at < private.points_cutoff()`,
+      [ALICE],
+    );
+    const descriptionsBefore = await db.query(
+      `select count(*)::int as n from public.route_descriptions where author_id = $1 and created_at < private.points_cutoff()`,
+      [ALICE],
+    );
+    assert.equal(
+      rows[0].before_cutoff,
+      routesBefore.rows[0].n * 10 + descriptionsBefore.rows[0].n * 5,
+    );
+    await db.query(`update public.routes set created_at = '2026-12-01' where created_by = $1`, [
+      ALICE,
+    ]);
+    await db.query(
+      `update public.route_descriptions set created_at = '2026-12-01' where author_id = $1`,
+      [ALICE],
+    );
+    const after = await db.query(`select private.legacy_points($1, '-infinity') as p`, [ALICE]);
+    assert.equal(after.rows[0].p, 0);
+  });
+});

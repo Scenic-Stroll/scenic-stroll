@@ -44,3 +44,5 @@ export * from './safety.ts';
 export * from './pin-api.ts';
 export * from './collect.ts';
 export * from './cluster.ts';
+export * from './pointsRules.ts';
+export * from './points.ts';
