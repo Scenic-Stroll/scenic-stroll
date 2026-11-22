@@ -23,6 +23,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { SafetyNotice } from '@/components/safety-notice';
+import { useFeatureRules } from '@/lib/user-settings';
 import { Avatar } from '@/components/ui/avatar';
 import { Chip } from '@/components/ui/chip';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -53,6 +55,11 @@ const TABS = [
 type TabKey = (typeof TABS)[number]['key'];
 
 export function FriendsScreen() {
+  // Safety mode (under-18s): no friend features at all, so no friend data is even fetched.
+  return useFeatureRules().friends ? <FriendsContent /> : <SafetyNotice feature="Friends" />;
+}
+
+function FriendsContent() {
   const t = useAppTheme();
   const [tab, setTab] = useState<TabKey>('friends');
   const [adding, setAdding] = useState(false);

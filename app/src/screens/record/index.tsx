@@ -18,6 +18,8 @@ import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import MapView from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { SafetyNotice } from '@/components/safety-notice';
+import { useFeatureRules } from '@/lib/user-settings';
 import { CheckpointSheet, type CheckpointDetails } from '@/components/checkpoint-sheet';
 import { RouteTrace } from '@/components/route-trace';
 import { ThemedText } from '@/components/themed-text';
@@ -39,6 +41,11 @@ import { useAppTheme, type Palette } from '@/theme';
 import { showAlert } from '@/lib/alert';
 
 export function RecordHome() {
+  // Safety mode (under-18s): the server never stores their recordings, so don't record at all.
+  return useFeatureRules().recordRoutes ? <Recorder /> : <SafetyNotice feature="Route recording" />;
+}
+
+function Recorder() {
   const status = useRecorder((s) => s.status);
   return status === 'idle' ? <IdleView /> : <RecordingView />;
 }

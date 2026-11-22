@@ -16,6 +16,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import * as Location from 'expo-location';
 import { create } from 'zustand';
 
+import { currentFeatureRules } from '@/lib/user-settings';
 import { watchPosition } from '@/lib/watch-position';
 import * as localDb from '@/lib/local-db';
 import { refreshLocalData } from '@/lib/query-client';
@@ -85,6 +86,11 @@ function onLocation(loc: Location.LocationObject) {
 /** Starts a new recording. Returns false (and sets `error`) if location isn't allowed. */
 export async function startRecording(options: { trimEnds: boolean }): Promise<boolean> {
   if (useRecorder.getState().status !== 'idle') return false;
+  // Safety mode (under-18s) never records; the database refuses their uploads too (D52).
+  if (!currentFeatureRules().recordRoutes) {
+    useRecorder.setState({ error: 'Route recording is off in safety mode.' });
+    return false;
+  }
   useRecorder.setState({ ...initialState, status: 'starting' });
 
   const permission = await Location.requestForegroundPermissionsAsync();

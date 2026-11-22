@@ -1079,3 +1079,21 @@ Migration `*_knowledge_pins.sql`, `shared/src/pins.ts`, audit in `docs/PINS_AUDI
   append-only for everyone, the server functions included.
 - **Settings:** `safety_mode` is a generated column (`age_band = 'under_18'`) — nobody can write it; once under-18 an
   account can't switch to adult (only an admin can fix a mistake), and settings rows can't be deleted.
+
+## D52 — Consent and under-18 safety mode (2026-11-23)
+
+`app/src/components/consent-screen.tsx`, `app/src/lib/user-settings.ts`, `shared/src/safety.ts`, migration
+`*_safety_mode_enforcement.sql`.
+
+- **One consent screen** on first launch (and when `CONSENT_VERSION` changes), on every platform; it replaces the web
+  welcome card (D47). Age band (Under 18 / 18 or over), a required agreement with links to the privacy policy and terms,
+  and two **unticked** opt-ins (research, government sharing) — offered to adults only.
+- **Safety mode = under-18**, computed by the database; there is no switch. Turned off for them: route recording,
+  friends, location sharing, shop offers, points (badges only), server-side collection. The app hides these
+  (`featureRules`), and the **database refuses them** whatever the client sends: triggers on routes, descriptions,
+  friend codes, friendships and location shares. Switching an account to under-18 deletes those rows; switching back
+  is refused (phase 1). Unknown settings (not answered yet, offline first launch) are treated as safety mode in the app.
+- Accounts from before the consent screen (no settings row) keep working on the server; the app asks them first thing.
+- Reading style (child / teen / adult) is a separate Profile setting for everyone; it never affects safety mode.
+- A minor can still create a new anonymous account and answer "18 or over" — the age band is self-declared. Stronger
+  age checks are out of scope for the MVP.

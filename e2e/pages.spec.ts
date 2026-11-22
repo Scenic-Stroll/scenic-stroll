@@ -1,22 +1,35 @@
 // The public pages: welcome screen, privacy, terms, credits, and a wrong link.
 import { expect, test } from '@playwright/test';
 
-test('first visit shows the welcome screen with Beta, coverage and Start', async ({ page }) => {
-  // Forget "welcome seen" once (not on the reload below, which checks it's remembered).
-  await page.addInitScript(() => {
-    if (sessionStorage.getItem('e2e-welcome-reset')) return;
-    sessionStorage.setItem('e2e-welcome-reset', '1');
-    localStorage.removeItem('scenic-stroll:welcome-seen');
+test.describe('first launch', () => {
+  // A brand-new visitor: no saved session, so a fresh anonymous account and the consent screen.
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test('consent screen: Beta, coverage, age band, unticked opt-ins, then Start', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await expect(page.getByText('BETA')).toBeVisible();
+    await expect(page.getByText(/Smart walking routes:/)).toBeVisible();
+    const start = page.getByRole('button', { name: /Start/ });
+    await expect(start).toBeDisabled();
+
+    await page.getByRole('radio', { name: 'Under 18' }).click();
+    await expect(page.getByText(/Safety mode will be on/)).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: /Research/ })).toHaveCount(0); // adults only
+
+    await page.getByRole('radio', { name: '18 or over' }).click();
+    for (const name of [/Research/, /Government/]) {
+      await expect(page.getByRole('checkbox', { name })).not.toBeChecked();
+    }
+    await expect(start).toBeDisabled(); // consent not ticked yet
+    await page.getByRole('checkbox', { name: /I agree to the privacy policy/ }).click();
+    await start.click();
+    await expect(page.getByText('BETA')).toBeHidden();
+    await page.reload();
+    await expect(page.getByRole('search', { name: /Search places/ })).toBeVisible();
+    await expect(page.getByText('BETA')).toBeHidden(); // stored on the server
   });
-  await page.goto('/');
-  await expect(page.getByText('BETA')).toBeVisible();
-  await expect(page.getByText(/Smart walking routes:/)).toBeVisible();
-  await expect(page.getByText(/Transport comparison:/)).toBeVisible();
-  await page.getByRole('button', { name: /Start/ }).click();
-  await expect(page.getByText('BETA')).toBeHidden();
-  await page.reload();
-  await expect(page.getByRole('search', { name: /Search places/ })).toBeVisible();
-  await expect(page.getByText('BETA')).toBeHidden(); // remembered
 });
 
 for (const [path, heading] of [

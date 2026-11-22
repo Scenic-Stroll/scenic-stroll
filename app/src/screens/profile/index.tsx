@@ -5,7 +5,14 @@
  * Points, stats and badges are calculated on this phone from your recordings (works offline and for
  * anonymous users). Verification-based points/badges unlock when route verification ships (Phase 5).
  */
-import { badgesFor, levelFor, pointsFor, TAGS } from '@scenic/shared';
+import {
+  badgesFor,
+  featureRules,
+  levelFor,
+  pointsFor,
+  TAGS,
+  type ReadingLevel,
+} from '@scenic/shared';
 import { useQuery } from '@tanstack/react-query';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
@@ -37,12 +44,19 @@ import { useSharing } from '@/lib/location-sharing';
 import { useSavedPlaces } from '@/lib/saved-places-store';
 import { ShareLocationSheet } from '@/screens/friends/share-location-sheet';
 import { useSettings, type ThemePreference } from '@/lib/settings-store';
+import { setReadingStyle, useUserSettings } from '@/lib/user-settings';
 import { useAuth } from '@/providers/auth-provider';
 import { radius, space, TAP_TARGET, type, useAppTheme } from '@/theme';
 import { showAlert } from '@/lib/alert';
 
 import { BadgeTile } from './badge-tile';
 import { EditProfileSheet } from './edit-profile-sheet';
+
+const READING_OPTIONS = [
+  { key: 'child', label: 'Child' },
+  { key: 'teen', label: 'Teen' },
+  { key: 'adult', label: 'Adult' },
+] as const satisfies readonly { key: ReadingLevel; label: string }[];
 
 const THEME_OPTIONS = [
   { key: 'system', label: 'System' },
@@ -60,6 +74,8 @@ export function ProfileScreen() {
   const stats = useQuery({ queryKey: localKeys.stats, queryFn: getMyStats });
   const savedCount = useSavedPlaces((s) => s.places.length);
   const settings = useSettings();
+  const { settings: userSettings } = useUserSettings();
+  const rules = featureRules(userSettings);
 
   const [editing, setEditing] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -278,14 +294,23 @@ export function ProfileScreen() {
               />
             }
           />
-          <ListRow
-            icon={sharingOn ? 'access-point' : 'map-marker-account-outline'}
-            title="Location sharing"
-            subtitle={
-              sharingOn ? 'On — tap to change or stop' : 'Off · share live with chosen friends'
-            }
-            onPress={() => setSharingSheet(true)}
-          />
+          {userSettings?.safety_mode ? (
+            <ListRow
+              icon="shield-check-outline"
+              title="Safety mode: on"
+              subtitle="For everyone under 18: no route recording or friends, pins stay on this device. It can’t be turned off."
+            />
+          ) : null}
+          {rules.friends ? (
+            <ListRow
+              icon={sharingOn ? 'access-point' : 'map-marker-account-outline'}
+              title="Location sharing"
+              subtitle={
+                sharingOn ? 'On — tap to change or stop' : 'Off · share live with chosen friends'
+              }
+              onPress={() => setSharingSheet(true)}
+            />
+          ) : null}
           <ListRow
             icon="download-outline"
             title="Download my data"
@@ -312,6 +337,20 @@ export function ProfileScreen() {
               onChange={settings.setThemePreference}
             />
           </View>
+          {userSettings && userId ? (
+            <View style={styles.themeRow}>
+              <Text style={[type.body, { color: t.textPrimary }]}>Reading style</Text>
+              <SegmentedTabs
+                options={READING_OPTIONS}
+                value={userSettings.reading_style}
+                onChange={(style) =>
+                  void setReadingStyle(userId, style).catch((err: unknown) =>
+                    showAlert('Reading style', err instanceof Error ? err.message : String(err)),
+                  )
+                }
+              />
+            </View>
+          ) : null}
           <ListRow icon="translate" title="Language" subtitle="English · 繁體中文 coming soon" />
           {/* Team-only (admin-tools.ts): hidden in the public web app. */}
           {ADMIN_TOOLS ? (

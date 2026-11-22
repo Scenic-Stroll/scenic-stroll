@@ -5,7 +5,7 @@ import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { OfflineBanner } from '@/components/offline-banner';
-import { Welcome } from '@/components/welcome';
+import { ConsentGate } from '@/components/consent-screen';
 import { useBackgroundSync } from '@/hooks/use-background-sync';
 import { queryClient } from '@/lib/query-client';
 import { registerServiceWorker } from '@/lib/service-worker';
@@ -81,7 +81,7 @@ export default function RootLayout() {
               />
             </Stack>
             <OfflineBanner />
-            <Welcome />
+            <ConsentGate />
           </ThemeProvider>
         </AuthProvider>
       </QueryClientProvider>

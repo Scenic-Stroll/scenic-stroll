@@ -40,3 +40,4 @@ export * from './transit/live-departures.ts';
 export * from './rush-hour.ts';
 export * from './privacy.ts';
 export * from './pins.ts';
+export * from './safety.ts';

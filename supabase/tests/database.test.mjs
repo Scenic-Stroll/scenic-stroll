@@ -1695,3 +1695,70 @@ describe('knowledge pins (pins phase 1, D51)', () => {
     assert.deepEqual(mine.rows, [{ user_id: READER }]);
   });
 });
+
+describe('safety mode for under-18s (pins phase 2, D52)', () => {
+  const TEEN = 'd0000000-0000-4000-8000-000000000001';
+  const GROWNUP = 'd0000000-0000-4000-8000-000000000002'; // adult who later says they're under 18
+  const TEEN_ROUTE = 'd0000000-0000-4000-8000-0000000000aa';
+  const GROWNUP_ROUTE = 'd0000000-0000-4000-8000-0000000000bb';
+
+  before(async () => {
+    await db.query('insert into auth.users (id) values ($1), ($2)', [TEEN, GROWNUP]);
+    await as(
+      TEEN,
+      `insert into public.user_settings (age_band, consent_version) values ('under_18', 'v1')`,
+    );
+    await as(
+      GROWNUP,
+      `insert into public.user_settings (age_band, consent_version) values ('adult', 'v1')`,
+    );
+  });
+
+  it('under-18s cannot upload a route recording', async () => {
+    await rejects(
+      as(TEEN, 'select public.create_route($1::jsonb)', [
+        JSON.stringify(payload({ id: TEEN_ROUTE })),
+      ]),
+      /not available in safety mode/,
+    );
+  });
+
+  it('under-18s cannot get a friend code, so nobody can add them', async () => {
+    await rejects(as(TEEN, 'select public.my_friend_code()'), /not available in safety mode/);
+  });
+
+  it('under-18s cannot share their location', async () => {
+    await rejects(
+      as(TEEN, `select public.start_location_share(22.3365, 114.1745, 8, 'exact', true, 60, '{}')`),
+      /not available in safety mode/,
+    );
+  });
+
+  it('switching to under-18 removes recordings, friend codes and shares already on the server', async () => {
+    await as(GROWNUP, 'select public.create_route($1::jsonb)', [
+      JSON.stringify(payload({ id: GROWNUP_ROUTE })),
+    ]);
+    await as(GROWNUP, 'select public.my_friend_code()');
+    await as(
+      GROWNUP,
+      `select public.start_location_share(22.3365, 114.1745, 8, 'exact', true, 60, '{}')`,
+    );
+    await as(GROWNUP, `update public.user_settings set age_band = 'under_18'`);
+    const left = await db.query(
+      `select
+         (select count(*) from public.routes where created_by = $1)::int as routes,
+         (select count(*) from public.friend_codes where user_id = $1)::int as codes,
+         (select count(*) from public.location_shares where user_id = $1)::int as shares`,
+      [GROWNUP],
+    );
+    assert.deepEqual(left.rows[0], { routes: 0, codes: 0, shares: 0 });
+    // …and there is no way back to adult (phase 1 test), so nothing can be re-created.
+    await rejects(as(GROWNUP, 'select public.my_friend_code()'), /not available in safety mode/);
+  });
+
+  it('adults and accounts that have not answered yet keep every feature', async () => {
+    // ALICE and BOB (earlier tests) have no settings row and created routes and friend codes above.
+    const { rows } = await db.query('select count(*)::int as n from public.friend_codes');
+    assert.ok(rows[0].n >= 2);
+  });
+});
