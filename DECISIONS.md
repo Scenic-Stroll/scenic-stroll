@@ -876,3 +876,184 @@ friend" (no meetup card exists), and the comparison caption uses the eval's Exit
 ## D40 — Demo video dropped (2026-10-23)
 
 The team decided not to make the 30 s video, so the Remotion project from D39 (`video/`) was deleted.
+
+## D41 — Public web app: hosting, map library, backend plan (2026-11-19)
+
+Audit in `docs/WEB_LAUNCH_AUDIT.md`. Decisions agreed with the team:
+
+- **One codebase, Expo web target** (react-native-web), built as a single-page app (`web.output: "single"`): the
+  app needs sign-in and location, so pre-rendering pages on a server buys nothing and broke the build.
+- **SDK 58 first:** merged into `main` before any web work.
+- **Hosting: EAS Hosting**, not Vercel: Vercel's free Hobby plan is for non-commercial use only and the project has a
+  business model. Netlify / Cloudflare Pages remain fallbacks.
+- **Map on web: MapLibre GL JS with OpenFreeMap tiles** — free, no key, no usage limits, OpenStreetMap data. Google's JS
+  map would need a public, billed key. Consequence: no Traffic layer on web (hidden there).
+- **Backend: Supabase Pro** (the free plan pauses after 7 days without activity, which silently breaks a public link).
+  Upgrading is a billing step the team does in the Supabase dashboard.
+
+## D42 — Web layout and input details (2026-11-19)
+
+- **Wide screens (≥ 900 px) get a side panel** instead of the bottom sheet (`map-panel.tsx`); routes are fitted
+  clear of whichever panel is showing. Phones (native and narrow browsers) keep the bottom sheet.
+- **Long-press on the web map** is decided when the finger lifts, from the touch events' own timestamps, with
+  10 px of wobble allowed; right-click does the same on computers. A timer misfired when the page was busy.
+- **QR scanning on web** uses `expo-camera`'s built-in fallback (the `barcode-detector` polyfill) where the
+  browser has no barcode reader (iPhone Safari, Firefox, Windows). Typing a friend code always works.
+- **Location denied** now says how to fix it per platform and offers the alternatives (pick from the list,
+  drop a pin) — the "My location" button used to fail silently.
+
+## D43 — Team-only tools hidden in the public web app (2026-11-19)
+
+One flag, `ADMIN_TOOLS` (`app/src/lib/admin-tools.ts`): on in development (Expo Go, `npm run web`) and in builds made
+with `EXPO_PUBLIC_ADMIN_TOOLS=1`; off in the public web build. Behind it: the Diagnostics card (Test backend, Simulate
+weather / rush hour / walk, Test smart routing), the data-collection-mode switch, and the answers saved for the demo
+(`savedDemoRoutes`, `savedDemoTrip` return nothing), since on a public site a simulated or saved answer could pass for
+live data. Verified on a production web build: none of them appear in Profile. The code still ships in the bundle; that's
+fine — these tools only change what that device shows and hold no secrets.
+
+## D44 — Backend safety for a public link (2026-11-19)
+
+Migration `public_launch_safety`, `supabase/functions/_shared/guard.ts` + `cors.ts`.
+
+- **Rate limits** on all 6 Edge Functions, per minute, per user and per IP, counted in Postgres
+  (`public.rate_limit_hit`, service role only) so they hold across function instances. Per-IP limits are
+  generous (a campus shares one IP); per-user limits do the real work (plan-trip, which calls paid APIs: 20/min).
+  Health-check GETs are free. If counting fails the request goes through (fail open, logged). Over the limit →
+  429 "Too many requests — wait a minute", which the app already shows as is.
+- **CORS:** browsers may call the functions only from origins in the `ALLOWED_ORIGINS` secret (comma-separated,
+  `*` = one subdomain level, for preview links) and from localhost. Until the secret is set (step 6, when the
+  domain exists) any origin still works. Phones send no Origin header and are unaffected.
+- **CAPTCHA: not switched on yet.** Supabase's CAPTCHA covers every sign-in, including the phone apps, which
+  have no CAPTCHA widget yet — turning it on today would break native sign-in. Meanwhile Supabase limits
+  anonymous sign-ups to 30 per hour per IP (checked on the live project). Needs a Cloudflare Turnstile key and
+  a native widget; tracked in the launch checklist.
+- **Moderation:** shared routes start `review_status = 'pending'` and are visible only to their author until the
+  team approves them (dashboard SQL, docs/SETUP.md). Checkpoints and descriptions follow their route's
+  visibility. Signed-in users can report a route (one report each, write-only); 3 reporters flag it (hidden).
+- **Cost alarm:** `COST ALARM` in the function logs at 80 % of a paid API's daily cap and when it's reached
+  (then plan-trip already falls back to the free provider).
+- 7 new database tests, incl. "a signed-out browser can't read anyone's location".
+
+## D45 — Installable web app (PWA) (2026-11-20)
+
+`app/public/` (manifest, index.html, sw.js, offline.html, icons), `src/lib/service-worker*.ts`,
+`src/components/offline-banner*.tsx`.
+
+- **Icon:** the template's `assets/images/icon.png` is Expo's logo, not ours, so the web icons are a
+  placeholder of our own (white winding path ending in a map pin on `#1BA136`), drawn by
+  `app/scripts/make-web-icons.py`. Everything sits inside the maskable safe zone, so one image serves "any" and
+  "maskable". The phone apps still use the Expo icon — **replace both with a designed logo before launch.**
+- **Manifest:** name/short name "Scenic Stroll", theme `#1BA136`, background `#0B2A18`, standalone. iPhone
+  Safari ignores most of the manifest, so `public/index.html` (Expo's template for single-page builds) adds
+  `apple-touch-icon` and the `apple-mobile-web-app-*` tags. Status bar style "default" (not translucent), so
+  the app never draws under the iPhone status bar.
+- **Service worker** (hand-written, ~100 lines, no Workbox — easier for the team to read): only our own site's
+  GET requests. Pages: network first, offline → saved app, or `offline.html` if never saved. Hashed build
+  files (`/_expo/static/`, `/assets/`): cache first. **Live data is never cached by the worker** — Supabase,
+  map tiles and weather are other origins and pass straight through. `scripts/stamp-service-worker.mjs` gives
+  each build its own cache name; old caches are deleted on activate.
+- Registered only in production builds (`__DEV__` off), so `npm run web` never serves stale code.
+- **Offline banner (web only):** opened offline from the saved copy, a thin bar says "You’re offline — maps,
+  weather and routes come back when you reconnect." Phones keep their per-screen messages.
+- Hosting must serve `sw.js` with `Cache-Control: no-cache` (step 6), so new releases are picked up.
+
+## D46 — Hosting and CI (2026-11-20)
+
+`.github/workflows/web.yml`, `docs/DEPLOY.md`, `app/app.json` (`owner`, `extra.eas.projectId`).
+
+- **EAS Hosting** (D41), Expo project `@spidexz/scenic-stroll`. Production `https://scenic-stroll.expo.app`
+  (nothing deployed there until step 9); previews `https://scenic-stroll--<id>.expo.app`.
+- **Deep links:** EAS Hosting answers unknown paths with `index.html` (checked on the preview), so no rewrite
+  config is needed. Unknown app paths now show a plain "Page not found" screen (`src/app/+not-found.tsx`)
+  instead of Expo Router's developer screen with a sitemap.
+- **CI** (GitHub Actions, one job): `npm ci`, typecheck, lint, all tests, format check, web build; then a
+  preview deploy for same-repo pull requests and a production deploy on push to `main`. Fork PRs are checked,
+  not deployed. eas-cli is pinned (27.11.0). Public values come from repository _variables_, the Expo token from
+  a _secret_; no secret key is ever an `EXPO_PUBLIC_` variable.
+- **Preview addresses:** named aliases (`--alias pr-12`) were created but returned 404 for several minutes in
+  our test, so CI reports each deployment's own address instead (from `eas deploy --json`).
+- **Cache:** EAS Hosting lets browsers cache files for 1 h and has no per-file header setting for single-page
+  builds. The service worker fetches pages and unhashed files with `cache: 'no-cache'`, so a new release can't
+  be shadowed by an old cached `index.html` pointing at deleted bundles. The build id hashes `index.html` and
+  `sw.js`.
+- `src/css.d.ts` declares `*.css` imports so the type check passes on a fresh checkout (no generated
+  `expo-env.d.ts` in CI).
+- **CORS allow-list** for the Edge Functions: `https://scenic-stroll.expo.app,https://scenic-stroll--*.expo.app`
+  (DEPLOY.md). Supabase Auth redirect URLs aren't needed: the app only uses anonymous sign-in.
+
+## D47 — Public-launch essentials (2026-11-20)
+
+- **Welcome screen (web only):** first visit to `/` shows what the app does, the coverage ("Smart walking
+  routes: CityU, Kowloon Tong MTR and Festival Walk. Transport comparison: all of Hong Kong"), a **Beta** label,
+  a location note and **Start**; links to privacy, terms, credits and feedback. Never shown over a shared link;
+  remembered per browser (localStorage — a convenience, the app works without it). Phones unchanged.
+- **Privacy policy and terms** (`/privacy`, `/terms`, text in `app/src/content/`): plain English, marked
+  **draft for team review, not legal advice**, mentions the PDPO. Every claim was checked against the code
+  (e.g. "Delete my data" does _not_ remove a live location share, friendships or reports — the policy says so).
+  The contact email is a placeholder to fill in before launch. Traditional Chinese: not yet.
+- **Credits** (`/attribution`): moved from Profile → About into `content/attribution.ts`; adds the web map tiles
+  (OpenFreeMap / OpenMapTiles / OSM) and place search (openrouteservice).
+- **Feedback:** `/feedback` (Profile → About, welcome screen) writes to `public.feedback`: insert-only for signed-in
+  users, 10 per person per hour (security-definer count in the policy), read only by the team (SETUP.md §9b).
+  "A route is wrong" is the first choice; single routes keep their "Report a problem" button (D44).
+- **Error reports — Sentry:** web via `@sentry/browser`, loaded only when `EXPO_PUBLIC_SENTRY_DSN` is set. Sentry v11
+  collects user info, headers, bodies and query strings by default, so `dataCollection` turns each off; console
+  breadcrumbs are dropped and `scrubText` (shared/src/privacy.ts) removes coordinates, ids in paths and query
+  strings. Edge Functions: `guard.ts` catches crashes, answers 500 and posts one scrubbed event to Sentry's
+  envelope endpoint (`_shared/error-report.ts`, ~60 lines) when the `SENTRY_DSN` secret is set — no SDK, so cold
+  starts stay fast and the payload is easy to audit.
+- **Visit counts — Umami Cloud** (free Hobby plan, cookie-free, no cross-site tracking, honours Do Not Track):
+  page views plus `route-planned`, `route-recorded`, `feedback-sent`; friend/recording ids and query strings are
+  removed from page addresses. Off unless `EXPO_PUBLIC_UMAMI_WEBSITE_ID` is set. Plausible was the alternative
+  (paid only).
+- **Sharing a link:** Open Graph / Twitter tags and a 1200×630 share image (`public/og-image.png`, drawn by
+  `scripts/make-web-icons.py`), pointing at the production address.
+- **Accessibility:** a visible `:focus-visible` outline for keyboard users; a scan found no icon-only button
+  without a label; the step-free filter stays a top-level chip on the map. Unknown pages: "Page not found" (D46).
+
+## D48 — Testing before launch, and what it found (2026-11-20)
+
+`e2e/`, `playwright.config.ts`, `scripts/load-test.mjs`, `docs/TESTING.md` (results and the real-phone checklist).
+
+- **Playwright** at the repo root (test tooling, not part of the app): Chromium + WebKit × phone + desktop, against the
+  live site (`BASE_URL`). One shared anonymous session (Supabase: 30 new anonymous accounts per hour per IP), one test
+  at a time, service workers blocked except in the offline test (EAS Hosting answered 429 when every fresh browser
+  downloaded the app twice). The recording upload is faked by replacing `fetch` in the page: WebKit sends requests from
+  a service-worker page past `page.route`, which let an earlier version create 5 real (pending, hidden) routes — deleted.
+  Not in CI yet (live services, hosting quota).
+- **Web bugs found and fixed:**
+  - `lib/watch-position(.web).ts`: expo-location's web `watchPositionAsync` labels positions with the browser's
+    watch id but files callbacks under its own counter; once the map's location dot also watches, positions go
+    nowhere (and the watch is cancelled). Recording, follow mode and location sharing now use the browser directly
+    on the web; phones still use expo-location.
+  - Recording failed to start when the browser refused the screen Wake Lock; keep-awake is now best effort.
+  - `query-client.ts`: on-device queries (`['local', …]`) use `networkMode: 'always'` — TanStack Query paused them
+    offline in browsers ("Review route" spun forever).
+  - Service worker: saves every JS/CSS file of the build and the icon font at install (list written by
+    `stamp-service-worker.mjs`), so screens never opened before still open offline.
+  - `use-background-sync.ts`: also listens to the browser's `online` event; NetInfo didn't report reconnecting.
+  - `geocode` sent the openrouteservice key in the URL, which appeared in a logged error; it now goes in the
+    `Authorization` header like the other ORS calls (test added). **The ORS key must be rotated.**
+- **Accessibility** (Lighthouse 84 → 100): on the web the bottom sheet no longer exposes three "slider"s without
+  values (the phones keep "adjustable"); tab rows are real tabs (`Chip role="tab"`, the record button in the tab
+  bar); the welcome logo is a plain `<img alt="">`; `robots.txt` added (SEO 100).
+- **Not met:** phone Performance 38 (desktop 79) — JavaScript size; and the free database handles ~5 smart routes at
+  once. Both are launch-checklist items (bundle splitting; Supabase Pro + bigger compute).
+
+## D49 — Production deploy (2026-11-21)
+
+- `eas deploy --prod` from the `web-launch` branch: https://scenic-stroll.expo.app. Before it: production build scanned
+  for secret-key patterns (none), iOS and Android bundles exported (native code still compiles), smoke test passed.
+  After it: 41/41 Playwright tests against production; no test data in the live database.
+- Deployed by hand because `web-launch` isn't merged yet; from the first merge to `main`, CI deploys production.
+- Shared knowingly before the "Before sharing the link" items in `docs/LAUNCH_CHECKLIST.md` (keys, Supabase Pro, CORS
+  secret, contact email): the address isn't announced, the page says Beta, and the limits (rate limits, Google cap,
+  moderation) are active. Roll back: DEPLOY.md.
+
+## D50 — Vercel as a second host (2026-11-23)
+
+The team wants a Vercel link as well. `vercel.json` (repo root) builds the same static site: `npm ci` at the root (the
+`shared/` workspace), `npm run build:web --workspace app`, output `app/dist`, a catch-all rewrite to `index.html`
+(Vercel, unlike EAS Hosting, 404s unknown paths), `no-cache` for `sw.js`, one-year cache for hashed files. EAS
+Hosting stays (D41/D46). Vercel Hobby is for non-commercial use only — fine for a student project; revisit if that
+changes. Steps: DEPLOY.md → Alternative: Vercel.

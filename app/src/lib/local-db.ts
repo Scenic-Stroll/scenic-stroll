@@ -10,30 +10,19 @@
  *   pending   → saved by the user, waiting to upload
  *   uploaded  → on the server
  */
-import type { CheckpointKind, GpsSample, LocalCheckpoint, LocalRecording } from '@scenic/shared';
+import type { CheckpointKind, GpsSample, LocalCheckpoint } from '@scenic/shared';
 import { pathLengthMeters } from '@scenic/shared';
 import * as SQLite from 'expo-sqlite';
 
-export type RecordingStatus = 'recording' | 'draft' | 'pending' | 'uploaded';
+import type {
+  MyStats,
+  RecordingDetail,
+  RecordingStatus,
+  RecordingSummary,
+  ReviewFields,
+} from './local-db-types';
 
-export type RecordingSummary = {
-  id: string;
-  status: RecordingStatus;
-  title: string | null;
-  startedAt: number;
-  endedAt: number | null;
-  distanceM: number;
-  lastError: string | null;
-};
-
-/** A recording with everything the review screen needs. */
-export type RecordingDetail = Omit<LocalRecording, 'checkpoints'> & {
-  status: RecordingStatus;
-  startedAt: number;
-  endedAt: number | null;
-  lastError: string | null;
-  checkpoints: (LocalCheckpoint & { id: number })[];
-};
+export type { MyStats, RecordingDetail, RecordingStatus, RecordingSummary, ReviewFields };
 
 const db = SQLite.openDatabaseSync('scenic-stroll.db');
 
@@ -152,15 +141,6 @@ export async function recoverInterruptedRecordings(activeId: string | null): Pro
 }
 
 // ---- review / upload ----------------------------------------------------------------------
-
-export type ReviewFields = {
-  title: string;
-  startLabel: string | null;
-  endLabel: string | null;
-  description: string | null;
-  showAuthor: boolean;
-  trimEnds: boolean;
-};
 
 /** User pressed Save on the review screen → queue for upload. */
 export async function saveReview(id: string, f: ReviewFields) {
@@ -293,19 +273,6 @@ export async function loadRecording(id: string): Promise<RecordingDetail | null>
 }
 
 // ---- profile stats / my data ------------------------------------------------------------
-
-export type MyStats = {
-  /** Routes uploaded (shared with the community). */
-  routesLogged: number;
-  /** Uploaded routes that include a description. */
-  descriptions: number;
-  /** Total distance of saved recordings (waiting or uploaded), in metres. */
-  metersWalked: number;
-  /** Lift checkpoints on uploaded routes. */
-  liftCheckpoints: number;
-  /** Uploaded routes that go indoors (have an entrance checkpoint). */
-  shelteredRoutes: number;
-};
 
 /** Numbers for the Profile tab, calculated from what's stored on this phone. */
 export async function getMyStats(): Promise<MyStats> {

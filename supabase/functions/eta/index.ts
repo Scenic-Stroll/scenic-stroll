@@ -6,8 +6,8 @@
 // ('unavailable') rather than fail: the app then shows "live times unavailable".
 //
 // auth: 'user' → only signed-in app users (anonymous accounts count), like our other functions.
-import { withSupabase } from '@supabase/server';
 
+import { guarded, LIMITS } from '../_shared/guard.ts';
 import { stopEta } from '../_shared/eta-fetch.ts';
 import { errorResponse, json, readBody } from '../_shared/http.ts';
 import {
@@ -19,7 +19,7 @@ import {
 const TIMEOUT_MS = 4_000;
 
 export default {
-  fetch: withSupabase({ auth: 'user' }, async (req, ctx) => {
+  fetch: guarded('eta', LIMITS.eta, async (req, ctx) => {
     // GET = health check for Settings → "Test backend". The operators' APIs need no keys.
     if (req.method === 'GET') {
       return json({ ok: true, function: 'eta', provider: 'data.gov.hk', missingSecrets: [] });

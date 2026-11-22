@@ -93,6 +93,9 @@ Deno.test('ORS: geocode keeps only well-formed results', async () => {
     assertEquals(results, [{ label: 'Festival Walk', point: { lat: 22.3373, lng: 114.1746 } }]);
     const url = new URL(fake.calls[0]!.url);
     assertEquals(url.searchParams.get('boundary.country'), 'HK');
+    // The key travels in a header: addresses end up in error logs.
+    assertEquals(url.searchParams.has('api_key'), false);
+    assertEquals(new Headers(fake.calls[0]!.init?.headers).get('Authorization'), 'k');
   } finally {
     fake.restore();
   }

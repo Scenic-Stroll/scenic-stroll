@@ -1,0 +1,3 @@
+# Scenic Stroll: everything may be indexed.
+User-agent: *
+Allow: /

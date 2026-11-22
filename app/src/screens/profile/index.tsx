@@ -12,7 +12,6 @@ import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -23,6 +22,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DiagnosticsCard } from '@/components/diagnostics-card';
+import { ADMIN_TOOLS } from '@/lib/admin-tools';
 import { Avatar } from '@/components/ui/avatar';
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
@@ -39,6 +39,7 @@ import { ShareLocationSheet } from '@/screens/friends/share-location-sheet';
 import { useSettings, type ThemePreference } from '@/lib/settings-store';
 import { useAuth } from '@/providers/auth-provider';
 import { radius, space, TAP_TARGET, type, useAppTheme } from '@/theme';
+import { showAlert } from '@/lib/alert';
 
 import { BadgeTile } from './badge-tile';
 import { EditProfileSheet } from './edit-profile-sheet';
@@ -93,14 +94,14 @@ export function ProfileScreen() {
     try {
       await downloadMyData(userId);
     } catch (e) {
-      Alert.alert('Couldn’t export your data', e instanceof Error ? e.message : String(e));
+      showAlert('Couldn’t export your data', e instanceof Error ? e.message : String(e));
     } finally {
       setExporting(false);
     }
   };
 
   const confirmDelete = () => {
-    Alert.alert(
+    showAlert(
       'Delete all my data?',
       'This permanently deletes your uploaded routes and descriptions from the server, and every recording, GPS point and saved place on this phone. It can’t be undone.',
       [
@@ -112,9 +113,9 @@ export function ProfileScreen() {
             setDeleting(true);
             try {
               await deleteMyData(userId);
-              Alert.alert('Deleted', 'Your routes, descriptions and phone data have been deleted.');
+              showAlert('Deleted', 'Your routes, descriptions and phone data have been deleted.');
             } catch (e) {
-              Alert.alert(
+              showAlert(
                 'Nothing was deleted on your phone',
                 `${e instanceof Error ? e.message : String(e)} Check your connection and try again.`,
               );
@@ -312,26 +313,31 @@ export function ProfileScreen() {
             />
           </View>
           <ListRow icon="translate" title="Language" subtitle="English · 繁體中文 coming soon" />
-          <ListRow
-            icon="clipboard-list-outline"
-            title="Data collection mode"
-            subtitle="Team walks: bigger buttons, auto-numbered titles, “Save & record another”, no 50 m trim"
-            right={
-              <Switch
-                value={settings.dataCollectionMode}
-                onValueChange={settings.setDataCollectionMode}
-                accessibilityLabel="Data collection mode"
-                trackColor={{ true: t.primary, false: t.border }}
-              />
-            }
-          />
+          {/* Team-only (admin-tools.ts): hidden in the public web app. */}
+          {ADMIN_TOOLS ? (
+            <ListRow
+              icon="clipboard-list-outline"
+              title="Data collection mode"
+              subtitle="Team walks: bigger buttons, auto-numbered titles, “Save & record another”, no 50 m trim"
+              right={
+                <Switch
+                  value={settings.dataCollectionMode}
+                  onValueChange={settings.setDataCollectionMode}
+                  accessibilityLabel="Data collection mode"
+                  trackColor={{ true: t.primary, false: t.border }}
+                />
+              }
+            />
+          ) : null}
         </Section>
 
-        <Section title="Diagnostics">
-          <View style={styles.inset}>
-            <DiagnosticsCard />
-          </View>
-        </Section>
+        {ADMIN_TOOLS ? (
+          <Section title="Diagnostics">
+            <View style={styles.inset}>
+              <DiagnosticsCard />
+            </View>
+          </Section>
+        ) : null}
 
         <Section title="About">
           <ListRow
@@ -345,49 +351,28 @@ export function ProfileScreen() {
             right={<Value text={String(TAGS.length)} />}
           />
           <ListRow
-            icon="map-outline"
-            title="Landmark data"
-            subtitle="© OpenStreetMap contributors (ODbL)"
+            icon="message-text-outline"
+            title="Send feedback"
+            subtitle="A wrong route, a bug or an idea"
+            onPress={() => router.push('/feedback')}
           />
           <ListRow
-            icon="weather-partly-cloudy"
-            title="Weather data"
-            subtitle="© Hong Kong Observatory, HKSAR Government · via DATA.GOV.HK"
+            icon="shield-account-outline"
+            title="Privacy policy"
+            subtitle="Draft · what we collect and how to delete it"
+            onPress={() => router.push('/privacy')}
           />
           <ListRow
-            icon="walk"
-            title="Walking network"
-            subtitle="3D Pedestrian Network © Lands Department, HKSAR Government · via CSDI / DATA.GOV.HK"
+            icon="file-document-outline"
+            title="Terms of use"
+            subtitle="Draft"
+            onPress={() => router.push('/terms')}
           />
           <ListRow
-            icon="weather-sunny-off"
-            title="Shade estimates"
-            subtitle="Building heights © Lands Department, HKSAR Government · trees © OpenStreetMap contributors (ODbL)"
-          />
-          <ListRow
-            icon="car"
-            title="Driving routes"
-            subtitle="Google Maps Platform (live traffic, when enabled) · openrouteservice.org, © OpenStreetMap contributors"
-          />
-          <ListRow
-            icon="train"
-            title="Public transport"
-            subtitle="MTR lines, stations and fares © MTR Corporation · via DATA.GOV.HK · station positions © OpenStreetMap contributors (ODbL) · Google Maps Platform (when enabled)"
-          />
-          <ListRow
-            icon="taxi"
-            title="Taxi fares"
-            subtitle="Urban taxi meter tariff (from 14 July 2024) · Transport Department, HKSAR Government"
-          />
-          <ListRow
-            icon="alert-outline"
-            title="Traffic and incidents"
-            subtitle="Road traffic layer by Google Maps / Apple Maps · incidents from Transport Department special traffic news · via DATA.GOV.HK"
-          />
-          <ListRow
-            icon="clock-fast"
-            title="Live arrivals"
-            subtitle="MTR Next Train, KMB/LWB, Citybus and green minibus (Transport Department) real-time data · via DATA.GOV.HK"
+            icon="database-outline"
+            title="Data sources & credits"
+            subtitle="OpenStreetMap, Hong Kong Government open data and more"
+            onPress={() => router.push('/attribution')}
           />
         </Section>
       </ScrollView>

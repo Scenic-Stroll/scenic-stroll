@@ -1,8 +1,9 @@
 import type { Badge } from '@scenic/shared';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon, type IconName } from '@/components/ui/icon';
 import { radius, space, type, useAppTheme } from '@/theme';
+import { showAlert } from '@/lib/alert';
 
 /** A badge: green when earned, grey when locked. Tap to see how to earn it. */
 export function BadgeTile({ badge }: { badge: Badge }) {
@@ -13,7 +14,7 @@ export function BadgeTile({ badge }: { badge: Badge }) {
       accessibilityLabel={`${badge.name} badge, ${badge.earned ? 'earned' : 'locked'}`}
       accessibilityHint="Shows how to earn this badge"
       onPress={() =>
-        Alert.alert(
+        showAlert(
           `${badge.name} · ${badge.zh}`,
           badge.earned ? `Earned! ${badge.howToEarn}` : `Locked. ${badge.howToEarn}`,
         )

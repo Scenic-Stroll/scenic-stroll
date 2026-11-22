@@ -6,6 +6,8 @@ import { pointAlong, WALK_SPEED_MPS, type LatLng } from '@scenic/shared';
 import * as Location from 'expo-location';
 import { useCallback, useEffect, useRef } from 'react';
 
+import { watchPosition } from '@/lib/watch-position';
+
 export type Fix = { point: LatLng; accuracyM: number | null; atMs: number };
 
 /** The demo walker goes 4× walking speed, so a 6-minute walk takes 1.5 minutes on stage. */
@@ -38,7 +40,7 @@ export function usePositionFeed({
     void (async () => {
       const { granted } = await Location.requestForegroundPermissionsAsync();
       if (!granted || cancelled) return;
-      sub = await Location.watchPositionAsync(
+      sub = await watchPosition(
         { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1000, distanceInterval: 2 },
         (pos) =>
           onFixRef.current({

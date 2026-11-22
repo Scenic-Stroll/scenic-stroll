@@ -14,7 +14,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import MapView from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -36,6 +36,7 @@ import {
 } from '@/lib/recorder';
 import { useSettings } from '@/lib/settings-store';
 import { useAppTheme, type Palette } from '@/theme';
+import { showAlert } from '@/lib/alert';
 
 export function RecordHome() {
   const status = useRecorder((s) => s.status);
@@ -161,7 +162,7 @@ function RecordingView() {
   };
 
   const stop = () => {
-    Alert.alert('Stop recording?', 'You can review and describe the route next.', [
+    showAlert('Stop recording?', 'You can review and describe the route next.', [
       { text: 'Keep walking', style: 'cancel' },
       {
         text: 'Stop',
@@ -174,7 +175,7 @@ function RecordingView() {
   };
 
   const discard = () => {
-    Alert.alert('Discard this recording?', 'The route will be deleted from your phone.', [
+    showAlert('Discard this recording?', 'The route will be deleted from your phone.', [
       { text: 'Keep it', style: 'cancel' },
       { text: 'Discard', style: 'destructive', onPress: () => void cancelRecording() },
     ]);
@@ -208,7 +209,7 @@ function RecordingView() {
           onCheckpointPress={(id) => {
             const cp = checkpoints.find((c) => c.id === id);
             if (!cp) return;
-            Alert.alert(describeCheckpoint(cp), 'Remove this checkpoint?', [
+            showAlert(describeCheckpoint(cp), 'Remove this checkpoint?', [
               { text: 'Keep', style: 'cancel' },
               { text: 'Remove', style: 'destructive', onPress: () => void removeCheckpoint(id) },
             ]);

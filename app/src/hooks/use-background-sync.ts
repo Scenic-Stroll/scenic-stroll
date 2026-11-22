@@ -1,6 +1,6 @@
 import NetInfo from '@react-native-community/netinfo';
 import { useEffect } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 import { recoverInterruptedRecordings } from '@/lib/local-db';
 import { useRecorder } from '@/lib/recorder';
@@ -37,11 +37,16 @@ export function useBackgroundSync() {
     const net = NetInfo.addEventListener((state) => {
       if (state.isConnected) void processUploadQueue();
     });
+    // Browsers: NetInfo didn't report the connection coming back, so recordings saved offline
+    // waited until the tab was reopened. The browser's own "online" event does (D48).
+    const onOnline = () => void processUploadQueue();
+    if (Platform.OS === 'web') window.addEventListener('online', onOnline);
     // Friends' live locations: one Realtime subscription for the whole app.
     const unsubscribeLocations = subscribeToFriendLocations();
     return () => {
       appState.remove();
       net();
+      if (Platform.OS === 'web') window.removeEventListener('online', onOnline);
       unsubscribeLocations();
     };
   }, [signedIn]);

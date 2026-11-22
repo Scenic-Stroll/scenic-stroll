@@ -48,7 +48,16 @@ export async function budgetedCall<T>(
     .select('id', { count: 'exact', head: true })
     .eq('api', opts.api)
     .gte('created_at', hkMidnight(now));
-  if ((count ?? 0) >= opts.dailyCap) throw new BudgetError(`${opts.api}: daily cap reached`);
+  const used = count ?? 0;
+  if (used >= opts.dailyCap) {
+    console.error(`COST ALARM ${opts.api}: daily cap of ${opts.dailyCap} reached — free fallback`);
+    throw new BudgetError(`${opts.api}: daily cap reached`);
+  }
+  // Early warning in the function logs (Supabase dashboard → Edge Functions → Logs, search
+  // "COST ALARM") so the team notices before the cap is hit.
+  if (used >= opts.dailyCap * 0.8) {
+    console.warn(`COST ALARM ${opts.api}: ${used} of ${opts.dailyCap} paid calls used today`);
+  }
 
   try {
     const value = await call();

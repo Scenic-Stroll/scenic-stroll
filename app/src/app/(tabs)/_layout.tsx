@@ -93,7 +93,9 @@ function RecordTabButton({ onPress }: { onPress?: (e: never) => void }) {
   return (
     <View style={styles.slot}>
       <Pressable
-        accessibilityRole="button"
+        // "tab": it sits in the tab bar and opens the Record tab (a "button" inside a tab list
+        // breaks screen readers' tab navigation — Lighthouse accessibility, D48).
+        accessibilityRole="tab"
         accessibilityLabel={recording ? 'Recording in progress — open recorder' : 'Record a route'}
         onPress={(e) => onPress?.(e as never)}
         style={({ pressed }) => [

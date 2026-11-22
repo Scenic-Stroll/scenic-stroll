@@ -1,0 +1,90 @@
+<!doctype html>
+<!--
+  Shown by the service worker (sw.js) when there's no internet AND the app itself was never
+  saved on this device yet (for example, the very first visit). Plain HTML: it must work alone.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>You're offline · Scenic Stroll</title>
+    <meta name="theme-color" content="#1BA136" />
+    <link rel="icon" type="image/png" href="/icons/icon-192.png" />
+    <style>
+      :root {
+        --bg: #ffffff;
+        --text: #1a1a1a;
+        --muted: #5a5a5a;
+        --button: #14822a;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0b2a18;
+          --text: #f2f2f2;
+          --muted: #c4d4c8;
+          --button: #34c152;
+        }
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 16px;
+        box-sizing: border-box;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          Roboto,
+          sans-serif;
+        text-align: center;
+      }
+      main {
+        max-width: 360px;
+      }
+      img {
+        width: 72px;
+        height: 72px;
+        border-radius: 16px;
+      }
+      p {
+        color: var(--muted);
+        line-height: 1.5;
+      }
+      button {
+        font: inherit;
+        font-weight: 600;
+        padding: 12px 24px;
+        border: 0;
+        border-radius: 999px;
+        background: var(--button);
+        color: #ffffff;
+        cursor: pointer;
+      }
+      @media (prefers-color-scheme: dark) {
+        button {
+          color: #0b1f10;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="/icons/icon-192.png" alt="" />
+      <h1>You're offline</h1>
+      <p>
+        Scenic Stroll needs the internet to load maps, weather and routes. Connect to Wi-Fi or
+        mobile data and try again.
+      </p>
+      <button type="button" onclick="location.reload()">Try again</button>
+    </main>
+    <script>
+      // Reload by itself as soon as the connection comes back.
+      window.addEventListener('online', () => location.reload());
+    </script>
+  </body>
+</html>

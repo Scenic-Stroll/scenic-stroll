@@ -5,7 +5,6 @@
  *   bottom — sheet with 3 snap points: "Nearby" community routes, or route planning
  * Light base map by default (2D); 3D is a layer toggle.
  */
-import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import {
   DEMO_CENTER,
   DEMO_STOPS,
@@ -52,6 +51,8 @@ import { CHECKPOINT_INFO, describeCheckpoint } from '@/constants/checkpoints';
 import { ShareLocationSheet } from '@/screens/friends/share-location-sheet';
 import { useMyProfile } from '@/lib/profile';
 import { radius, shadow, space, TAP_TARGET, type, useAppTheme, useColorSchemeName } from '@/theme';
+import { showAlert } from '@/lib/alert';
+import { locationDeniedMessage } from '@/lib/location-denied';
 
 import { FloorSelector } from './floor-selector';
 import { FollowEngine } from './follow/follow-engine';
@@ -67,6 +68,7 @@ import { ShadeLayer, ShadeLegend } from './shade-layer';
 import { OPERATOR_LABEL } from './stop-arrivals';
 import { IncidentsBanner } from './incidents';
 import { profileForMode, type RouteMode } from './route-mode-tabs';
+import { MapPanel, routeFitPadding, useWideLayout, type MapPanelHandle } from './map-panel';
 import { SmartRouteLine } from './smart-route-line';
 import type { TravelMode } from './travel-mode-tabs';
 import { TripLine } from './trip-line';
@@ -101,7 +103,8 @@ export function MapHome() {
   const t = useAppTheme();
   const scheme = useColorSchemeName();
   const mapRef = useRef<MapView>(null);
-  const sheetRef = useRef<BottomSheet>(null);
+  const sheetRef = useRef<MapPanelHandle>(null);
+  const wide = useWideLayout();
   const profile = useMyProfile();
   const friendLocations = useFriendLocations();
   const sharingOn = useSharing((s) => s.status === 'on');
@@ -188,13 +191,16 @@ export function MapHome() {
     retry: 1,
   });
 
-  const fit = useCallback((points: LatLng[]) => {
-    if (points.length < 2) return;
-    mapRef.current?.fitToCoordinates(points.map(toMap), {
-      edgePadding: { top: 200, right: 80, bottom: 380, left: 60 },
-      animated: true,
-    });
-  }, []);
+  const fit = useCallback(
+    (points: LatLng[]) => {
+      if (points.length < 2) return;
+      mapRef.current?.fitToCoordinates(points.map(toMap), {
+        edgePadding: routeFitPadding(wide),
+        animated: true,
+      });
+    },
+    [wide],
+  );
 
   // Our computed routes (fall back silently to the standard route if unavailable).
   const smart = useSmartRoutes({
@@ -280,7 +286,10 @@ export function MapHome() {
     try {
       const { granted } = await Location.requestForegroundPermissionsAsync();
       setHasLocationPermission(granted);
-      if (!granted) return;
+      if (!granted) {
+        showAlert('Can’t show your location', locationDeniedMessage());
+        return;
+      }
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       const here = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       setUserLocation(here);
@@ -737,13 +746,10 @@ export function MapHome() {
         </View>
       </SafeAreaView>
 
-      <BottomSheet
+      <MapPanel
         ref={sheetRef}
-        index={SHEET_PEEK}
+        initialIndex={SHEET_PEEK}
         snapPoints={SNAP_POINTS}
-        enableDynamicSizing={false}
-        backgroundStyle={{ backgroundColor: t.background, borderRadius: radius.sheet }}
-        handleIndicatorStyle={{ backgroundColor: t.border, width: 40 }}
         accessibilityLabel={
           following
             ? 'Walking directions'
@@ -754,89 +760,87 @@ export function MapHome() {
                 : 'Nearby routes'
         }
       >
-        <BottomSheetScrollView keyboardShouldPersistTaps="handled">
-          {following ? (
-            <FollowPanel onRecentre={() => useFollow.getState().patch({ followCamera: true })} />
-          ) : planning ? (
-            <PlanningSheet
-              origin={origin}
-              destination={destination}
-              onPickOrigin={() => {
-                setPickerFromSearchBar(false);
-                setPicking('origin');
-              }}
-              onPickDestination={() => {
-                setPickerFromSearchBar(false);
-                setPicking('destination');
-              }}
-              onSwap={() => {
-                setOrigin(destination);
-                setDestination(origin);
-                setSelectedOptionId(null);
-              }}
-              onClose={closePlanning}
-              mode={mode}
-              onModeChange={setMode}
-              departure={departure}
-              onDepartureChange={setDeparture}
-              now={now}
-              onConditionOverride={(m) => {
-                setConditionOverride(m);
-                setMode('best_now'); // show what the new priority suggests
-              }}
-              standardRoute={standardRoute.data}
-              isLoading={standardRoute.isFetching}
-              error={standardRoute.error}
-              onRetry={() => void standardRoute.refetch()}
-              selectedOptionId={shownOptionId}
-              onSelectOption={selectOption}
-              smart={smart.data}
-              smartLoading={smart.isFetching}
-              onStart={startFollowing}
-              travel={{
-                mode: travelMode,
-                onModeChange: (m) => {
-                  setTravelMode(m);
-                  setSelectedTripId(null);
-                },
-                plan: trips.data,
-                updatedAt: trips.dataUpdatedAt,
-                loading: trips.isFetching,
-                selectedId: shownTripId,
-                onSelect: (id) => {
-                  setSelectedTripId(id);
-                  const trip = trips.data?.options.find((o) => o.id === id);
-                  if (trip) fit(trip.legs.flatMap((l) => l.geometry));
-                },
-              }}
-            />
-          ) : selectedPlace ? (
-            <PlaceSheet
-              place={selectedPlace}
-              communityRoutes={community.data ?? []}
-              onRouteHere={() => routeTo(selectedPlace)}
-              onRouteFrom={() => routeFrom(selectedPlace)}
-              onClose={() => {
-                setSelectedPlace(null);
-                sheetRef.current?.snapToIndex(SHEET_PEEK);
-              }}
-              onSelectRoute={selectCommunityRoute}
-            />
-          ) : (
-            <NearbySheet
-              routes={community.data}
-              isLoading={community.isPending}
-              error={community.error}
-              onRetry={() => void community.refetch()}
-              center={userLocation ?? DEMO_CENTER}
-              filters={filters}
-              selectedId={selectedRouteId}
-              onSelectRoute={selectCommunityRoute}
-              onRecord={() => router.navigate('/record')}
-            />
-          )}
-        </BottomSheetScrollView>
-      </BottomSheet>
+        {following ? (
+          <FollowPanel onRecentre={() => useFollow.getState().patch({ followCamera: true })} />
+        ) : planning ? (
+          <PlanningSheet
+            origin={origin}
+            destination={destination}
+            onPickOrigin={() => {
+              setPickerFromSearchBar(false);
+              setPicking('origin');
+            }}
+            onPickDestination={() => {
+              setPickerFromSearchBar(false);
+              setPicking('destination');
+            }}
+            onSwap={() => {
+              setOrigin(destination);
+              setDestination(origin);
+              setSelectedOptionId(null);
+            }}
+            onClose={closePlanning}
+            mode={mode}
+            onModeChange={setMode}
+            departure={departure}
+            onDepartureChange={setDeparture}
+            now={now}
+            onConditionOverride={(m) => {
+              setConditionOverride(m);
+              setMode('best_now'); // show what the new priority suggests
+            }}
+            standardRoute={standardRoute.data}
+            isLoading={standardRoute.isFetching}
+            error={standardRoute.error}
+            onRetry={() => void standardRoute.refetch()}
+            selectedOptionId={shownOptionId}
+            onSelectOption={selectOption}
+            smart={smart.data}
+            smartLoading={smart.isFetching}
+            onStart={startFollowing}
+            travel={{
+              mode: travelMode,
+              onModeChange: (m) => {
+                setTravelMode(m);
+                setSelectedTripId(null);
+              },
+              plan: trips.data,
+              updatedAt: trips.dataUpdatedAt,
+              loading: trips.isFetching,
+              selectedId: shownTripId,
+              onSelect: (id) => {
+                setSelectedTripId(id);
+                const trip = trips.data?.options.find((o) => o.id === id);
+                if (trip) fit(trip.legs.flatMap((l) => l.geometry));
+              },
+            }}
+          />
+        ) : selectedPlace ? (
+          <PlaceSheet
+            place={selectedPlace}
+            communityRoutes={community.data ?? []}
+            onRouteHere={() => routeTo(selectedPlace)}
+            onRouteFrom={() => routeFrom(selectedPlace)}
+            onClose={() => {
+              setSelectedPlace(null);
+              sheetRef.current?.snapToIndex(SHEET_PEEK);
+            }}
+            onSelectRoute={selectCommunityRoute}
+          />
+        ) : (
+          <NearbySheet
+            routes={community.data}
+            isLoading={community.isPending}
+            error={community.error}
+            onRetry={() => void community.refetch()}
+            center={userLocation ?? DEMO_CENTER}
+            filters={filters}
+            selectedId={selectedRouteId}
+            onSelectRoute={selectCommunityRoute}
+            onRecord={() => router.navigate('/record')}
+          />
+        )}
+      </MapPanel>
 
       {followSession ? <FollowEngine key={followSession.id} conditionMode={now.mode} /> : null}
 

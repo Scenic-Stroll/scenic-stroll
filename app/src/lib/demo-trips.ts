@@ -11,6 +11,7 @@ import {
   type PlanTripResponse,
 } from '@scenic/shared';
 
+import { ADMIN_TOOLS } from '@/lib/admin-tools';
 import snapshot from '@/demo/trip-snapshot.json';
 
 /** A plan, plus when it was saved if it isn't live ("18:05 on 2026-10-18"). */
@@ -44,6 +45,8 @@ function startingNow(plan: PlanTripResponse, now: number): PlanTripResponse {
 }
 
 export function savedDemoTrip(origin: LatLng, destination: LatLng): TripPlan | null {
+  // Only for the team's demos: on the public app a saved answer could pass for live data.
+  if (!ADMIN_TOOLS) return null;
   const entry = (snapshot.entries as Entry[]).find(
     (e) =>
       haversineMeters(e.from, origin) <= SAME_PLACE_M &&

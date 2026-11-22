@@ -5,8 +5,8 @@
 // Anything but status "ok" (or an error) means: the app shows the standard route instead.
 //
 // auth: 'user' → only signed-in app users (anonymous accounts count), like our other functions.
-import { withSupabase } from '@supabase/server';
 
+import { guarded, LIMITS } from '../_shared/guard.ts';
 import { loadConditions } from '../_shared/conditions-service.ts';
 import { loadTripGraph } from '../_shared/graph-loader.ts';
 import { errorResponse, json, readBody } from '../_shared/http.ts';
@@ -18,7 +18,7 @@ import {
 } from '../_shared/scenic/smart-route-api.ts';
 
 export default {
-  fetch: withSupabase({ auth: 'user' }, async (req, ctx) => {
+  fetch: guarded('smart-route', LIMITS.smartRoute, async (req, ctx) => {
     // GET = health check for Settings → "Test backend". No API keys needed.
     if (req.method === 'GET') {
       return json({

@@ -7,6 +7,7 @@
 import type { ConditionMode, LatLng, RoutingProfile, SmartRouteResponse } from '@scenic/shared';
 import { useQuery } from '@tanstack/react-query';
 
+import { track } from '@/lib/analytics';
 import { smartRoute } from '@/lib/api';
 import { savedDemoRoutes, type SavedRoutes } from '@/lib/demo-snapshot';
 import { isSupabaseConfigured } from '@/lib/supabase';
@@ -31,13 +32,15 @@ export function useSmartRoutes(args: {
     queryFn: async (): Promise<SmartRouteResponse | SavedRoutes | null> => {
       try {
         // Sending the card's condition keeps the routes consistent with what the card says.
-        return await smartRoute({
+        const routes = await smartRoute({
           origin: origin!,
           destination: destination!,
           profile,
           condition,
           departure_time: departureTime,
         });
+        track('route-planned'); // web visit counts only (analytics.web.ts)
+        return routes;
       } catch (err) {
         const saved = savedDemoRoutes({
           origin: origin!,

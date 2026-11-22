@@ -11,6 +11,7 @@ import { useQuery } from '@tanstack/react-query';
 import * as Location from 'expo-location';
 import { create } from 'zustand';
 
+import { watchPosition } from '@/lib/watch-position';
 import { queryClient } from '@/lib/query-client';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import type { Place } from '@/screens/map/types';
@@ -128,7 +129,7 @@ export async function startSharing(settings: ShareSettings): Promise<string | nu
   useSharing.setState({ status: 'on', expiresAt, lastSentAt: Date.now(), error: null });
   if (expiresAt) expiryTimer = setTimeout(() => void stopSharing(), expiresAt - Date.now());
 
-  watch = await Location.watchPositionAsync(
+  watch = await watchPosition(
     { accuracy: Location.Accuracy.Balanced, timeInterval: UPDATE_EVERY_MS, distanceInterval: 0 },
     async (loc) => {
       if (useSharing.getState().status !== 'on') return;
