@@ -5,7 +5,7 @@ and read them later. Background: `docs/PINS_AUDIT.md`; decisions D51–D57 in `D
 
 ## One-time setup (team lead)
 
-1. **Apply the migrations** in `supabase/migrations/` from `20261123100000_knowledge_pins.sql` onwards (dashboard
+1. **Apply the migrations** in `supabase/migrations/` from `20261122201056_knowledge_pins.sql` onwards (already applied to the live project on 22 Nov 2026) (dashboard
    → SQL editor, or the Supabase MCP `apply_migration`), then deploy the functions:
    ```bash
    npm run sync-shared
