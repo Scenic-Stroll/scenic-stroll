@@ -1169,8 +1169,9 @@ migration `*_points.sql`, `app/src/lib/points.ts`, `app/src/screens/profile/poin
 
 ## D56 — Tabs and recording on the web (2026-11-24)
 
-- **Tabs:** Map · Explore · My collection (centre) · Friends · Profile. Routes is no longer a tab but still exists
-  (Profile → My routes); Record is reached with a "Record a route" button on the map (hidden in safety mode), which
+- **Tabs:** Map · Explore · My collection (centre) · Friends · Profile. Routes and Record are no longer tabs but
+  ordinary pages (`/routes`, `/record`) — a tab hidden with `href: null` can't be opened at all on the web (found by
+  the browser tests). Routes: Profile → My routes; Record is reached with a "Record a route" button on the map (hidden in safety mode), which
   turns red while a recording runs. Explore is a placeholder for topic boards.
 - **Recording on the web:** a "Keep this page open while recording" note; when the page was hidden (`visibilitychange`)
   or no good fix came for 20 s (`GPS_RULES.gapSeconds`, the existing gap rule), a "Recording paused — tap to resume"

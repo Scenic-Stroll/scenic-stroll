@@ -152,6 +152,7 @@ test('walk past a pin → saved → read it in My collection → points go up', 
   await expect(page.getByText('THE PIN TEXT')).toHaveCount(0);
 
   // Read it later, in My collection.
+  await page.goBack(); // the recorder is its own page; back to the map and its tab bar
   await page.getByRole('tab', { name: /My collection/ }).click();
   await page.getByRole('button', { name: new RegExp(`^${PIN.title}, unread`) }).click();
   await expect(page.getByText('THE PIN TEXT')).toBeVisible();
@@ -162,7 +163,8 @@ test('walk past a pin → saved → read it in My collection → points go up', 
   await page.getByRole('button', { name: /Done reading/ }).click();
   await expect(page.getByText(/Marked as read\. \+20 points/)).toBeVisible();
 
-  // The balance went up.
-  await page.goto('/profile');
+  // The balance went up (switch tabs, don't reload: the fake points server lives in the page).
+  await page.goBack();
+  await page.getByRole('tab', { name: /Profile/ }).click();
   await expect(page.getByText('20 points')).toBeVisible();
 });

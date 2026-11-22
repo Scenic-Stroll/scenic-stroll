@@ -50,9 +50,6 @@ export default function TabsLayout() {
           tabBarButton: (props) => <CollectionTabButton onPress={props.onPress} />,
         }}
       />
-      {/* Not tabs any more (D56): Record from the map's button, Routes from Profile → My routes. */}
-      <Tabs.Screen name="record" options={{ title: 'Record', href: null }} />
-      <Tabs.Screen name="routes" options={{ title: 'Routes', href: null }} />
       <Tabs.Screen
         name="friends"
         options={{

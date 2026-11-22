@@ -56,6 +56,16 @@ export default function RootLayout() {
                 name="saved-places"
                 options={{ headerShown: true, title: 'Saved places', headerBackTitle: 'Profile' }}
               />
+              {/* Not tabs (D56): Record opens from the map's button, Routes from Profile → My
+                  routes. Ordinary pages, because a hidden tab can't be opened on the web. */}
+              <Stack.Screen
+                name="record"
+                options={{ headerShown: true, title: 'Record a route', headerBackTitle: 'Map' }}
+              />
+              <Stack.Screen
+                name="routes"
+                options={{ headerShown: true, title: 'Routes', headerBackTitle: 'Back' }}
+              />
               <Stack.Screen
                 name="pin/[id]"
                 options={{ headerShown: true, title: 'Pin', headerBackTitle: 'Back' }}

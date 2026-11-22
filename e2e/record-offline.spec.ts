@@ -89,7 +89,8 @@ test('a recording made offline is kept and uploads when back online', async ({ p
   await page.getByRole('textbox', { name: 'Title' }).fill('E2E test walk');
   await page.getByRole('button', { name: /Save & upload/ }).click();
   // Saved in the browser, waiting for the internet.
-  await page.getByRole('tab', { name: /Routes/ }).click();
+  // The Record page offers a link to My routes while something waits to upload (D56).
+  await page.getByRole('button', { name: /waiting to upload — see My routes/ }).click();
   await expect(
     page.getByRole('button', { name: 'E2E test walk, Waiting to upload' }),
   ).toBeVisible();
