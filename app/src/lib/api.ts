@@ -23,6 +23,11 @@ import {
   type SmartRouteRequest,
   type SmartRouteResponse,
   type StopEtaResponse,
+  GenerateVersionsResponseSchema,
+  LookupSourceResponseSchema,
+  SnapResponseSchema,
+  type PinSource,
+  type SnapResponse,
 } from '@scenic/shared';
 import {
   FunctionsFetchError,
@@ -128,6 +133,7 @@ async function callFunction<T extends z.ZodType>(
   name: FunctionName,
   options: { method: 'GET' } | { method: 'POST'; body: Record<string, unknown> },
   schema: T,
+  timeoutMs = FUNCTION_TIMEOUT_MS,
 ): Promise<z.infer<T>> {
   if (!isSupabaseConfigured) {
     throw new FunctionCallError(
@@ -140,7 +146,7 @@ async function callFunction<T extends z.ZodType>(
   // (saved demo trips, walking-only) instead of spinning. Cold starts take up to ~8 s.
   const { data, error } = await supabase.functions.invoke(name, {
     ...options,
-    timeout: FUNCTION_TIMEOUT_MS,
+    timeout: timeoutMs,
   });
   if (error) throw await toFunctionError(name, error);
 
@@ -208,4 +214,35 @@ export function fetchConditions(): Promise<Conditions> {
 /** Profile → Diagnostics → "Test backend": asks one function for its health report. */
 export function pingFunction(name: FunctionName): Promise<FunctionHealth> {
   return callFunction(name, { method: 'GET' }, FunctionHealthSchema);
+}
+
+// ---- Knowledge pins: the expert form and review (/admin, D53) ----------------------------------
+
+/** The pedestrian node and OSM place within 25 m of a tapped point. */
+export function snapPin(point: LatLng): Promise<SnapResponse> {
+  return callFunction(
+    FUNCTIONS.pinTools,
+    { method: 'POST', body: { action: 'snap', point } },
+    SnapResponseSchema,
+  );
+}
+
+/** A source from a DOI or a title (OpenAlex, then Crossref); null if neither knows it. */
+export async function lookupPinSource(query: string): Promise<PinSource | null> {
+  const res = await callFunction(
+    FUNCTIONS.pinTools,
+    { method: 'POST', body: { action: 'lookup_source', query } },
+    LookupSourceResponseSchema,
+  );
+  return res.source;
+}
+
+/** AI child / teen / adult versions with questions, saved as "in review". Can take ~1 minute. */
+export function generatePinVersions(pinId: string) {
+  return callFunction(
+    FUNCTIONS.generatePinVersions,
+    { method: 'POST', body: { pin_id: pinId } },
+    GenerateVersionsResponseSchema,
+    90_000,
+  );
 }

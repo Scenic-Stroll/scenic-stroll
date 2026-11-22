@@ -41,3 +41,4 @@ export * from './rush-hour.ts';
 export * from './privacy.ts';
 export * from './pins.ts';
 export * from './safety.ts';
+export * from './pin-api.ts';

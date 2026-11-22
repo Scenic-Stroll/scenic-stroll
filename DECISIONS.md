@@ -1097,3 +1097,28 @@ Migration `*_knowledge_pins.sql`, `shared/src/pins.ts`, audit in `docs/PINS_AUDI
 - Reading style (child / teen / adult) is a separate Profile setting for everyone; it never affects safety mode.
 - A minor can still create a new anonymous account and answer "18 or over" — the age band is self-declared. Stronger
   age checks are out of scope for the MVP.
+
+## D53 — Pin authoring and review (2026-11-23)
+
+`/admin` (`app/src/app/admin/`, `app/src/screens/admin/`), Edge Functions `pin-tools` and `generate-pin-versions`,
+migration `*_pin_authoring.sql`, seed `supabase/seed/sample_pin.sql`.
+
+- **Sign-in:** experts and reviewers sign in with an **email code** (`signInWithOtp` + `verifyOtp`) on `/admin`;
+  everyone else stays anonymous. The Supabase "Magic link" email template must contain `{{ .Token }}` (docs/PINS.md).
+  A new account shows its id; an admin adds it as an expert on the same page (after checking them by hand).
+- **Expert form:** tap the map → `pin-tools` snaps to the nearest pedestrian node (`nearest_ped_node`, active graph,
+  25 m) and the nearest OSM place (openrouteservice reverse geocoder, 25 m; no OSM copy kept), or "custom place" with
+  a required description. Sources: DOI or title → **OpenAlex, then Crossref** (Google Scholar has no API and its terms
+  forbid automated use); or a web page by hand. The expert's own `summary` is stored on the pin.
+- **AI versions:** `generate-pin-versions` uses **Gemini** (the provider in docs/SETUP.md; key `GEMINI_API_KEY`, model
+  `GEMINI_MODEL`, default `gemini-2.5-flash`), key in a header. The prompt allows only facts from the summary (and the
+  "beyond Hong Kong" line), child version ≤ ~80 words; the answer must pass `GeneratedVersionsSchema` (one version per
+  level, 1–2 questions each, answer among the options, child ≤ 100 words), one retry. It runs with the **caller's**
+  rights, so the database decides who may write; everything is saved `in_review`. Until the key is set it answers
+  503 with a clear message.
+- **Review page:** summary, sources, "beyond Hong Kong" and each version with its questions side by side; edit,
+  approve, reject (version → draft; question → deleted); "Publish" only when the adult version and its questions are
+  approved (the database checks again). The label comes from `publish_pin` (D51).
+- **Sample pin** "Why Kent Road is in Kowloon": a SQL file run by hand once an expert exists — `in_review`,
+  `is_sample`, two checked sources (SCMP, 5 Nov 2018; Gwulo "Kowloon Tong Garden Estate [c.1922- ]"), **no summary or
+  facts written by us**, an approximate point to be corrected on site. Never set live automatically.

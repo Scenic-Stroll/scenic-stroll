@@ -57,6 +57,8 @@ export type MapViewProps = {
   onRegionChangeComplete?: (region: Region) => void;
   onPanDrag?: () => void;
   onLongPress?: (e: { nativeEvent: { coordinate: MapLatLng } }) => void;
+  /** A tap/click on the map itself (not on a line). Used by the admin pin form. */
+  onPress?: (e: { nativeEvent: { coordinate: MapLatLng } }) => void;
   onMapReady?: () => void;
   children?: ReactNode;
   // Phone-only react-native-maps props our screens pass; accepted and ignored on web.
@@ -142,7 +144,13 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     });
     m.on('moveend', () => handlers.current.onRegionChangeComplete?.(regionOf(m)));
     m.on('dragstart', () => handlers.current.onPanDrag?.());
-    m.on('click', (e) => tappedLine(m, lines.current, e.point)?.onPress?.());
+    m.on('click', (e) => {
+      const line = tappedLine(m, lines.current, e.point);
+      if (line?.onPress) return line.onPress();
+      handlers.current.onPress?.({
+        nativeEvent: { coordinate: { latitude: e.lngLat.lat, longitude: e.lngLat.lng } },
+      });
+    });
     m.on('mousemove', (e) => {
       m.getCanvas().style.cursor = tappedLine(m, lines.current, e.point) ? 'pointer' : '';
     });

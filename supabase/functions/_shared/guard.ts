@@ -21,6 +21,8 @@ export const LIMITS = {
   planRoute: { perUser: 30, perIp: 300 },
   planTrip: { perUser: 20, perIp: 200 }, // calls paid APIs
   smartRoute: { perUser: 30, perIp: 300 },
+  pinTools: { perUser: 30, perIp: 120 },
+  generatePinVersions: { perUser: 5, perIp: 30 }, // calls a paid LLM
 } satisfies Record<string, Limits>;
 
 const WINDOW_S = 60;

@@ -1762,3 +1762,66 @@ describe('safety mode for under-18s (pins phase 2, D52)', () => {
     assert.ok(rows[0].n >= 2);
   });
 });
+
+describe('pin authoring helpers (pins phase 3, D53)', () => {
+  const ADMIN = 'c0000000-0000-4000-8000-000000000001'; // from the phase 1 tests
+  const EXPERT = 'c0000000-0000-4000-8000-000000000002';
+  const READER = 'c0000000-0000-4000-8000-000000000003';
+
+  it('my_pin_role says admin, expert or nothing', async () => {
+    const role = async (who) => (await as(who, 'select public.my_pin_role() as r')).rows[0].r;
+    assert.equal(await role(ADMIN), 'admin');
+    assert.equal(await role(EXPERT), 'expert');
+    assert.equal(await role(READER), null);
+  });
+
+  it('nearest_ped_node finds a node of the active graph within 25 m, and nothing farther away', async () => {
+    const { rows } = await db.query(
+      `select n.id, extensions.st_y(n.geom) as lat, extensions.st_x(n.geom) as lng
+       from public.ped_nodes n join public.graph_builds b on b.id = n.build_id
+       where b.status = 'active' limit 1`,
+    );
+    const node = rows[0];
+    // ~10 m north of the node → snaps to it.
+    const near = await as(
+      READER,
+      'select node_id, distance_m from public.nearest_ped_node($1, $2)',
+      [node.lat + 0.00009, node.lng],
+    );
+    assert.equal(near.rows.length, 1);
+    assert.ok(near.rows[0].distance_m < 25);
+    // Far from any node (Tsim Sha Tsui) → nothing.
+    const far = await as(READER, 'select node_id from public.nearest_ped_node(22.2976, 114.1722)');
+    assert.equal(far.rows.length, 0);
+  });
+
+  it('experts can write the summary of their own pin', async () => {
+    const { rows } = await as(
+      EXPERT,
+      `insert into public.pins (title, summary, location, place_kind, place_description, author_expert_id)
+       values ('Summary test', 'A short summary written by the expert from the sources.',
+               extensions.st_setsrid(extensions.st_makepoint(114.1745, 22.3372), 4326),
+               'custom', 'A test place by the road', $1)
+       returning summary`,
+      [EXPERT],
+    );
+    assert.match(rows[0].summary, /short summary/);
+  });
+});
+
+describe('sample pin seed (supabase/seed/sample_pin.sql)', () => {
+  const EXPERT = 'c0000000-0000-4000-8000-000000000002'; // from the phase 1 tests
+
+  it('creates the sample pin in review, marked as sample, with its two sources', async () => {
+    const sql = fs
+      .readFileSync(path.join(here, '..', 'seed', 'sample_pin.sql'), 'utf8')
+      .replace('00000000-0000-0000-0000-000000000000', EXPERT);
+    await db.exec(sql);
+    const { rows } = await db.query(
+      `select p.status, p.is_sample, count(s.id)::int as sources
+       from public.pins p join public.pin_sources s on s.pin_id = p.id
+       where p.title = 'Why Kent Road is in Kowloon' and p.is_sample group by p.id`,
+    );
+    assert.deepEqual(rows, [{ status: 'in_review', is_sample: true, sources: 2 }]);
+  });
+});
